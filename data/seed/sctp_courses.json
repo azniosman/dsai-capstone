@@ -1,0 +1,229 @@
+{
+  "courses": [
+    {
+      "title": "Applied Data Engineering with Python",
+      "provider": "NUS-ISS",
+      "skills_taught": ["Python", "SQL", "Spark", "ETL", "Airflow"],
+      "duration_weeks": 12,
+      "level": "intermediate",
+      "url": "https://www.iss.nus.edu.sg/",
+      "certification": "NUS-ISS Certificate in Data Engineering"
+    },
+    {
+      "title": "Cloud Infrastructure and DevOps on AWS",
+      "provider": "NUS-ISS",
+      "skills_taught": ["AWS", "Docker", "Kubernetes", "Terraform", "CI/CD"],
+      "duration_weeks": 10,
+      "level": "intermediate",
+      "url": "https://www.iss.nus.edu.sg/",
+      "certification": "NUS-ISS Certificate in Cloud Computing"
+    },
+    {
+      "title": "Machine Learning Engineering",
+      "provider": "NUS-ISS",
+      "skills_taught": ["Python", "Scikit-learn", "TensorFlow", "MLOps", "Feature Engineering"],
+      "duration_weeks": 14,
+      "level": "intermediate",
+      "url": "https://www.iss.nus.edu.sg/",
+      "certification": "NUS-ISS Certificate in Machine Learning"
+    },
+    {
+      "title": "Cybersecurity Operations and Analytics",
+      "provider": "NUS-ISS",
+      "skills_taught": ["SIEM", "SOC Operations", "Incident Response", "Network Security", "Threat Modeling"],
+      "duration_weeks": 12,
+      "level": "intermediate",
+      "url": "https://www.iss.nus.edu.sg/",
+      "certification": "NUS-ISS Certificate in Cybersecurity"
+    },
+    {
+      "title": "Full Stack Web Development",
+      "provider": "NTU",
+      "skills_taught": ["JavaScript", "TypeScript", "React", "Node.js", "REST APIs", "SQL"],
+      "duration_weeks": 16,
+      "level": "beginner",
+      "url": "https://www.ntu.edu.sg/pace",
+      "certification": "NTU Professional Certificate in Full Stack Development"
+    },
+    {
+      "title": "Data Science and AI Foundations",
+      "provider": "NTU",
+      "skills_taught": ["Python", "Pandas", "NumPy", "Statistical Modeling", "Scikit-learn"],
+      "duration_weeks": 12,
+      "level": "beginner",
+      "url": "https://www.ntu.edu.sg/pace",
+      "certification": "NTU Professional Certificate in Data Science"
+    },
+    {
+      "title": "Deep Learning for Natural Language Processing",
+      "provider": "NTU",
+      "skills_taught": ["Python", "NLP", "PyTorch", "TensorFlow"],
+      "duration_weeks": 10,
+      "level": "advanced",
+      "url": "https://www.ntu.edu.sg/pace",
+      "certification": "NTU Professional Certificate in NLP"
+    },
+    {
+      "title": "Network Security and Ethical Hacking",
+      "provider": "NTU",
+      "skills_taught": ["Penetration Testing", "Network Security", "Vulnerability Assessment", "TCP/IP", "Firewall"],
+      "duration_weeks": 10,
+      "level": "intermediate",
+      "url": "https://www.ntu.edu.sg/pace",
+      "certification": "NTU Professional Certificate in Cybersecurity"
+    },
+    {
+      "title": "Agile Product Management",
+      "provider": "SMU Academy",
+      "skills_taught": ["Agile", "Scrum", "Communication", "Stakeholder Management", "Problem Solving"],
+      "duration_weeks": 6,
+      "level": "beginner",
+      "url": "https://academy.smu.edu.sg/",
+      "certification": "SMU Certificate in Agile Product Management"
+    },
+    {
+      "title": "Business Intelligence and Data Analytics",
+      "provider": "SMU Academy",
+      "skills_taught": ["SQL", "Data Warehousing", "Data Modeling", "Statistical Modeling", "Communication"],
+      "duration_weeks": 8,
+      "level": "beginner",
+      "url": "https://academy.smu.edu.sg/",
+      "certification": "SMU Certificate in Business Intelligence"
+    },
+    {
+      "title": "Cloud Architecture with Azure",
+      "provider": "SMU Academy",
+      "skills_taught": ["Azure", "Docker", "Terraform", "IAM", "Network Security"],
+      "duration_weeks": 8,
+      "level": "intermediate",
+      "url": "https://academy.smu.edu.sg/",
+      "certification": "SMU Certificate in Cloud Architecture"
+    },
+    {
+      "title": "Python Programming for Beginners",
+      "provider": "NTUC LearningHub",
+      "skills_taught": ["Python", "SQL", "Bash"],
+      "duration_weeks": 6,
+      "level": "beginner",
+      "url": "https://www.ntuclearninghub.com/",
+      "certification": "NTUC LearningHub Certificate in Python Programming"
+    },
+    {
+      "title": "AWS Cloud Practitioner Bootcamp",
+      "provider": "NTUC LearningHub",
+      "skills_taught": ["AWS", "Docker", "CI/CD", "Bash"],
+      "duration_weeks": 4,
+      "level": "beginner",
+      "url": "https://www.ntuclearninghub.com/",
+      "certification": "NTUC LearningHub AWS Cloud Practitioner Certificate"
+    },
+    {
+      "title": "Cybersecurity Essentials",
+      "provider": "NTUC LearningHub",
+      "skills_taught": ["Network Security", "Encryption", "Compliance", "IAM"],
+      "duration_weeks": 6,
+      "level": "beginner",
+      "url": "https://www.ntuclearninghub.com/",
+      "certification": "NTUC LearningHub Certificate in Cybersecurity Fundamentals"
+    },
+    {
+      "title": "Data Analytics with SQL and Python",
+      "provider": "NTUC LearningHub",
+      "skills_taught": ["SQL", "Python", "Pandas", "Statistical Modeling"],
+      "duration_weeks": 8,
+      "level": "beginner",
+      "url": "https://www.ntuclearninghub.com/",
+      "certification": "NTUC LearningHub Certificate in Data Analytics"
+    },
+    {
+      "title": "Data Science Immersive",
+      "provider": "General Assembly",
+      "skills_taught": ["Python", "Pandas", "NumPy", "Scikit-learn", "Statistical Modeling", "SQL"],
+      "duration_weeks": 12,
+      "level": "beginner",
+      "url": "https://generalassemb.ly/",
+      "certification": "General Assembly Certificate in Data Science"
+    },
+    {
+      "title": "Software Engineering Immersive",
+      "provider": "General Assembly",
+      "skills_taught": ["JavaScript", "React", "Node.js", "SQL", "REST APIs", "HTML/CSS"],
+      "duration_weeks": 12,
+      "level": "beginner",
+      "url": "https://generalassemb.ly/",
+      "certification": "General Assembly Certificate in Software Engineering"
+    },
+    {
+      "title": "User Experience Design Immersive",
+      "provider": "General Assembly",
+      "skills_taught": ["Communication", "Problem Solving", "Stakeholder Management"],
+      "duration_weeks": 10,
+      "level": "beginner",
+      "url": "https://generalassemb.ly/",
+      "certification": "General Assembly Certificate in UX Design"
+    },
+    {
+      "title": "Data Engineering with dbt and Snowflake",
+      "provider": "Vertical Institute",
+      "skills_taught": ["dbt", "Snowflake", "SQL", "Data Modeling", "Data Warehousing"],
+      "duration_weeks": 8,
+      "level": "intermediate",
+      "url": "https://verticalinstitute.com/",
+      "certification": "Vertical Institute Certificate in Modern Data Engineering"
+    },
+    {
+      "title": "Frontend Development with React",
+      "provider": "Vertical Institute",
+      "skills_taught": ["JavaScript", "TypeScript", "React", "HTML/CSS", "REST APIs"],
+      "duration_weeks": 8,
+      "level": "beginner",
+      "url": "https://verticalinstitute.com/",
+      "certification": "Vertical Institute Certificate in Frontend Development"
+    },
+    {
+      "title": "Backend Development with FastAPI",
+      "provider": "Vertical Institute",
+      "skills_taught": ["Python", "FastAPI", "REST APIs", "PostgreSQL", "Docker"],
+      "duration_weeks": 8,
+      "level": "intermediate",
+      "url": "https://verticalinstitute.com/",
+      "certification": "Vertical Institute Certificate in Backend Development"
+    },
+    {
+      "title": "Kubernetes and Container Orchestration",
+      "provider": "NUS-ISS",
+      "skills_taught": ["Kubernetes", "Docker", "CI/CD", "AWS", "Terraform"],
+      "duration_weeks": 8,
+      "level": "advanced",
+      "url": "https://www.iss.nus.edu.sg/",
+      "certification": "NUS-ISS Certificate in Container Orchestration"
+    },
+    {
+      "title": "Computer Vision with Deep Learning",
+      "provider": "NTU",
+      "skills_taught": ["Python", "Computer Vision", "PyTorch", "TensorFlow", "NumPy"],
+      "duration_weeks": 10,
+      "level": "advanced",
+      "url": "https://www.ntu.edu.sg/pace",
+      "certification": "NTU Professional Certificate in Computer Vision"
+    },
+    {
+      "title": "Streaming Data with Kafka and Spark",
+      "provider": "NUS-ISS",
+      "skills_taught": ["Kafka", "Spark", "Python", "AWS", "Data Warehousing"],
+      "duration_weeks": 8,
+      "level": "advanced",
+      "url": "https://www.iss.nus.edu.sg/",
+      "certification": "NUS-ISS Certificate in Streaming Data"
+    },
+    {
+      "title": "Leadership for Tech Professionals",
+      "provider": "SMU Academy",
+      "skills_taught": ["Leadership", "Communication", "Teamwork", "Stakeholder Management", "Critical Thinking"],
+      "duration_weeks": 4,
+      "level": "beginner",
+      "url": "https://academy.smu.edu.sg/",
+      "certification": "SMU Certificate in Technology Leadership"
+    }
+  ]
+}

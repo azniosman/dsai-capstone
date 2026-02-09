@@ -1,0 +1,40 @@
+{
+  "categories": [
+    {
+      "name": "Programming Languages",
+      "skills": ["Python", "JavaScript", "TypeScript", "Java", "C++", "Go", "R", "SQL", "Bash", "Kotlin"]
+    },
+    {
+      "name": "Web Development",
+      "skills": ["React", "Angular", "Vue.js", "Node.js", "Django", "FastAPI", "REST APIs", "GraphQL", "HTML/CSS", "Next.js"]
+    },
+    {
+      "name": "Cloud & DevOps",
+      "skills": ["AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform", "CI/CD", "Jenkins", "Ansible", "GitHub Actions"]
+    },
+    {
+      "name": "Data Engineering",
+      "skills": ["Spark", "Kafka", "Airflow", "ETL", "Data Warehousing", "dbt", "Snowflake", "Hadoop", "Data Modeling", "Redshift"]
+    },
+    {
+      "name": "Data Science & ML",
+      "skills": ["Pandas", "NumPy", "Scikit-learn", "TensorFlow", "PyTorch", "NLP", "Computer Vision", "MLOps", "Statistical Modeling", "Feature Engineering"]
+    },
+    {
+      "name": "Cybersecurity",
+      "skills": ["Network Security", "Penetration Testing", "SIEM", "IAM", "Encryption", "Compliance", "Incident Response", "Threat Modeling", "SOC Operations", "Vulnerability Assessment"]
+    },
+    {
+      "name": "Databases",
+      "skills": ["PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch", "DynamoDB", "Cassandra", "Neo4j", "SQL Server"]
+    },
+    {
+      "name": "Networking",
+      "skills": ["TCP/IP", "DNS", "Load Balancing", "VPN", "Firewall", "SDN", "HTTP/HTTPS", "CDN", "Network Monitoring"]
+    },
+    {
+      "name": "Soft Skills",
+      "skills": ["Communication", "Problem Solving", "Teamwork", "Agile", "Scrum", "Leadership", "Stakeholder Management", "Critical Thinking", "Time Management"]
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+"""Hybrid job recommender combining content-based and rule-based scoring."""
+
+from sqlalchemy.orm import Session
+
+from app.models.job_role import JobRole
+from app.models.user_profile import UserProfile
+from app.schemas.recommendation import RoleRecommendation
+from app.services.skill_matcher import compute_content_similarity, match_skills
+
+# Hybrid weights
+W_CONTENT = 0.60
+W_RULE = 0.25
+W_CAREER_SWITCHER = 0.15
+
+EDUCATION_RANK = {
+    "diploma": 1,
+    "bachelor": 2,
+    "master": 3,
+    "phd": 4,
+}
+
+
+def _rule_score(profile: UserProfile, role: JobRole) -> float:
+    """Rule-based matching on education and experience."""
+    score = 0.0
+
+    # Education match
+    user_ed = EDUCATION_RANK.get((profile.education or "").lower(), 0)
+    role_ed = EDUCATION_RANK.get((role.education_level or "").lower(), 0)
+    if user_ed >= role_ed:
+        score += 0.5
+    elif user_ed == role_ed - 1:
+        score += 0.25
+
+    # Experience match
+    if profile.years_experience >= role.min_experience_years:
+        score += 0.5
+    elif profile.years_experience >= role.min_experience_years - 1:
+        score += 0.25
+
+    return score
+
+
+def _career_switcher_bonus(profile: UserProfile, role: JobRole) -> float:
+    if profile.is_career_switcher and role.career_switcher_friendly:
+        return 1.0
+    return 0.0
+
+
+def get_recommendations(
+    profile: UserProfile, db: Session, top_n: int = 5
+) -> list[RoleRecommendation]:
+    roles = db.query(JobRole).all()
+    user_skills = profile.skills or []
+
+    scored = []
+    for role in roles:
+        all_role_skills = role.required_skills + role.preferred_skills
+
+        content_score = compute_content_similarity(user_skills, all_role_skills)
+        rule_score = _rule_score(profile, role)
+        cs_bonus = _career_switcher_bonus(profile, role)
+
+        match_score = (
+            W_CONTENT * content_score
+            + W_RULE * rule_score
+            + W_CAREER_SWITCHER * cs_bonus
+        )
+
+        # Determine matched/missing skills
+        skill_scores = match_skills(user_skills, role.required_skills)
+        matched = [s for s, v in skill_scores.items() if v >= 0.5]
+        missing = [s for s, v in skill_scores.items() if v < 0.5]
+
+        # Build rationale
+        parts = []
+        if matched:
+            parts.append(f"Strong in: {', '.join(matched[:3])}")
+        if missing:
+            parts.append(f"Gaps in: {', '.join(missing[:3])}")
+        if cs_bonus > 0:
+            parts.append("Career-switcher friendly role")
+        rationale = ". ".join(parts) if parts else "General match"
+
+        scored.append(RoleRecommendation(
+            role_id=role.id,
+            title=role.title,
+            category=role.category,
+            match_score=round(match_score, 3),
+            content_score=round(content_score, 3),
+            rule_score=round(rule_score, 3),
+            career_switcher_bonus=round(cs_bonus, 3),
+            matched_skills=matched,
+            missing_skills=missing,
+            rationale=rationale,
+            salary_range=role.salary_range,
+        ))
+
+    scored.sort(key=lambda r: r.match_score, reverse=True)
+    return scored[:top_n]
