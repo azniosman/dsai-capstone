@@ -44,5 +44,13 @@ htmlcov/
 # ML models
 backend/app/ml/models/
 
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform/terraform.tfvars
+crash.log
+
 # Notes
 .notes/
