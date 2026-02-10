@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Box, Typography, Alert, CircularProgress, Button, Paper, Grid, Chip } from "@mui/material";
+import { Box, Typography, Alert, Button, Paper, Grid, Chip } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import SchoolIcon from "@mui/icons-material/School";
+import RouteIcon from "@mui/icons-material/Route";
 import api from "../api/client";
 import RoadmapTimeline from "../components/RoadmapTimeline";
+import WorkflowStepper from "../components/WorkflowStepper";
+import EmptyState from "../components/EmptyState";
+import SkeletonCard from "../components/SkeletonCard";
 
 export default function Roadmap() {
-  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -15,24 +17,37 @@ export default function Roadmap() {
   const profileId = localStorage.getItem("profileId");
 
   useEffect(() => {
-    if (!profileId) { navigate("/"); return; }
+    if (!profileId) { setLoading(false); return; }
     api
       .get(`/api/upskilling/${profileId}`)
       .then((res) => setData(res.data))
       .catch((err) => setError(err.response?.data?.detail || "Failed to load roadmap"))
       .finally(() => setLoading(false));
-  }, [navigate, profileId]);
+  }, [profileId]);
 
   const downloadPdf = () => {
     window.open(`${api.defaults.baseURL || ""}/api/export/roadmap/${profileId}`, "_blank");
   };
 
-  if (loading) return <CircularProgress sx={{ display: "block", mx: "auto", mt: 4 }} />;
-  if (error) return <Alert severity="error">{error}</Alert>;
-  if (!data?.roadmap?.length) return <Alert severity="info">No upskilling roadmap available yet.</Alert>;
+  if (loading) return <Box><WorkflowStepper /><SkeletonCard count={2} /></Box>;
+  if (error) return <Box><WorkflowStepper /><Alert severity="error">{error}</Alert></Box>;
+
+  if (!profileId || !data?.roadmap?.length) {
+    return (
+      <Box>
+        <WorkflowStepper />
+        <EmptyState
+          icon={<RouteIcon />}
+          title="No roadmap available"
+          description="Create a profile and get recommendations first to see your personalized upskilling roadmap."
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box>
+      <WorkflowStepper />
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h5">Upskilling Roadmap</Typography>
         <Button variant="outlined" startIcon={<DownloadIcon />} onClick={downloadPdf}>

@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Paper, Alert, CircularProgress, Grid, Chip,
+  Box, Typography, Paper, Alert, Grid, Chip,
   LinearProgress,
 } from "@mui/material";
+import GroupIcon from "@mui/icons-material/Group";
 import api from "../api/client";
+import SkeletonCard from "../components/SkeletonCard";
+import EmptyState from "../components/EmptyState";
 
 export default function PeerComparison() {
   const navigate = useNavigate();
@@ -14,15 +17,25 @@ export default function PeerComparison() {
 
   useEffect(() => {
     const profileId = localStorage.getItem("profileId");
-    if (!profileId) { navigate("/"); return; }
+    if (!profileId) { setLoading(false); return; }
     api.get(`/api/peer-comparison/${profileId}`)
       .then((res) => setData(res.data))
       .catch((err) => setError(err.response?.data?.detail || "Failed to load peer data"))
       .finally(() => setLoading(false));
-  }, [navigate]);
+  }, []);
 
-  if (loading) return <CircularProgress sx={{ display: "block", mx: "auto", mt: 4 }} />;
+  if (loading) return <SkeletonCard count={3} />;
   if (error) return <Alert severity="error">{error}</Alert>;
+
+  if (!data) {
+    return (
+      <EmptyState
+        icon={<GroupIcon />}
+        title="No peer data available"
+        description="Create a profile to see how you compare to others targeting similar roles."
+      />
+    );
+  }
 
   return (
     <Box>
@@ -31,7 +44,7 @@ export default function PeerComparison() {
         See how your profile compares to others targeting similar roles.
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="subtitle2">Your Profile</Typography>
         <Typography>Skills: {data.your_skills_count} &middot; Experience: {data.your_experience} years</Typography>
       </Paper>

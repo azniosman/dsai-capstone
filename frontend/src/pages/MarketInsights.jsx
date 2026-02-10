@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Box, Typography, Paper, Chip, CircularProgress, Alert, Grid,
+  Box, Typography, Paper, Chip, Alert, Grid,
 } from "@mui/material";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -8,6 +8,7 @@ import {
 } from "recharts";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import api from "../api/client";
+import SkeletonCard from "../components/SkeletonCard";
 
 const DEMAND_COLORS = { high: "#4caf50", medium: "#ff9800", low: "#f44336" };
 
@@ -23,7 +24,7 @@ export default function MarketInsights() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <CircularProgress sx={{ display: "block", mx: "auto", mt: 4 }} />;
+  if (loading) return <SkeletonCard count={4} />;
   if (error) return <Alert severity="error">{error}</Alert>;
 
   const salaryData = data.insights.map((i) => ({
@@ -44,7 +45,6 @@ export default function MarketInsights() {
       <Typography variant="h5" gutterBottom>Singapore Tech Market Insights</Typography>
 
       <Grid container spacing={3}>
-        {/* Top Skills */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>Top In-Demand Skills</Typography>
@@ -61,7 +61,6 @@ export default function MarketInsights() {
           </Paper>
         </Grid>
 
-        {/* Highest Demand */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>Fastest Growing Sectors</Typography>
@@ -73,54 +72,51 @@ export default function MarketInsights() {
           </Paper>
         </Grid>
 
-        {/* Salary Chart */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>Average Monthly Salary (SGD)</Typography>
-            <Box sx={{ height: 300 }}>
+            <Box sx={{ height: 300 }} role="img" aria-label="Bar chart of average monthly salaries by tech category">
               <ResponsiveContainer>
                 <BarChart data={salaryData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="category" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
                   <YAxis />
                   <Tooltip formatter={(v) => `SGD ${v.toLocaleString()}`} />
-                  <Bar dataKey="salary" fill="#1976d2" />
+                  <Bar dataKey="salary" fill="#1565c0" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Box>
           </Paper>
         </Grid>
 
-        {/* Growth Chart */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>YoY Growth (%)</Typography>
-            <Box sx={{ height: 300 }}>
+            <Box sx={{ height: 300 }} role="img" aria-label="Bar chart of year-over-year growth percentages by category">
               <ResponsiveContainer>
                 <BarChart data={salaryData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="category" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
                   <YAxis />
                   <Tooltip formatter={(v) => `${v}%`} />
-                  <Bar dataKey="growth" fill="#9c27b0" />
+                  <Bar dataKey="growth" fill="#00897b" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Box>
           </Paper>
         </Grid>
 
-        {/* Radar */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>Market Overview Radar</Typography>
-            <Box sx={{ height: 350 }}>
+            <Box sx={{ height: 350 }} role="img" aria-label="Radar chart showing market demand and growth across tech categories">
               <ResponsiveContainer>
                 <RadarChart data={radarData}>
                   <PolarGrid />
                   <PolarAngleAxis dataKey="category" tick={{ fontSize: 11 }} />
                   <PolarRadiusAxis />
-                  <Radar name="Demand" dataKey="demand" stroke="#1976d2" fill="#1976d2" fillOpacity={0.2} />
-                  <Radar name="Growth %" dataKey="growth" stroke="#9c27b0" fill="#9c27b0" fillOpacity={0.2} />
+                  <Radar name="Demand" dataKey="demand" stroke="#1565c0" fill="#1565c0" fillOpacity={0.2} />
+                  <Radar name="Growth %" dataKey="growth" stroke="#00897b" fill="#00897b" fillOpacity={0.2} />
                   <Legend />
                 </RadarChart>
               </ResponsiveContainer>
@@ -128,10 +124,9 @@ export default function MarketInsights() {
           </Paper>
         </Grid>
 
-        {/* Category Cards */}
         {data.insights.map((ins) => (
           <Grid item xs={12} md={4} key={ins.role_category}>
-            <Paper sx={{ p: 2 }}>
+            <Paper sx={{ p: 3 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="subtitle1" fontWeight="bold">{ins.role_category}</Typography>
                 <Chip label={ins.demand_level} size="small" sx={{ bgcolor: DEMAND_COLORS[ins.demand_level], color: "white" }} />

@@ -18,8 +18,8 @@ const SEVERITY_COLORS = {
 
 export default function GapTable({ gaps }) {
   return (
-    <TableContainer component={Paper} variant="outlined">
-      <Table size="small">
+    <TableContainer component={Paper} variant="outlined" sx={{ overflowX: "auto" }}>
+      <Table size="small" sx={{ minWidth: 600 }}>
         <TableHead>
           <TableRow>
             <TableCell>Skill</TableCell>

@@ -3,12 +3,14 @@ import {
   Box, Button, Paper, TextField, Typography, Alert, CircularProgress, Chip,
 } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { useSnackbar } from "../contexts/SnackbarContext";
 import api from "../api/client";
 import GapTable from "../components/GapTable";
 
 const GAP_COLORS = { none: "#4caf50", low: "#2196f3", medium: "#ff9800", high: "#f44336" };
 
 export default function JDMatch() {
+  const { showSuccess, showError } = useSnackbar();
   const [jd, setJd] = useState("");
   const [title, setTitle] = useState("");
   const [result, setResult] = useState(null);
@@ -29,8 +31,11 @@ export default function JDMatch() {
         job_title: title || null,
       });
       setResult(res.data);
+      showSuccess(`Analysis complete — ${Math.round(res.data.match_score * 100)}% match!`);
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to analyze JD");
+      const msg = err.response?.data?.detail || "Failed to analyze JD";
+      setError(msg);
+      showError(msg);
     } finally {
       setLoading(false);
     }
@@ -88,7 +93,7 @@ export default function JDMatch() {
           </Paper>
 
           {chartData.length > 0 && (
-            <Box sx={{ height: 300, mb: 3 }}>
+            <Box sx={{ height: 300, mb: 3 }} role="img" aria-label="Bar chart showing your skill levels for this job">
               <ResponsiveContainer>
                 <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
                   <CartesianGrid strokeDasharray="3 3" />
