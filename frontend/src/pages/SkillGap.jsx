@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Box, Typography, Alert, CircularProgress, Tabs, Tab, Paper, ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { Box, Typography, Alert, Tabs, Tab, Paper, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
 } from "recharts";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import api from "../api/client";
 import GapTable from "../components/GapTable";
+import WorkflowStepper from "../components/WorkflowStepper";
+import EmptyState from "../components/EmptyState";
+import SkeletonCard from "../components/SkeletonCard";
 
 const GAP_COLORS = { none: "#4caf50", low: "#2196f3", medium: "#ff9800", high: "#f44336" };
 
 export default function SkillGap() {
-  const navigate = useNavigate();
   const [gaps, setGaps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,7 +23,7 @@ export default function SkillGap() {
   useEffect(() => {
     const profileId = localStorage.getItem("profileId");
     if (!profileId) {
-      navigate("/");
+      setLoading(false);
       return;
     }
     api
@@ -29,11 +31,23 @@ export default function SkillGap() {
       .then((res) => setGaps(res.data.gaps))
       .catch((err) => setError(err.response?.data?.detail || "Failed to load skill gaps"))
       .finally(() => setLoading(false));
-  }, [navigate]);
+  }, []);
 
-  if (loading) return <CircularProgress sx={{ display: "block", mx: "auto", mt: 4 }} />;
-  if (error) return <Alert severity="error">{error}</Alert>;
-  if (gaps.length === 0) return <Alert severity="info">No gap analysis available. Submit a profile first.</Alert>;
+  if (loading) return <Box><WorkflowStepper /><SkeletonCard count={2} /></Box>;
+  if (error) return <Box><WorkflowStepper /><Alert severity="error">{error}</Alert></Box>;
+
+  if (!localStorage.getItem("profileId") || gaps.length === 0) {
+    return (
+      <Box>
+        <WorkflowStepper />
+        <EmptyState
+          icon={<BarChartIcon />}
+          title="No skill gaps to show"
+          description="Create a profile first to see how your skills compare to target roles."
+        />
+      </Box>
+    );
+  }
 
   const currentGap = gaps[tab];
   const chartData = currentGap.gaps.map((g) => ({
@@ -43,7 +57,6 @@ export default function SkillGap() {
     severity: g.gap_severity,
   }));
 
-  // Radar data: show user level vs required level
   const radarData = currentGap.gaps.slice(0, 10).map((g) => ({
     skill: g.skill.length > 12 ? g.skill.slice(0, 12) + "..." : g.skill,
     "Your Level": Math.round(g.user_level * 100),
@@ -52,6 +65,7 @@ export default function SkillGap() {
 
   return (
     <Box>
+      <WorkflowStepper />
       <Typography variant="h5" gutterBottom>Skill Gap Analysis</Typography>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
@@ -71,14 +85,14 @@ export default function SkillGap() {
       </Box>
 
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ height: 350 }}>
+        <Box sx={{ height: 350 }} role="img" aria-label="Chart comparing your skill levels to required levels">
           <ResponsiveContainer>
             {chartType === "radar" ? (
               <RadarChart data={radarData}>
                 <PolarGrid />
                 <PolarAngleAxis dataKey="skill" tick={{ fontSize: 11 }} />
                 <PolarRadiusAxis domain={[0, 100]} />
-                <Radar name="Your Level" dataKey="Your Level" stroke="#1976d2" fill="#1976d2" fillOpacity={0.4} />
+                <Radar name="Your Level" dataKey="Your Level" stroke="#1565c0" fill="#1565c0" fillOpacity={0.4} />
                 <Radar name="Required" dataKey="Required" stroke="#f44336" fill="#f44336" fillOpacity={0.1} />
                 <Legend />
               </RadarChart>

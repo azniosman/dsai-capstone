@@ -16,6 +16,10 @@ export default function MatchScoreBar({ score, label }) {
         value={pct}
         color={color}
         sx={{ flexGrow: 1, height: 8, borderRadius: 4 }}
+        aria-label={`${label || "Score"}: ${pct}%`}
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
       />
       <Typography variant="body2" fontWeight="bold" sx={{ minWidth: 40 }}>
         {pct}%

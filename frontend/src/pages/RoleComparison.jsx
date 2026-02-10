@@ -76,8 +76,7 @@ export default function RoleComparison() {
 
       {result && (
         <>
-          {/* Common Skills */}
-          <Paper sx={{ p: 2, mb: 2 }}>
+          <Paper sx={{ p: 3, mb: 2 }}>
             <Typography variant="subtitle1" fontWeight="bold">Skills in Common</Typography>
             <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 1 }}>
               {result.common_skills.length > 0
@@ -86,9 +85,8 @@ export default function RoleComparison() {
             </Box>
           </Paper>
 
-          {/* Comparison Table */}
-          <TableContainer component={Paper}>
-            <Table size="small">
+          <TableContainer component={Paper} sx={{ overflowX: "auto", mb: 2 }}>
+            <Table size="small" sx={{ minWidth: 600 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Attribute</TableCell>
@@ -122,13 +120,13 @@ export default function RoleComparison() {
                     <TableCell key={r.role_id} align="center">{r.salary_range || "N/A"}</TableCell>
                   ))}
                 </TableRow>
-                <TableRow>
+                <TableRow sx={{ display: { xs: "none", md: "table-row" } }}>
                   <TableCell>Education</TableCell>
                   {result.roles.map((r) => (
                     <TableCell key={r.role_id} align="center">{r.education_level}</TableCell>
                   ))}
                 </TableRow>
-                <TableRow>
+                <TableRow sx={{ display: { xs: "none", md: "table-row" } }}>
                   <TableCell>Min Experience</TableCell>
                   {result.roles.map((r) => (
                     <TableCell key={r.role_id} align="center">{r.min_experience_years} yrs</TableCell>
@@ -166,8 +164,7 @@ export default function RoleComparison() {
             </Table>
           </TableContainer>
 
-          {/* Unique Skills */}
-          <Paper sx={{ p: 2, mt: 2 }}>
+          <Paper sx={{ p: 3 }}>
             <Typography variant="subtitle1" fontWeight="bold">Unique Skills per Role</Typography>
             {Object.entries(result.unique_skills_per_role).map(([title, skills]) => (
               <Box key={title} sx={{ mt: 1 }}>

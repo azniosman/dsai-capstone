@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import {
   Box, Button, Paper, TextField, Typography, Alert, Tabs, Tab,
 } from "@mui/material";
+import { useSnackbar } from "../contexts/SnackbarContext";
 import api from "../api/client";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { showSuccess, showError } = useSnackbar();
   const [tab, setTab] = useState(0);
   const [form, setForm] = useState({ email: "", password: "", name: "" });
   const [error, setError] = useState(null);
@@ -27,15 +29,17 @@ export default function Login() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
       localStorage.setItem("token", res.data.access_token);
-      // Fetch user info
       const me = await api.get("/api/auth/me", {
         headers: { Authorization: `Bearer ${res.data.access_token}` },
       });
       localStorage.setItem("userName", me.data.name);
       localStorage.setItem("userEmail", me.data.email);
+      showSuccess(`Welcome back, ${me.data.name}!`);
       navigate("/");
     } catch (err) {
-      setError(err.response?.data?.detail || "Login failed");
+      const msg = err.response?.data?.detail || "Login failed";
+      setError(msg);
+      showError(msg);
     } finally {
       setLoading(false);
     }
@@ -47,10 +51,13 @@ export default function Login() {
     setError(null);
     try {
       await api.post("/api/auth/register", form);
+      showSuccess("Account created! Please log in.");
       setTab(0);
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.detail || "Registration failed");
+      const msg = err.response?.data?.detail || "Registration failed";
+      setError(msg);
+      showError(msg);
     } finally {
       setLoading(false);
     }
@@ -60,6 +67,7 @@ export default function Login() {
     localStorage.removeItem("token");
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");
+    showSuccess("Logged out successfully.");
     navigate("/");
   };
 

@@ -7,10 +7,12 @@ import {
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
+import { useSnackbar } from "../contexts/SnackbarContext";
 import api from "../api/client";
 
 export default function ProgressDashboard() {
   const navigate = useNavigate();
+  const { showSuccess, showError } = useSnackbar();
   const [progress, setProgress] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,17 +51,17 @@ export default function ProgressDashboard() {
         skill: newSkill.trim(),
         level: newLevel,
       });
+      showSuccess(`Recorded progress for "${newSkill.trim()}"!`);
       setNewSkill("");
       loadData();
     } catch (err) {
-      setError("Failed to record progress");
+      showError("Failed to record progress");
     }
   };
 
   if (loading) return <CircularProgress sx={{ display: "block", mx: "auto", mt: 4 }} />;
   if (error) return <Alert severity="error">{error}</Alert>;
 
-  // Group timeline by date for chart
   const dateMap = {};
   timeline.forEach((t) => {
     if (!t.date) return;
@@ -69,14 +71,13 @@ export default function ProgressDashboard() {
   const chartData = Object.values(dateMap);
   const allSkills = [...new Set(timeline.map((t) => t.skill))];
 
-  const COLORS = ["#1976d2", "#9c27b0", "#4caf50", "#ff9800", "#f44336", "#00bcd4"];
+  const COLORS = ["#1565c0", "#00897b", "#4caf50", "#ff9800", "#f44336", "#00bcd4"];
 
   return (
     <Box>
       <Typography variant="h5" gutterBottom>Progress Tracking</Typography>
 
       <Grid container spacing={3}>
-        {/* Stats */}
         <Grid item xs={4}>
           <Paper sx={{ p: 3, textAlign: "center" }}>
             <Typography variant="h3" color="success.main">{progress?.skills_acquired || 0}</Typography>
@@ -96,17 +97,16 @@ export default function ProgressDashboard() {
           </Paper>
         </Grid>
 
-        {/* Record Progress */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>Record Skill Progress</Typography>
-            <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+            <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
               <TextField
                 label="Skill Name"
                 size="small"
                 value={newSkill}
                 onChange={(e) => setNewSkill(e.target.value)}
-                sx={{ flex: 1 }}
+                sx={{ flex: 1, minWidth: 150 }}
               />
               <FormControl size="small" sx={{ minWidth: 150 }}>
                 <InputLabel>Level</InputLabel>
@@ -121,12 +121,11 @@ export default function ProgressDashboard() {
           </Paper>
         </Grid>
 
-        {/* Timeline Chart */}
         {chartData.length > 0 && (
           <Grid item xs={12}>
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom>Skill Progress Over Time</Typography>
-              <Box sx={{ height: 300 }}>
+              <Box sx={{ height: 300 }} role="img" aria-label="Line chart showing skill progress over time">
                 <ResponsiveContainer>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -151,7 +150,6 @@ export default function ProgressDashboard() {
           </Grid>
         )}
 
-        {/* History */}
         {progress?.entries?.length > 0 && (
           <Grid item xs={12}>
             <Paper sx={{ p: 3 }}>

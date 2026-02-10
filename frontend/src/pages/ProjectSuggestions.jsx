@@ -1,31 +1,41 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Card, CardContent, Chip, Alert, CircularProgress, Grid,
+  Box, Typography, Card, CardContent, Chip, Alert, Grid,
 } from "@mui/material";
 import BuildIcon from "@mui/icons-material/Build";
 import api from "../api/client";
+import SkeletonCard from "../components/SkeletonCard";
+import EmptyState from "../components/EmptyState";
 
 const DIFFICULTY_COLORS = { beginner: "success", intermediate: "warning", advanced: "error" };
 
 export default function ProjectSuggestions() {
-  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const profileId = localStorage.getItem("profileId");
-    if (!profileId) { navigate("/"); return; }
+    if (!profileId) { setLoading(false); return; }
     api.get(`/api/project-suggestions/${profileId}`)
       .then((res) => setData(res.data))
       .catch((err) => setError(err.response?.data?.detail || "Failed to load projects"))
       .finally(() => setLoading(false));
-  }, [navigate]);
+  }, []);
 
-  if (loading) return <CircularProgress sx={{ display: "block", mx: "auto", mt: 4 }} />;
+  if (loading) return <SkeletonCard count={4} />;
   if (error) return <Alert severity="error">{error}</Alert>;
-  if (!data?.suggestions?.length) return <Alert severity="info">No project suggestions yet — submit a profile first.</Alert>;
+
+  if (!data?.suggestions?.length) {
+    return (
+      <EmptyState
+        icon={<BuildIcon />}
+        title="No project suggestions yet"
+        description="Create a profile first to get personalized portfolio project ideas."
+      />
+    );
+  }
 
   return (
     <Box>
@@ -37,8 +47,8 @@ export default function ProjectSuggestions() {
       <Grid container spacing={3}>
         {data.suggestions.map((proj, i) => (
           <Grid item xs={12} md={6} key={i}>
-            <Card variant="outlined" sx={{ height: "100%" }}>
-              <CardContent>
+            <Card sx={{ height: "100%", p: 3 }}>
+              <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
                 <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 1 }}>
                   <BuildIcon color="primary" />
                   <Typography variant="h6">{proj.title}</Typography>
