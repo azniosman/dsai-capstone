@@ -59,7 +59,7 @@ resource "aws_cloudfront_distribution" "frontend" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
 
-  aliases = var.certificate_arn != "" ? [var.domain_name] : []
+  aliases = var.enable_https ? [var.domain_name] : []
 
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD", "OPTIONS"]
@@ -105,10 +105,10 @@ resource "aws_cloudfront_distribution" "frontend" {
   }
 
   viewer_certificate {
-    acm_certificate_arn            = var.certificate_arn != "" ? var.certificate_arn : null
-    ssl_support_method             = var.certificate_arn != "" ? "sni-only" : null
+    acm_certificate_arn            = var.enable_https ? var.certificate_arn : null
+    ssl_support_method             = var.enable_https ? "sni-only" : null
     cloudfront_default_certificate = var.certificate_arn == ""
-    minimum_protocol_version       = var.certificate_arn != "" ? "TLSv1.2_2021" : "TLSv1"
+    minimum_protocol_version       = var.enable_https ? "TLSv1.2_2021" : "TLSv1"
   }
 
   price_class = "PriceClass_200"
@@ -129,8 +129,8 @@ resource "aws_s3_bucket_policy" "frontend" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "AllowCloudFrontOAC"
-        Effect    = "Allow"
+        Sid    = "AllowCloudFrontOAC"
+        Effect = "Allow"
         Principal = {
           Service = "cloudfront.amazonaws.com"
         }

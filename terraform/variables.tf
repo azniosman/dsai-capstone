@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "ap-southeast-1"
+  default     = "us-east-1"
 }
 
 variable "project_name" {
@@ -55,6 +55,12 @@ variable "backend_desired_count" {
   description = "Desired number of backend tasks"
   type        = number
   default     = 1
+}
+
+variable "enable_https" {
+  description = "Enable HTTPS with ACM certificate and custom domain"
+  type        = bool
+  default     = true
 }
 
 variable "allowed_cors_origins" {

@@ -16,9 +16,9 @@ module "ecr" {
 
 # --- Monitoring (log groups needed before ECS) ---
 module "monitoring" {
-  source         = "./modules/monitoring"
-  project_name   = var.project_name
-  environment    = var.environment
+  source             = "./modules/monitoring"
+  project_name       = var.project_name
+  environment        = var.environment
   log_retention_days = 7
 }
 
@@ -73,12 +73,28 @@ module "ecs" {
   jwt_secret_arn            = module.secrets.jwt_secret_arn
   log_group_name            = module.monitoring.backend_log_group_name
   allowed_cors_origins      = local.cors_origins
+  certificate_arn           = module.dns.certificate_arn
+  enable_https              = var.enable_https
+}
+
+# --- DNS & HTTPS ---
+module "dns" {
+  source        = "./modules/dns"
+  domain_name   = var.domain_name
+  api_subdomain = var.api_subdomain
+
+  alb_dns_name              = module.ecs.alb_dns_name
+  alb_zone_id               = module.ecs.alb_zone_id
+  cloudfront_domain_name    = module.frontend.cloudfront_domain_name
+  cloudfront_hosted_zone_id = module.frontend.cloudfront_hosted_zone_id
 }
 
 # --- Frontend ---
 module "frontend" {
-  source       = "./modules/frontend"
-  project_name = var.project_name
-  environment  = var.environment
-  domain_name  = local.frontend_domain
+  source          = "./modules/frontend"
+  project_name    = var.project_name
+  environment     = var.environment
+  domain_name     = local.frontend_domain
+  certificate_arn = module.dns.certificate_arn
+  enable_https    = var.enable_https
 }

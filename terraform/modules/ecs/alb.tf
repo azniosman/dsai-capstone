@@ -68,7 +68,7 @@ resource "aws_lb_target_group" "backend" {
 
 # When a certificate IS provided: redirect HTTP -> HTTPS
 resource "aws_lb_listener" "http" {
-  count = var.certificate_arn != "" ? 1 : 0
+  count = var.enable_https ? 1 : 0
 
   load_balancer_arn = aws_lb.main.arn
   port              = 80
@@ -87,7 +87,7 @@ resource "aws_lb_listener" "http" {
 
 # When a certificate IS provided: HTTPS listener forwarding to target group
 resource "aws_lb_listener" "https" {
-  count = var.certificate_arn != "" ? 1 : 0
+  count = var.enable_https ? 1 : 0
 
   load_balancer_arn = aws_lb.main.arn
   port              = 443
@@ -103,7 +103,7 @@ resource "aws_lb_listener" "https" {
 
 # When NO certificate is provided: forward HTTP directly (for initial testing)
 resource "aws_lb_listener" "http_forward" {
-  count = var.certificate_arn != "" ? 0 : 1
+  count = var.enable_https ? 0 : 1
 
   load_balancer_arn = aws_lb.main.arn
   port              = 80

@@ -104,6 +104,7 @@ pytest
 | Database | PostgreSQL 16 |
 | Auth | JWT + bcrypt |
 | Cloud | AWS (ECS Fargate, RDS, S3, CloudFront, ALB) |
+| DNS/TLS | Route 53, ACM (wildcard cert) |
 | IaC | Terraform (modular) |
 | CI/CD | GitHub Actions |
 | Deploy | Docker Compose (local), AWS ECS Fargate (production) |
@@ -142,9 +143,16 @@ pytest
 | Networking | VPC + VPC Endpoints | No NAT Gateway — saves ~$32/month |
 | Secrets | Secrets Manager + SSM | Secure injection into ECS tasks |
 | CI/CD | GitHub Actions + OIDC | No long-lived AWS credentials |
-| IaC | Terraform (7 modules) | Modular, reproducible infrastructure |
+| DNS/TLS | Route 53 + ACM | Custom domain (workd.my), wildcard cert, HTTPS everywhere |
+| IaC | Terraform (8 modules) | Modular, reproducible infrastructure |
 
 Estimated monthly cost: **~$50–70**
+
+### Production URLs
+
+- Frontend: https://workd.my
+- Backend API: https://api.workd.my
+- API docs: https://api.workd.my/docs
 
 ### Deploy to AWS
 
@@ -155,6 +163,8 @@ terraform init
 terraform plan
 terraform apply
 ```
+
+After first deploy, update your domain's nameservers to the Route 53 values from `terraform output route53_nameservers` to activate DNS and HTTPS.
 
 CI/CD auto-deploys on push to `main`:
 - Backend changes → pytest → Docker build → ECR push → ECS rolling update
@@ -189,6 +199,7 @@ dsai-capstone/
 │   │   ├── ecs/                 # Fargate cluster, ALB, IAM
 │   │   ├── ecr/                 # Container registry
 │   │   ├── frontend/            # S3 + CloudFront
+│   │   ├── dns/                 # Route 53, ACM certificate, DNS records
 │   │   ├── secrets/             # Secrets Manager + SSM
 │   │   └── monitoring/          # CloudWatch logs + alarms
 │   └── providers.tf

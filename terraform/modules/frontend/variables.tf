@@ -16,3 +16,9 @@ variable "certificate_arn" {
   type        = string
   default     = ""
 }
+
+variable "enable_https" {
+  description = "Whether to enable custom domain + HTTPS (must be known at plan time)"
+  type        = bool
+  default     = false
+}

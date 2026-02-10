@@ -72,6 +72,12 @@ variable "certificate_arn" {
   default     = ""
 }
 
+variable "enable_https" {
+  description = "Whether to enable HTTPS listeners (must be known at plan time)"
+  type        = bool
+  default     = false
+}
+
 variable "allowed_cors_origins" {
   type    = list(string)
   default = []

@@ -37,3 +37,13 @@ output "ecs_service_name" {
   description = "ECS service name"
   value       = module.ecs.service_name
 }
+
+output "route53_nameservers" {
+  description = "Route53 nameservers — set these at your domain registrar"
+  value       = module.dns.nameservers
+}
+
+output "certificate_arn" {
+  description = "ACM certificate ARN"
+  value       = module.dns.certificate_arn
+}
