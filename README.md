@@ -1,13 +1,30 @@
 # Job Recommendation & Skill Gap Analysis System
 
-A career intelligence platform for SCTP learners and career-switchers in Singapore. Submit your profile or resume to get matched with suitable job roles, understand your skill gaps, and receive a personalized upskilling roadmap.
+A career intelligence platform for SCTP learners and career-switchers in Singapore. Submit your profile or resume to get matched with suitable job roles, understand your skill gaps, and receive a personalized upskilling roadmap with SkillsFuture Credit integration.
 
 ## Features
 
-- **Profile Analysis** — Extract skills from resume text or manual input
-- **Job Recommendations** — Hybrid AI matching with match scores and rationale
-- **Skill Gap Analysis** — Per-role breakdown of required vs. current skills
-- **Upskilling Roadmap** — Personalized learning plan with SCTP courses and timelines
+### Core
+- **Profile Analysis** — Upload a PDF/DOCX resume or manually enter skills; AI extracts and normalizes skills via Sentence Transformers + spaCy
+- **Job Recommendations** — Hybrid AI scoring (60% content similarity + 25% rule-based + 15% career-switcher bonus) with match rationale
+- **Skill Gap Analysis** — Per-role breakdown with radar and bar chart visualizations
+- **Upskilling Roadmap** — Personalized learning plan with SCTP courses, timelines, and PDF export
+
+### Intelligence
+- **Career Coach Chatbot** — LLM-powered conversational career advisor (OpenAI API with rule-based fallback)
+- **Mock Interview Simulator** — Role-specific interview practice with feedback and performance assessment
+- **JD Match** — Paste any job description for instant skill gap analysis against your profile
+- **Singapore Market Insights** — Salary benchmarks, demand levels, hiring volume, and YoY growth by sector
+
+### Analysis
+- **Multi-Role Comparison** — Side-by-side comparison of 2–4 roles (match score, salary, transition difficulty, skill overlap)
+- **Peer Comparison** — See how your profile stacks up against others targeting similar roles (anonymized)
+- **Portfolio Project Suggestions** — Curated project ideas for each missing skill to build your portfolio
+
+### Tracking & Account
+- **Progress Dashboard** — Record skill acquisitions over time with timeline charts
+- **SkillsFuture Credit Integration** — Course fee breakdowns with subsidy and SkillsFuture Credit amounts
+- **User Authentication** — JWT-based login/register with profile history
 
 ## Quick Start
 
@@ -38,6 +55,12 @@ npm install
 npm run dev
 ```
 
+### Seed Database
+
+```bash
+python data/scripts/seed_db.py
+```
+
 ### Tests
 
 ```bash
@@ -45,12 +68,72 @@ cd backend
 pytest
 ```
 
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/register` | User registration |
+| POST | `/api/auth/login` | Login (returns JWT) |
+| GET | `/api/auth/me` | Current user info |
+| POST | `/api/profile` | Create user profile |
+| POST | `/api/upload-resume` | Upload PDF/DOCX resume |
+| POST | `/api/recommend` | Get job recommendations |
+| GET | `/api/skill-gap/{id}` | Skill gap analysis |
+| GET | `/api/upskilling/{id}` | Upskilling roadmap |
+| POST | `/api/jd-match` | Match profile against a job description |
+| POST | `/api/chat` | Career coach chatbot |
+| POST | `/api/interview` | Mock interview simulator |
+| GET | `/api/market-insights` | Singapore labor market data |
+| POST | `/api/compare-roles` | Multi-role comparison |
+| GET | `/api/roles` | List all roles |
+| GET | `/api/peer-comparison/{id}` | Anonymized peer comparison |
+| GET | `/api/project-suggestions/{id}` | Portfolio project ideas |
+| POST | `/api/progress` | Record skill progress |
+| GET | `/api/progress/{id}` | Progress dashboard |
+| GET | `/api/progress/{id}/timeline` | Progress timeline data |
+| GET | `/api/export/roadmap/{id}` | Export roadmap as PDF |
+
 ## Tech Stack
 
-| Layer    | Technology                          |
-|----------|-------------------------------------|
-| Frontend | React, Vite, MUI, Recharts         |
-| Backend  | Python, FastAPI, SQLAlchemy         |
-| AI/ML    | Sentence Transformers, spaCy, FAISS |
-| Database | PostgreSQL                          |
-| Deploy   | Docker Compose                      |
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, Vite, MUI 6, Recharts |
+| Backend | Python 3.11, FastAPI, SQLAlchemy 2 |
+| AI/ML | Sentence Transformers (all-MiniLM-L6-v2), spaCy, FAISS |
+| LLM | OpenAI API (optional, rule-based fallback) |
+| Database | PostgreSQL 16 |
+| Auth | JWT + bcrypt |
+| Deploy | Docker Compose |
+
+## Project Structure
+
+```
+dsai-capstone/
+├── backend/
+│   ├── app/
+│   │   ├── main.py              # FastAPI entry point
+│   │   ├── auth.py              # JWT authentication
+│   │   ├── config.py            # Settings & env vars
+│   │   ├── database.py          # SQLAlchemy connection
+│   │   ├── models/              # ORM models (7 models)
+│   │   ├── schemas/             # Pydantic schemas
+│   │   ├── routers/             # API endpoints (15 routers)
+│   │   ├── services/            # Business logic (5 services)
+│   │   └── ml/                  # ML pipelines (embeddings, taxonomy)
+│   └── tests/
+├── frontend/
+│   └── src/
+│       ├── pages/               # 13 React pages
+│       └── components/          # Reusable UI components
+├── data/
+│   ├── seed/                    # 50 job roles, 83 skills, 25 courses
+│   └── scripts/                 # Database seed script
+└── docker-compose.yml
+```
+
+## Seed Data
+
+- **50 Singapore tech job roles** across 6 categories (Data, Software, Cloud, Security, AI/ML, Product)
+- **~83 skills** in 9 taxonomy categories
+- **25 SCTP courses** from 6 providers (NUS-ISS, NTU, SMU Academy, NTUC LearningHub, General Assembly, Vertical Institute)
+- **6 market insight sectors** with salary, demand, and growth data
