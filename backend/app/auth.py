@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
@@ -39,9 +39,10 @@ def get_current_user_optional(
         return None
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        sub = payload.get("sub")
+        if sub is None:
             return None
+        user_id = int(sub)
     except JWTError:
         return None
     from app.models.user import User

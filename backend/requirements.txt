@@ -21,4 +21,5 @@ openai==1.58.1
 reportlab==4.2.5
 # Feature: Auth
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 python-jose[cryptography]==3.3.0
