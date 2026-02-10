@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, JSON
+from sqlalchemy import Column, Integer, String, JSON, Boolean, Float
 from app.database import Base
 
 
@@ -13,3 +13,8 @@ class SCTPCourse(Base):
     level = Column(String, default="intermediate")
     url = Column(String)
     certification = Column(String)
+    # SkillsFuture Credit fields
+    skillsfuture_eligible = Column(Boolean, default=True)
+    skillsfuture_credit_amount = Column(Float, default=0.0)
+    course_fee = Column(Float, default=0.0)
+    nett_fee_after_subsidy = Column(Float, default=0.0)

@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
 
 from app.database import engine, SessionLocal, Base
-from app.models import JobRole, Skill, SCTPCourse
+from app.models import JobRole, Skill, SCTPCourse, MarketInsight
 
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "seed")
 
@@ -66,10 +66,26 @@ def seed_courses(db):
                 level=course["level"],
                 url=course.get("url"),
                 certification=course.get("certification"),
+                skillsfuture_eligible=course.get("skillsfuture_eligible", True),
+                skillsfuture_credit_amount=course.get("skillsfuture_credit_amount", 500.0),
+                course_fee=course.get("course_fee", 2000.0),
+                nett_fee_after_subsidy=course.get("nett_fee_after_subsidy", 500.0),
             ))
             count += 1
     db.commit()
     print(f"  Seeded {count} courses")
+
+
+def seed_market_insights(db):
+    from app.routers.market import DEFAULT_INSIGHTS
+    count = 0
+    for insight in DEFAULT_INSIGHTS:
+        existing = db.query(MarketInsight).filter_by(role_category=insight["role_category"]).first()
+        if not existing:
+            db.add(MarketInsight(**insight))
+            count += 1
+    db.commit()
+    print(f"  Seeded {count} market insights")
 
 
 def main():
@@ -84,6 +100,8 @@ def main():
         seed_job_roles(db)
         print("Seeding SCTP courses...")
         seed_courses(db)
+        print("Seeding market insights...")
+        seed_market_insights(db)
         print("Done!")
     finally:
         db.close()

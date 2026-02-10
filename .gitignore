@@ -43,3 +43,6 @@ htmlcov/
 
 # ML models
 backend/app/ml/models/
+
+# Notes
+.notes/

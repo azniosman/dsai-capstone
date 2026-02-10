@@ -64,6 +64,10 @@ def generate_roadmap(profile: UserProfile, db: Session) -> list[RoadmapItem]:
                 priority=priority,
                 week_start=current_week,
                 week_end=week_end,
+                skillsfuture_eligible=best_course.skillsfuture_eligible or True,
+                skillsfuture_credit_amount=best_course.skillsfuture_credit_amount or 500.0,
+                course_fee=best_course.course_fee or 2000.0,
+                nett_fee_after_subsidy=best_course.nett_fee_after_subsidy or 500.0,
             ))
             current_week = week_end + 1
 

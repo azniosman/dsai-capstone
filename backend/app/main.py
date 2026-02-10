@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import profile, recommend, skill_gap, upskilling
+from app.routers import (
+    auth, profile, recommend, skill_gap, upskilling,
+    upload, jd_match, progress, chat, interview,
+    market, compare, peer, projects, export,
+)
 
 app = FastAPI(
     title="Job Recommendation & Skill Gap Analysis",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 app.add_middleware(
@@ -15,10 +19,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Core
+app.include_router(auth.router, prefix="/api")
 app.include_router(profile.router, prefix="/api")
 app.include_router(recommend.router, prefix="/api")
 app.include_router(skill_gap.router, prefix="/api")
 app.include_router(upskilling.router, prefix="/api")
+
+# New features
+app.include_router(upload.router, prefix="/api")
+app.include_router(jd_match.router, prefix="/api")
+app.include_router(progress.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+app.include_router(interview.router, prefix="/api")
+app.include_router(market.router, prefix="/api")
+app.include_router(compare.router, prefix="/api")
+app.include_router(peer.router, prefix="/api")
+app.include_router(projects.router, prefix="/api")
+app.include_router(export.router, prefix="/api")
 
 
 @app.get("/health")

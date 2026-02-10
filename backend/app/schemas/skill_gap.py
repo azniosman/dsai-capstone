@@ -33,8 +33,17 @@ class RoadmapItem(BaseModel):
     priority: int
     week_start: int
     week_end: int
+    # SkillsFuture Credit fields
+    skillsfuture_eligible: bool = True
+    skillsfuture_credit_amount: float = 0.0
+    course_fee: float = 0.0
+    nett_fee_after_subsidy: float = 0.0
 
 
 class RoadmapResponse(BaseModel):
     profile_id: int
     roadmap: list[RoadmapItem]
+    total_weeks: int = 0
+    total_cost: float = 0.0
+    total_after_subsidy: float = 0.0
+    total_skillsfuture_applicable: float = 0.0

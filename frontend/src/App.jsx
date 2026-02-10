@@ -1,42 +1,136 @@
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-import { AppBar, Toolbar, Typography, Button, Container, Box } from "@mui/material";
+import { useState } from "react";
+import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
+import {
+  AppBar, Toolbar, Typography, Button, Container, Box, IconButton,
+  Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider,
+} from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import PersonIcon from "@mui/icons-material/Person";
+import WorkIcon from "@mui/icons-material/Work";
+import BarChartIcon from "@mui/icons-material/BarChart";
+import RouteIcon from "@mui/icons-material/Route";
+import DescriptionIcon from "@mui/icons-material/Description";
+import ChatIcon from "@mui/icons-material/Chat";
+import QuizIcon from "@mui/icons-material/Quiz";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import CompareIcon from "@mui/icons-material/Compare";
+import GroupIcon from "@mui/icons-material/Group";
+import BuildIcon from "@mui/icons-material/Build";
+import TimelineIcon from "@mui/icons-material/Timeline";
+import LoginIcon from "@mui/icons-material/Login";
+
 import ProfileInput from "./pages/ProfileInput";
 import Recommendations from "./pages/Recommendations";
 import SkillGap from "./pages/SkillGap";
 import Roadmap from "./pages/Roadmap";
+import JDMatch from "./pages/JDMatch";
+import CareerChat from "./pages/CareerChat";
+import MockInterview from "./pages/MockInterview";
+import MarketInsights from "./pages/MarketInsights";
+import RoleComparison from "./pages/RoleComparison";
+import PeerComparison from "./pages/PeerComparison";
+import ProjectSuggestions from "./pages/ProjectSuggestions";
+import ProgressDashboard from "./pages/ProgressDashboard";
+import Login from "./pages/Login";
 
-export default function App() {
+const NAV_ITEMS = [
+  { label: "Profile", path: "/", icon: <PersonIcon /> },
+  { label: "Jobs", path: "/recommendations", icon: <WorkIcon /> },
+  { label: "Skill Gap", path: "/skill-gap", icon: <BarChartIcon /> },
+  { label: "Roadmap", path: "/roadmap", icon: <RouteIcon /> },
+  "divider",
+  { label: "JD Match", path: "/jd-match", icon: <DescriptionIcon /> },
+  { label: "Compare Roles", path: "/compare", icon: <CompareIcon /> },
+  { label: "Career Coach", path: "/chat", icon: <ChatIcon /> },
+  { label: "Mock Interview", path: "/interview", icon: <QuizIcon /> },
+  "divider",
+  { label: "Market Insights", path: "/market", icon: <TrendingUpIcon /> },
+  { label: "Peer Comparison", path: "/peers", icon: <GroupIcon /> },
+  { label: "Projects", path: "/projects", icon: <BuildIcon /> },
+  { label: "Progress", path: "/progress", icon: <TimelineIcon /> },
+];
+
+function NavDrawer({ open, onClose }) {
+  const location = useLocation();
   return (
-    <BrowserRouter>
+    <Drawer anchor="left" open={open} onClose={onClose}>
+      <Box sx={{ width: 250, pt: 2 }}>
+        <Typography variant="h6" sx={{ px: 2, mb: 1 }}>
+          Career Intelligence
+        </Typography>
+        <List>
+          {NAV_ITEMS.map((item, i) =>
+            item === "divider" ? (
+              <Divider key={i} sx={{ my: 1 }} />
+            ) : (
+              <ListItem key={item.path} disablePadding>
+                <ListItemButton
+                  component={Link}
+                  to={item.path}
+                  selected={location.pathname === item.path}
+                  onClick={onClose}
+                >
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.label} />
+                </ListItemButton>
+              </ListItem>
+            )
+          )}
+        </List>
+      </Box>
+    </Drawer>
+  );
+}
+
+function AppContent() {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  return (
+    <>
       <AppBar position="static">
         <Toolbar>
+          <IconButton color="inherit" edge="start" onClick={() => setDrawerOpen(true)} sx={{ mr: 1 }}>
+            <MenuIcon />
+          </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Career Intelligence
           </Typography>
-          <Button color="inherit" component={Link} to="/">
-            Profile
-          </Button>
-          <Button color="inherit" component={Link} to="/recommendations">
-            Jobs
-          </Button>
-          <Button color="inherit" component={Link} to="/skill-gap">
-            Skill Gap
-          </Button>
-          <Button color="inherit" component={Link} to="/roadmap">
-            Roadmap
-          </Button>
+          <Button color="inherit" component={Link} to="/" size="small">Profile</Button>
+          <Button color="inherit" component={Link} to="/recommendations" size="small">Jobs</Button>
+          <Button color="inherit" component={Link} to="/skill-gap" size="small">Gaps</Button>
+          <Button color="inherit" component={Link} to="/roadmap" size="small">Roadmap</Button>
+          <Button color="inherit" component={Link} to="/chat" size="small">Coach</Button>
+          <Button color="inherit" component={Link} to="/login" size="small" startIcon={<LoginIcon />}>Login</Button>
         </Toolbar>
       </AppBar>
+      <NavDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <Container maxWidth="lg">
-        <Box sx={{ mt: 4 }}>
+        <Box sx={{ mt: 4, mb: 4 }}>
           <Routes>
             <Route path="/" element={<ProfileInput />} />
             <Route path="/recommendations" element={<Recommendations />} />
             <Route path="/skill-gap" element={<SkillGap />} />
             <Route path="/roadmap" element={<Roadmap />} />
+            <Route path="/jd-match" element={<JDMatch />} />
+            <Route path="/chat" element={<CareerChat />} />
+            <Route path="/interview" element={<MockInterview />} />
+            <Route path="/market" element={<MarketInsights />} />
+            <Route path="/compare" element={<RoleComparison />} />
+            <Route path="/peers" element={<PeerComparison />} />
+            <Route path="/projects" element={<ProjectSuggestions />} />
+            <Route path="/progress" element={<ProgressDashboard />} />
+            <Route path="/login" element={<Login />} />
           </Routes>
         </Box>
       </Container>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }

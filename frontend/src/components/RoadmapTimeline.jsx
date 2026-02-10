@@ -1,4 +1,5 @@
 import { Box, Card, CardContent, Chip, Typography } from "@mui/material";
+import SchoolIcon from "@mui/icons-material/School";
 
 export default function RoadmapTimeline({ items }) {
   return (
@@ -36,7 +37,21 @@ export default function RoadmapTimeline({ items }) {
                 {item.certification && (
                   <Chip label={item.certification} size="small" color="secondary" />
                 )}
+                {item.skillsfuture_eligible && (
+                  <Chip
+                    icon={<SchoolIcon />}
+                    label={`SF Credit: SGD ${item.skillsfuture_credit_amount}`}
+                    size="small"
+                    color="success"
+                    variant="outlined"
+                  />
+                )}
               </Box>
+              {(item.course_fee > 0 || item.nett_fee_after_subsidy > 0) && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                  Fee: SGD {item.course_fee.toLocaleString()} &rarr; After subsidy: SGD {item.nett_fee_after_subsidy.toLocaleString()}
+                </Typography>
+              )}
               {item.url && (
                 <Typography variant="body2" sx={{ mt: 1 }}>
                   <a href={item.url} target="_blank" rel="noopener noreferrer">
