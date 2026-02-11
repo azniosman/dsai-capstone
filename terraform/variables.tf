@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "us-east-1"
+  default     = "ap-southeast-1"
 }
 
 variable "project_name" {
@@ -19,6 +19,7 @@ variable "environment" {
 variable "domain_name" {
   description = "Root domain name (e.g. example.com)"
   type        = string
+  default     = "workd.my"
 }
 
 variable "api_subdomain" {

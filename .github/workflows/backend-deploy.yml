@@ -14,8 +14,8 @@ permissions:
 env:
   AWS_REGION: ap-southeast-1
   ECR_REPOSITORY: dsai-capstone-backend
-  ECS_CLUSTER: dsai-capstone
-  ECS_SERVICE: dsai-capstone-backend
+  ECS_CLUSTER: dsai-capstone-prod-cluster
+  ECS_SERVICE: dsai-capstone-prod-backend-svc
   TASK_FAMILY: dsai-capstone-backend
 
 jobs:

@@ -12,14 +12,13 @@ terraform {
     }
   }
 
-  # Uncomment after first apply to migrate state to S3
-  # backend "s3" {
-  #   bucket         = "dsai-capstone-tfstate"
-  #   key            = "terraform.tfstate"
-  #   region         = "ap-southeast-1"
-  #   dynamodb_table = "dsai-capstone-tflock"
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket         = "dsai-capstone-tfstate"
+    key            = "terraform.tfstate"
+    region         = "ap-southeast-1"
+    dynamodb_table = "dsai-capstone-tflock"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
