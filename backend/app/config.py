@@ -2,25 +2,11 @@ import json
 import os
 
 from pydantic_settings import BaseSettings
-
-
-def _build_database_url() -> str:
-    """Build DATABASE_URL from env var or Secrets Manager JSON."""
-    raw = os.getenv("DATABASE_URL", "")
-    if raw:
-        # If it looks like JSON (from Secrets Manager), parse it
-        if raw.startswith("{"):
-            creds = json.loads(raw)
-            return (
-                f"postgresql://{creds['username']}:{creds['password']}"
-                f"@{creds['host']}:{creds.get('port', '5432')}/{creds['dbname']}"
-            )
-        return raw
-    return "postgresql://capstone:changeme@localhost:5432/capstone"
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
-    database_url: str = _build_database_url()
+    database_url: str = "postgresql://capstone:changeme@localhost:5432/capstone"
     sentence_transformer_model: str = "all-MiniLM-L6-v2"
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
@@ -35,6 +21,19 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
 
     model_config = {"env_file": ".env"}
+
+    @model_validator(mode="after")
+    def parse_database_url(self):
+        """Parse Secrets Manager JSON into a proper connection string."""
+        if self.database_url.startswith("{"):
+            creds = json.loads(self.database_url)
+            host = creds["host"].split(":")[0]
+            port = creds.get("port", "5432")
+            self.database_url = (
+                f"postgresql://{creds['username']}:{creds['password']}"
+                f"@{host}:{port}/{creds['dbname']}"
+            )
+        return self
 
 
 settings = Settings()
