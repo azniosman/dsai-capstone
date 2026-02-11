@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 ENV PYTHONPATH=/install/lib/python3.11/site-packages
-RUN python -c "import spacy; spacy.cli.download('en_core_web_sm')"
+ENV PATH="/install/bin:$PATH"
+RUN python -m spacy download en_core_web_sm
 
 FROM python:3.11-slim
 
@@ -20,7 +21,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
-COPY --from=builder /root/.local /root/.local
 
 RUN useradd --create-home appuser
 COPY --chown=appuser:appuser . .
