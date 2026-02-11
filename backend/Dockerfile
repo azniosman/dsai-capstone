@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 ENV PYTHONPATH=/install/lib/python3.11/site-packages
 ENV PATH="/install/bin:$PATH"
@@ -23,7 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /install /usr/local
 
 RUN useradd --create-home appuser
-COPY --chown=appuser:appuser . .
+COPY --chown=appuser:appuser backend/ .
+COPY --chown=appuser:appuser data/seed/ ./seed_data/
 USER appuser
 
 EXPOSE 8000

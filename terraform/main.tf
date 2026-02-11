@@ -3,7 +3,7 @@ locals {
   frontend_domain = var.domain_name
 
   cors_origins = concat(
-    ["https://${var.domain_name}"],
+    ["https://${var.domain_name}", "http://${var.domain_name}"],
     var.allowed_cors_origins,
   )
 }

@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "backend/**"
+      - "data/seed/**"
       - ".github/workflows/backend-deploy.yml"
 
 permissions:
@@ -51,12 +52,11 @@ jobs:
         id: login-ecr
 
       - name: Build and push Docker image
-        working-directory: backend
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $REGISTRY/$ECR_REPOSITORY:latest .
+          docker build -f backend/Dockerfile -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $REGISTRY/$ECR_REPOSITORY:latest .
           docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $REGISTRY/$ECR_REPOSITORY:latest
 

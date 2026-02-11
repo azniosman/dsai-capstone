@@ -1,17 +1,98 @@
+import json
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.database import engine, SessionLocal, Base
+from app.models import JobRole, Skill, SCTPCourse, MarketInsight
 from app.routers import (
     auth, profile, recommend, skill_gap, upskilling,
     upload, jd_match, progress, chat, interview,
     market, compare, peer, projects, export,
 )
 
+SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "seed_data")
+
+
+def _load_seed_json(filename):
+    path = os.path.join(SEED_DIR, filename)
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
+def _seed_database():
+    """Create tables and seed reference data if empty."""
+    Base.metadata.create_all(bind=engine)
+
+    db = SessionLocal()
+    try:
+        if db.query(Skill).first():
+            return  # already seeded
+
+        # Skills
+        data = _load_seed_json("skills_taxonomy.json")
+        if data:
+            for cat in data["categories"]:
+                for name in cat["skills"]:
+                    db.add(Skill(name=name, category=cat["name"]))
+            db.commit()
+
+        # Job roles
+        data = _load_seed_json("job_roles.json")
+        if data:
+            for r in data["roles"]:
+                db.add(JobRole(
+                    title=r["title"], category=r["category"],
+                    description=r["description"],
+                    required_skills=r["required_skills"],
+                    preferred_skills=r["preferred_skills"],
+                    min_experience_years=r["min_experience_years"],
+                    education_level=r["education_level"],
+                    career_switcher_friendly=r["career_switcher_friendly"],
+                    salary_range=r.get("salary_range"),
+                ))
+            db.commit()
+
+        # SCTP courses
+        data = _load_seed_json("sctp_courses.json")
+        if data:
+            for c in data["courses"]:
+                db.add(SCTPCourse(
+                    title=c["title"], provider=c["provider"],
+                    skills_taught=c["skills_taught"],
+                    duration_weeks=c["duration_weeks"], level=c["level"],
+                    url=c.get("url"), certification=c.get("certification"),
+                    skillsfuture_eligible=c.get("skillsfuture_eligible", True),
+                    skillsfuture_credit_amount=c.get("skillsfuture_credit_amount", 500.0),
+                    course_fee=c.get("course_fee", 2000.0),
+                    nett_fee_after_subsidy=c.get("nett_fee_after_subsidy", 500.0),
+                ))
+            db.commit()
+
+        # Market insights
+        from app.routers.market import DEFAULT_INSIGHTS
+        for ins in DEFAULT_INSIGHTS:
+            db.add(MarketInsight(**ins))
+        db.commit()
+
+    finally:
+        db.close()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    _seed_database()
+    yield
+
+
 app = FastAPI(
     title="Job Recommendation & Skill Gap Analysis",
     version="0.2.0",
+    lifespan=lifespan,
 )
 
 _default_origins = ["http://localhost:3000", "http://localhost:5173"]
