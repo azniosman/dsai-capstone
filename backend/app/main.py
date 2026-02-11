@@ -11,7 +11,7 @@ from app.models import JobRole, Skill, SCTPCourse, MarketInsight
 from app.routers import (
     auth, profile, recommend, skill_gap, upskilling,
     upload, jd_match, progress, chat, interview,
-    market, compare, peer, projects, export,
+    market, compare, peer, projects, export, courses,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -77,6 +77,8 @@ def _seed_database():
                     skillsfuture_credit_amount=c.get("skillsfuture_credit_amount", 500.0),
                     course_fee=c.get("course_fee", 2000.0),
                     nett_fee_after_subsidy=c.get("nett_fee_after_subsidy", 500.0),
+                    subsidy_percent=c.get("subsidy_percent", 70),
+                    mces_eligible=c.get("mces_eligible", False),
                 ))
             db.commit()
 
@@ -104,6 +106,14 @@ async def lifespan(app):
         logger.info("ML model loaded successfully")
     except Exception as e:
         logger.warning("ML model warmup failed (will retry on first request): %s", e)
+    # Pre-build taxonomy FAISS index so first request is fast
+    try:
+        logger.info("Pre-building taxonomy FAISS index...")
+        from app.ml.taxonomy import get_taxonomy_index
+        get_taxonomy_index()
+        logger.info("Taxonomy index built successfully")
+    except Exception as e:
+        logger.warning("Taxonomy index warmup failed (will retry on first request): %s", e)
     logger.info("Application startup complete")
     yield
 
@@ -147,6 +157,7 @@ app.include_router(compare.router, prefix="/api")
 app.include_router(peer.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
+app.include_router(courses.router, prefix="/api")
 
 
 @app.get("/health")

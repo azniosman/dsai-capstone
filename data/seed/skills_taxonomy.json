@@ -2,38 +2,47 @@
   "categories": [
     {
       "name": "Programming Languages",
+      "ssg_category": "technical",
       "skills": ["Python", "JavaScript", "TypeScript", "Java", "C++", "Go", "R", "SQL", "Bash", "Kotlin"]
     },
     {
       "name": "Web Development",
+      "ssg_category": "technical",
       "skills": ["React", "Angular", "Vue.js", "Node.js", "Django", "FastAPI", "REST APIs", "GraphQL", "HTML/CSS", "Next.js"]
     },
     {
       "name": "Cloud & DevOps",
+      "ssg_category": "technical",
       "skills": ["AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform", "CI/CD", "Jenkins", "Ansible", "GitHub Actions"]
     },
     {
       "name": "Data Engineering",
+      "ssg_category": "technical",
       "skills": ["Spark", "Kafka", "Airflow", "ETL", "Data Warehousing", "dbt", "Snowflake", "Hadoop", "Data Modeling", "Redshift"]
     },
     {
       "name": "Data Science & ML",
+      "ssg_category": "technical",
       "skills": ["Pandas", "NumPy", "Scikit-learn", "TensorFlow", "PyTorch", "NLP", "Computer Vision", "MLOps", "Statistical Modeling", "Feature Engineering"]
     },
     {
       "name": "Cybersecurity",
+      "ssg_category": "technical",
       "skills": ["Network Security", "Penetration Testing", "SIEM", "IAM", "Encryption", "Compliance", "Incident Response", "Threat Modeling", "SOC Operations", "Vulnerability Assessment"]
     },
     {
       "name": "Databases",
+      "ssg_category": "technical",
       "skills": ["PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch", "DynamoDB", "Cassandra", "Neo4j", "SQL Server"]
     },
     {
       "name": "Networking",
+      "ssg_category": "technical",
       "skills": ["TCP/IP", "DNS", "Load Balancing", "VPN", "Firewall", "SDN", "HTTP/HTTPS", "CDN", "Network Monitoring"]
     },
     {
       "name": "Soft Skills",
+      "ssg_category": "critical_core",
       "skills": ["Communication", "Problem Solving", "Teamwork", "Agile", "Scrum", "Leadership", "Stakeholder Management", "Critical Thinking", "Time Management"]
     }
   ]

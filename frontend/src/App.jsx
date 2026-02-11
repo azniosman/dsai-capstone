@@ -19,6 +19,7 @@ import GroupIcon from "@mui/icons-material/Group";
 import BuildIcon from "@mui/icons-material/Build";
 import TimelineIcon from "@mui/icons-material/Timeline";
 import LoginIcon from "@mui/icons-material/Login";
+import SchoolIcon from "@mui/icons-material/School";
 import HomeIcon from "@mui/icons-material/Home";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 
@@ -35,6 +36,7 @@ import PeerComparison from "./pages/PeerComparison";
 import ProjectSuggestions from "./pages/ProjectSuggestions";
 import ProgressDashboard from "./pages/ProgressDashboard";
 import Login from "./pages/Login";
+import CourseBrowser from "./pages/CourseBrowser";
 
 const NAV_SECTIONS = [
   {
@@ -53,6 +55,7 @@ const NAV_SECTIONS = [
       { label: "Compare Roles", path: "/compare", icon: <CompareIcon /> },
       { label: "Career Coach", path: "/chat", icon: <ChatIcon /> },
       { label: "Mock Interview", path: "/interview", icon: <QuizIcon /> },
+      { label: "Courses", path: "/courses", icon: <SchoolIcon /> },
     ],
   },
   {
@@ -79,6 +82,7 @@ const ROUTE_LABELS = {
   "/peers": "Peer Comparison",
   "/projects": "Projects",
   "/progress": "Progress",
+  "/courses": "Courses",
   "/login": "Login",
 };
 
@@ -241,6 +245,7 @@ function AppContent() {
             <Route path="/peers" element={<PeerComparison />} />
             <Route path="/projects" element={<ProjectSuggestions />} />
             <Route path="/progress" element={<ProgressDashboard />} />
+            <Route path="/courses" element={<CourseBrowser />} />
             <Route path="/login" element={<Login />} />
           </Routes>
         </Box>

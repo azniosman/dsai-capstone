@@ -4,6 +4,14 @@ import faiss
 import numpy as np
 
 from app.ml.embeddings import encode_texts
+from app.ml.taxonomy import get_skill_category
+
+# SSG category weights for skill importance
+CATEGORY_WEIGHTS = {
+    "critical_core": 1.3,
+    "technical": 1.0,
+    "generic": 0.8,
+}
 
 
 def build_skill_index(skills: list[str]) -> tuple[faiss.Index, list[str]]:
@@ -52,8 +60,20 @@ def match_skills(
 
 
 def compute_content_similarity(user_skills: list[str], role_skills: list[str]) -> float:
-    """Compute overall content similarity between user skills and role requirements."""
+    """Compute weighted content similarity between user skills and role requirements.
+
+    Applies SSG category weights: critical_core skills count 1.3x,
+    technical 1.0x, generic 0.8x.
+    """
     if not role_skills:
         return 0.0
     scores = match_skills(user_skills, role_skills)
-    return sum(scores.values()) / len(scores)
+    weighted_sum = 0.0
+    weight_total = 0.0
+    for skill, score in scores.items():
+        w = CATEGORY_WEIGHTS.get(get_skill_category(skill), 1.0)
+        weighted_sum += score * w
+        weight_total += w
+    if weight_total == 0:
+        return 0.0
+    return weighted_sum / weight_total

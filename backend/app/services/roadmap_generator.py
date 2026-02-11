@@ -6,11 +6,14 @@ from app.models.sctp_course import SCTPCourse
 from app.models.user_profile import UserProfile
 from app.schemas.skill_gap import RoadmapItem
 from app.services.gap_analyzer import analyze_gaps
+from app.services.subsidy_calculator import calculate_subsidies
 
 
 def generate_roadmap(profile: UserProfile, db: Session) -> list[RoadmapItem]:
     gaps = analyze_gaps(profile, db)
     courses = db.query(SCTPCourse).all()
+
+    is_career_switcher = profile.is_career_switcher or False
 
     # Collect all missing/partial skills across recommended roles, deduped
     skill_priorities: dict[str, int] = {}
@@ -53,6 +56,10 @@ def generate_roadmap(profile: UserProfile, db: Session) -> list[RoadmapItem]:
         if best_course:
             used_courses.add(best_course.id)
             week_end = current_week + best_course.duration_weeks - 1
+
+            # Calculate real subsidies
+            subsidies = calculate_subsidies(best_course, is_career_switcher)
+
             roadmap.append(RoadmapItem(
                 skill=skill,
                 course_title=best_course.title,
@@ -65,9 +72,9 @@ def generate_roadmap(profile: UserProfile, db: Session) -> list[RoadmapItem]:
                 week_start=current_week,
                 week_end=week_end,
                 skillsfuture_eligible=best_course.skillsfuture_eligible or True,
-                skillsfuture_credit_amount=best_course.skillsfuture_credit_amount or 500.0,
-                course_fee=best_course.course_fee or 2000.0,
-                nett_fee_after_subsidy=best_course.nett_fee_after_subsidy or 500.0,
+                skillsfuture_credit_amount=subsidies["sfc_applicable"],
+                course_fee=subsidies["course_fee"],
+                nett_fee_after_subsidy=subsidies["nett_payable"],
             ))
             current_week = week_end + 1
 

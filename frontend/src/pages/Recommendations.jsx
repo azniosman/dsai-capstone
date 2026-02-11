@@ -15,6 +15,12 @@ import WorkflowStepper from "../components/WorkflowStepper";
 import EmptyState from "../components/EmptyState";
 import SkeletonCard from "../components/SkeletonCard";
 
+const QUALITY_CHIP_PROPS = {
+  strong: { color: "success", label: "Strong Match" },
+  moderate: { color: "warning", label: "Moderate Match" },
+  developing: { color: "default", label: "Developing" },
+};
+
 export default function Recommendations() {
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,50 +59,66 @@ export default function Recommendations() {
 
       {!loading && !error && recs.length > 0 && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {recs.map((rec) => (
-            <Card key={rec.role_id} sx={{ p: 3 }}>
-              <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                  <Box>
-                    <Typography variant="h6">{rec.title}</Typography>
-                    <Chip label={rec.category} size="small" sx={{ mr: 1 }} />
-                    {rec.salary_range && (
-                      <Chip label={rec.salary_range} size="small" variant="outlined" />
-                    )}
+          {recs.map((rec) => {
+            const quality = QUALITY_CHIP_PROPS[rec.skill_match_quality] || QUALITY_CHIP_PROPS.developing;
+            return (
+              <Card key={rec.role_id} sx={{ p: 3 }}>
+                <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                    <Box>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                        <Typography variant="h6">{rec.title}</Typography>
+                        <Chip label={quality.label} color={quality.color} size="small" />
+                      </Box>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        <Chip label={rec.category} size="small" />
+                        {rec.salary_range && (
+                          <Chip label={rec.salary_range} size="small" variant="outlined" />
+                        )}
+                        {rec.career_switcher_bonus > 0 && (
+                          <Chip
+                            label="Career Switcher +"
+                            size="small"
+                            sx={{ bgcolor: "#00897b", color: "white" }}
+                          />
+                        )}
+                      </Box>
+                    </Box>
                   </Box>
-                </Box>
 
-                <Box sx={{ mt: 2 }}>
-                  <MatchScoreBar score={rec.match_score} label="Overall" />
-                  <MatchScoreBar score={rec.content_score} label="Skills" />
-                </Box>
-
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  {rec.rationale}
-                </Typography>
-
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="caption">Matched Skills:</Typography>
-                  <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>
-                    {rec.matched_skills.map((s) => (
-                      <SkillChip key={s} skill={s} severity="none" />
-                    ))}
+                  <Box sx={{ mt: 2 }}>
+                    <MatchScoreBar score={rec.match_score} label="Overall" />
+                    <MatchScoreBar score={rec.content_score} label="Skills" />
+                    <MatchScoreBar score={rec.rule_score} label="Profile Fit" />
                   </Box>
-                </Box>
 
-                {rec.missing_skills.length > 0 && (
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="caption">Missing Skills:</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    {rec.rationale}
+                  </Typography>
+
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="caption">Matched Skills:</Typography>
                     <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>
-                      {rec.missing_skills.map((s) => (
-                        <SkillChip key={s} skill={s} severity="high" />
+                      {rec.matched_skills.map((s) => (
+                        <SkillChip key={s} skill={s} severity="none" />
                       ))}
                     </Box>
                   </Box>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+
+                  {rec.missing_skills.length > 0 && (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="caption">Missing Skills:</Typography>
+                      <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>
+                        {rec.missing_skills.map((s) => (
+                          <SkillChip key={s} skill={s} severity="high" />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </Box>
       )}
     </Box>

@@ -7,7 +7,10 @@
       "duration_weeks": 12,
       "level": "intermediate",
       "url": "https://www.iss.nus.edu.sg/",
-      "certification": "NUS-ISS Certificate in Data Engineering"
+      "certification": "NUS-ISS Certificate in Data Engineering",
+      "course_fee": 6000.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Cloud Infrastructure and DevOps on AWS",
@@ -16,7 +19,10 @@
       "duration_weeks": 10,
       "level": "intermediate",
       "url": "https://www.iss.nus.edu.sg/",
-      "certification": "NUS-ISS Certificate in Cloud Computing"
+      "certification": "NUS-ISS Certificate in Cloud Computing",
+      "course_fee": 5500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Machine Learning Engineering",
@@ -25,7 +31,10 @@
       "duration_weeks": 14,
       "level": "intermediate",
       "url": "https://www.iss.nus.edu.sg/",
-      "certification": "NUS-ISS Certificate in Machine Learning"
+      "certification": "NUS-ISS Certificate in Machine Learning",
+      "course_fee": 7000.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Cybersecurity Operations and Analytics",
@@ -34,7 +43,10 @@
       "duration_weeks": 12,
       "level": "intermediate",
       "url": "https://www.iss.nus.edu.sg/",
-      "certification": "NUS-ISS Certificate in Cybersecurity"
+      "certification": "NUS-ISS Certificate in Cybersecurity",
+      "course_fee": 6000.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Full Stack Web Development",
@@ -43,7 +55,10 @@
       "duration_weeks": 16,
       "level": "beginner",
       "url": "https://www.ntu.edu.sg/pace",
-      "certification": "NTU Professional Certificate in Full Stack Development"
+      "certification": "NTU Professional Certificate in Full Stack Development",
+      "course_fee": 7500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Data Science and AI Foundations",
@@ -52,7 +67,10 @@
       "duration_weeks": 12,
       "level": "beginner",
       "url": "https://www.ntu.edu.sg/pace",
-      "certification": "NTU Professional Certificate in Data Science"
+      "certification": "NTU Professional Certificate in Data Science",
+      "course_fee": 5500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Deep Learning for Natural Language Processing",
@@ -61,7 +79,10 @@
       "duration_weeks": 10,
       "level": "advanced",
       "url": "https://www.ntu.edu.sg/pace",
-      "certification": "NTU Professional Certificate in NLP"
+      "certification": "NTU Professional Certificate in NLP",
+      "course_fee": 5000.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Network Security and Ethical Hacking",
@@ -70,7 +91,10 @@
       "duration_weeks": 10,
       "level": "intermediate",
       "url": "https://www.ntu.edu.sg/pace",
-      "certification": "NTU Professional Certificate in Cybersecurity"
+      "certification": "NTU Professional Certificate in Cybersecurity",
+      "course_fee": 5000.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Agile Product Management",
@@ -79,7 +103,10 @@
       "duration_weeks": 6,
       "level": "beginner",
       "url": "https://academy.smu.edu.sg/",
-      "certification": "SMU Certificate in Agile Product Management"
+      "certification": "SMU Certificate in Agile Product Management",
+      "course_fee": 3200.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Business Intelligence and Data Analytics",
@@ -88,7 +115,10 @@
       "duration_weeks": 8,
       "level": "beginner",
       "url": "https://academy.smu.edu.sg/",
-      "certification": "SMU Certificate in Business Intelligence"
+      "certification": "SMU Certificate in Business Intelligence",
+      "course_fee": 3800.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Cloud Architecture with Azure",
@@ -97,7 +127,10 @@
       "duration_weeks": 8,
       "level": "intermediate",
       "url": "https://academy.smu.edu.sg/",
-      "certification": "SMU Certificate in Cloud Architecture"
+      "certification": "SMU Certificate in Cloud Architecture",
+      "course_fee": 4000.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Python Programming for Beginners",
@@ -106,7 +139,10 @@
       "duration_weeks": 6,
       "level": "beginner",
       "url": "https://www.ntuclearninghub.com/",
-      "certification": "NTUC LearningHub Certificate in Python Programming"
+      "certification": "NTUC LearningHub Certificate in Python Programming",
+      "course_fee": 2500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "AWS Cloud Practitioner Bootcamp",
@@ -115,7 +151,10 @@
       "duration_weeks": 4,
       "level": "beginner",
       "url": "https://www.ntuclearninghub.com/",
-      "certification": "NTUC LearningHub AWS Cloud Practitioner Certificate"
+      "certification": "NTUC LearningHub AWS Cloud Practitioner Certificate",
+      "course_fee": 2000.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Cybersecurity Essentials",
@@ -124,7 +163,10 @@
       "duration_weeks": 6,
       "level": "beginner",
       "url": "https://www.ntuclearninghub.com/",
-      "certification": "NTUC LearningHub Certificate in Cybersecurity Fundamentals"
+      "certification": "NTUC LearningHub Certificate in Cybersecurity Fundamentals",
+      "course_fee": 2500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Data Analytics with SQL and Python",
@@ -133,7 +175,10 @@
       "duration_weeks": 8,
       "level": "beginner",
       "url": "https://www.ntuclearninghub.com/",
-      "certification": "NTUC LearningHub Certificate in Data Analytics"
+      "certification": "NTUC LearningHub Certificate in Data Analytics",
+      "course_fee": 3000.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Data Science Immersive",
@@ -142,7 +187,10 @@
       "duration_weeks": 12,
       "level": "beginner",
       "url": "https://generalassemb.ly/",
-      "certification": "General Assembly Certificate in Data Science"
+      "certification": "General Assembly Certificate in Data Science",
+      "course_fee": 5400.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "Software Engineering Immersive",
@@ -151,7 +199,10 @@
       "duration_weeks": 12,
       "level": "beginner",
       "url": "https://generalassemb.ly/",
-      "certification": "General Assembly Certificate in Software Engineering"
+      "certification": "General Assembly Certificate in Software Engineering",
+      "course_fee": 5400.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     },
     {
       "title": "User Experience Design Immersive",
@@ -160,7 +211,10 @@
       "duration_weeks": 10,
       "level": "beginner",
       "url": "https://generalassemb.ly/",
-      "certification": "General Assembly Certificate in UX Design"
+      "certification": "General Assembly Certificate in UX Design",
+      "course_fee": 4800.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Data Engineering with dbt and Snowflake",
@@ -169,7 +223,10 @@
       "duration_weeks": 8,
       "level": "intermediate",
       "url": "https://verticalinstitute.com/",
-      "certification": "Vertical Institute Certificate in Modern Data Engineering"
+      "certification": "Vertical Institute Certificate in Modern Data Engineering",
+      "course_fee": 3500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Frontend Development with React",
@@ -178,7 +235,10 @@
       "duration_weeks": 8,
       "level": "beginner",
       "url": "https://verticalinstitute.com/",
-      "certification": "Vertical Institute Certificate in Frontend Development"
+      "certification": "Vertical Institute Certificate in Frontend Development",
+      "course_fee": 3500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Backend Development with FastAPI",
@@ -187,7 +247,10 @@
       "duration_weeks": 8,
       "level": "intermediate",
       "url": "https://verticalinstitute.com/",
-      "certification": "Vertical Institute Certificate in Backend Development"
+      "certification": "Vertical Institute Certificate in Backend Development",
+      "course_fee": 3500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Kubernetes and Container Orchestration",
@@ -196,7 +259,10 @@
       "duration_weeks": 8,
       "level": "advanced",
       "url": "https://www.iss.nus.edu.sg/",
-      "certification": "NUS-ISS Certificate in Container Orchestration"
+      "certification": "NUS-ISS Certificate in Container Orchestration",
+      "course_fee": 4500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Computer Vision with Deep Learning",
@@ -205,7 +271,10 @@
       "duration_weeks": 10,
       "level": "advanced",
       "url": "https://www.ntu.edu.sg/pace",
-      "certification": "NTU Professional Certificate in Computer Vision"
+      "certification": "NTU Professional Certificate in Computer Vision",
+      "course_fee": 5000.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Streaming Data with Kafka and Spark",
@@ -214,7 +283,10 @@
       "duration_weeks": 8,
       "level": "advanced",
       "url": "https://www.iss.nus.edu.sg/",
-      "certification": "NUS-ISS Certificate in Streaming Data"
+      "certification": "NUS-ISS Certificate in Streaming Data",
+      "course_fee": 4500.0,
+      "subsidy_percent": 70,
+      "mces_eligible": false
     },
     {
       "title": "Leadership for Tech Professionals",
@@ -223,7 +295,10 @@
       "duration_weeks": 4,
       "level": "beginner",
       "url": "https://academy.smu.edu.sg/",
-      "certification": "SMU Certificate in Technology Leadership"
+      "certification": "SMU Certificate in Technology Leadership",
+      "course_fee": 2800.0,
+      "subsidy_percent": 70,
+      "mces_eligible": true
     }
   ]
 }

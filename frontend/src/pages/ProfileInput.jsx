@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Button, Chip, FormControl, FormControlLabel, Grid, InputLabel, MenuItem,
@@ -32,6 +32,7 @@ export default function ProfileInput() {
     name: "",
     education: "bachelor",
     years_experience: 0,
+    age: "",
     skills: [],
     resume_text: "",
     is_career_switcher: false,
@@ -40,6 +41,28 @@ export default function ProfileInput() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+
+  useEffect(() => {
+    const profileId = localStorage.getItem("profileId");
+    if (profileId) {
+      api.get(`/api/profile/${profileId}`)
+        .then((res) => {
+          const p = res.data;
+          setForm({
+            name: p.name || "",
+            education: p.education || "bachelor",
+            years_experience: p.years_experience || 0,
+            age: p.age ?? "",
+            skills: p.skills || [],
+            resume_text: "",
+            is_career_switcher: p.is_career_switcher || false,
+          });
+          setEditMode(true);
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   const toggleSkill = (skill) => {
     setForm((prev) => ({
@@ -85,14 +108,27 @@ export default function ProfileInput() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    const payload = {
+      ...form,
+      age: form.age !== "" ? parseInt(form.age) : null,
+    };
+
     try {
-      const res = await api.post("/api/profile", form);
-      localStorage.setItem("profileId", res.data.id);
-      showSuccess("Profile created! Fetching your job matches...");
-      navigate("/recommendations");
+      if (editMode) {
+        const profileId = localStorage.getItem("profileId");
+        await api.patch(`/api/profile/${profileId}`, payload);
+        showSuccess("Profile updated!");
+        navigate("/recommendations");
+      } else {
+        const res = await api.post("/api/profile", payload);
+        localStorage.setItem("profileId", res.data.id);
+        showSuccess("Profile created! Fetching your job matches...");
+        navigate("/recommendations");
+      }
     } catch (err) {
-      showError("Failed to create profile. Please try again.");
-      setError("Failed to create profile. Please try again.");
+      showError("Failed to save profile. Please try again.");
+      setError("Failed to save profile. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -146,7 +182,7 @@ export default function ProfileInput() {
       {/* Profile Form */}
       <Paper ref={formRef} sx={{ p: 4, maxWidth: 700, mx: "auto" }}>
         <Typography variant="h5" gutterBottom>
-          Your Profile
+          {editMode ? "Edit Your Profile" : "Your Profile"}
         </Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -177,6 +213,15 @@ export default function ProfileInput() {
             inputProps={{ min: 0 }}
             value={form.years_experience}
             onChange={(e) => setForm({ ...form, years_experience: parseInt(e.target.value) || 0 })}
+          />
+
+          <TextField
+            label="Age (optional)"
+            type="number"
+            inputProps={{ min: 16, max: 100 }}
+            value={form.age}
+            onChange={(e) => setForm({ ...form, age: e.target.value })}
+            helperText="Used for SkillsFuture subsidy eligibility (e.g. MCES for 40+)"
           />
 
           <FormControlLabel
@@ -243,7 +288,7 @@ export default function ProfileInput() {
           />
 
           <Button type="submit" variant="contained" size="large" disabled={loading}>
-            {loading ? "Analyzing..." : "Get Recommendations"}
+            {loading ? "Analyzing..." : editMode ? "Update Profile" : "Get Recommendations"}
           </Button>
         </Box>
       </Paper>

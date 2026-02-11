@@ -1,4 +1,4 @@
-"""Mock interview simulator endpoint."""
+"""Mock interview simulator endpoint with skill-gap-aware question selection."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -27,9 +27,12 @@ class InterviewResponse(BaseModel):
     feedback: str | None = None
     is_complete: bool = False
     question_number: int = 0
+    gap_targeted: bool = False
+    target_skill: str | None = None
 
 
-INTERVIEW_QUESTIONS = {
+# Role-specific interview questions
+ROLE_QUESTIONS = {
     "Data Engineer": [
         "Can you describe a data pipeline you've built from scratch? What tools did you use?",
         "How would you handle data quality issues in a streaming pipeline?",
@@ -60,26 +63,156 @@ INTERVIEW_QUESTIONS = {
     ],
 }
 
+# Skill-category-based questions for gap targeting
+CATEGORY_QUESTIONS = {
+    "Programming Languages": [
+        ("Python", "Can you walk me through how you'd design a Python package with proper error handling and testing?"),
+        ("JavaScript", "Explain the event loop in JavaScript. How does asynchronous code execution work?"),
+        ("SQL", "How would you optimise a slow query that joins five tables with millions of rows?"),
+        ("Java", "Describe the differences between Java's concurrency primitives and when you'd use each."),
+        ("TypeScript", "What advantages does TypeScript's type system bring to large-scale applications?"),
+    ],
+    "Web Development": [
+        ("React", "How do you manage state in a complex React application? Compare different approaches."),
+        ("REST APIs", "What makes a RESTful API well-designed? Walk me through your API design process."),
+        ("Node.js", "How would you handle high-concurrency requests in a Node.js application?"),
+        ("FastAPI", "What are the benefits of async endpoints in FastAPI, and when would you use them?"),
+        ("HTML/CSS", "How do you ensure web accessibility and responsive design in your front-end work?"),
+    ],
+    "Cloud & DevOps": [
+        ("AWS", "Describe how you'd architect a highly available application on AWS. What services would you use?"),
+        ("Docker", "Explain the difference between Docker images and containers. How do you optimise image size?"),
+        ("Kubernetes", "How would you handle a rolling deployment in Kubernetes? What about rollback strategies?"),
+        ("CI/CD", "Walk me through your ideal CI/CD pipeline. What checks and stages would you include?"),
+        ("Terraform", "How do you manage infrastructure state across multiple environments using Terraform?"),
+    ],
+    "Data Engineering": [
+        ("Spark", "How would you optimise a Spark job that's running out of memory on a large dataset?"),
+        ("Kafka", "Explain how you'd design a Kafka-based event streaming architecture for real-time analytics."),
+        ("ETL", "What's your approach to building reliable ETL pipelines? How do you handle failures?"),
+        ("Airflow", "How do you design DAGs in Airflow for complex data workflows with dependencies?"),
+        ("Data Warehousing", "Compare star schema vs snowflake schema. When would you use each?"),
+    ],
+    "Data Science & ML": [
+        ("Scikit-learn", "Walk me through your process for selecting and validating a machine learning model."),
+        ("TensorFlow", "How do you approach hyperparameter tuning in deep learning models?"),
+        ("NLP", "Describe how you'd build a text classification system. What preprocessing steps are essential?"),
+        ("MLOps", "How do you monitor model performance in production and handle model drift?"),
+        ("Feature Engineering", "What techniques do you use for feature selection and engineering?"),
+    ],
+    "Cybersecurity": [
+        ("Network Security", "How would you design a network security architecture for a cloud-native application?"),
+        ("SIEM", "Describe your experience with SIEM tools. How do you tune alerts to reduce false positives?"),
+        ("IAM", "Walk me through implementing a zero-trust identity and access management strategy."),
+        ("Incident Response", "Describe your incident response process. How do you handle a suspected data breach?"),
+        ("Penetration Testing", "What methodology do you follow for penetration testing? Walk me through a recent engagement."),
+    ],
+    "Databases": [
+        ("PostgreSQL", "How would you design a database schema for a multi-tenant SaaS application?"),
+        ("MongoDB", "When would you choose a document database over relational? What are the trade-offs?"),
+        ("Redis", "How do you use Redis for caching? Describe your cache invalidation strategy."),
+        ("Elasticsearch", "How would you design an Elasticsearch cluster for full-text search at scale?"),
+        ("DynamoDB", "Explain DynamoDB's partition key design. How do you avoid hot partitions?"),
+    ],
+    "Networking": [
+        ("TCP/IP", "Explain the TCP three-way handshake. How does it differ from UDP for real-time applications?"),
+        ("Load Balancing", "Compare different load balancing algorithms. When would you use each?"),
+        ("DNS", "How does DNS resolution work? How would you troubleshoot DNS-related issues?"),
+        ("HTTP/HTTPS", "Explain TLS handshake process. What are the performance implications of HTTPS?"),
+        ("CDN", "How would you design a CDN strategy for a global web application?"),
+    ],
+    "Soft Skills": [
+        ("Communication", "Tell me about a time you had to explain a complex technical concept to a non-technical audience."),
+        ("Problem Solving", "Describe a situation where you had to solve a problem with limited information. What was your approach?"),
+        ("Teamwork", "How do you handle disagreements within a team? Give me a specific example."),
+        ("Agile", "How do you estimate work in an Agile environment? How do you handle scope changes mid-sprint?"),
+        ("Leadership", "Describe a time you took initiative on a project. How did you motivate others?"),
+    ],
+}
 
-def _get_questions(role_title: str) -> list[str]:
-    for key, qs in INTERVIEW_QUESTIONS.items():
+
+def _get_role_questions(role_title: str) -> list[str]:
+    for key, qs in ROLE_QUESTIONS.items():
         if key.lower() in role_title.lower():
             return qs
-    return INTERVIEW_QUESTIONS["default"]
+    return ROLE_QUESTIONS["default"]
+
+
+def _get_gap_targeted_questions(profile_id: int, db: Session) -> list[tuple[str, str, str]]:
+    """Fetch user's skill gaps and return targeted questions.
+
+    Returns list of (question, target_skill, category) tuples sorted by gap severity.
+    """
+    try:
+        from app.models.user_profile import UserProfile
+        from app.services.gap_analyzer import analyze_gaps
+
+        profile = db.get(UserProfile, profile_id)
+        if not profile:
+            return []
+
+        gaps = analyze_gaps(profile, db)
+
+        # Collect gap skills with severity ordering
+        gap_skills = []
+        seen = set()
+        for role_gap in gaps:
+            for g in role_gap.gaps:
+                if g.gap_severity in ("high", "medium") and g.skill not in seen:
+                    seen.add(g.skill)
+                    gap_skills.append((g.skill, g.gap_severity))
+
+        # Sort: high severity first
+        gap_skills.sort(key=lambda x: 0 if x[1] == "high" else 1)
+
+        # Find matching questions from category bank
+        targeted = []
+        for skill, severity in gap_skills:
+            for category, questions in CATEGORY_QUESTIONS.items():
+                for q_skill, question in questions:
+                    if q_skill.lower() == skill.lower():
+                        targeted.append((question, skill, category))
+                        break
+
+        return targeted
+    except Exception:
+        return []
 
 
 @router.post("/interview", response_model=InterviewResponse)
 def mock_interview(payload: InterviewRequest, db: Session = Depends(get_db)):
-    questions = _get_questions(payload.role_title)
+    role_questions = _get_role_questions(payload.role_title)
     # Count user messages to determine question number
     user_msgs = [m for m in payload.messages if m.role == "user"]
     q_num = len(user_msgs)
 
+    # Build mixed question set: 3 gap-targeted + 2 role-specific (or fallback to all role)
+    gap_questions = []
+    if payload.profile_id:
+        gap_questions = _get_gap_targeted_questions(payload.profile_id, db)
+
+    # Compose final question list: up to 3 gap-targeted, then fill with role questions
+    mixed_questions = []
+    gap_meta = {}  # index -> (target_skill)
+    for i, (q, skill, cat) in enumerate(gap_questions[:3]):
+        mixed_questions.append(q)
+        gap_meta[len(mixed_questions) - 1] = skill
+
+    remaining_slots = 5 - len(mixed_questions)
+    for rq in role_questions:
+        if rq not in mixed_questions and remaining_slots > 0:
+            mixed_questions.append(rq)
+            remaining_slots -= 1
+
+    # Fall back to role questions only if no gap questions found
+    if not mixed_questions:
+        mixed_questions = role_questions
+
     if settings.openai_api_key and payload.messages:
-        return _llm_interview(payload, questions, q_num, db)
+        return _llm_interview(payload, mixed_questions, gap_meta, q_num, db)
 
     # Rule-based flow
-    if q_num >= len(questions):
+    if q_num >= len(mixed_questions):
         return InterviewResponse(
             reply="Great job completing the mock interview! Review your answers and consider how you could improve.",
             feedback=_generate_basic_feedback(payload.messages, payload.role_title),
@@ -87,11 +220,14 @@ def mock_interview(payload: InterviewRequest, db: Session = Depends(get_db)):
             question_number=q_num,
         )
 
+    is_gap = q_num in gap_meta
     return InterviewResponse(
-        reply=questions[q_num],
+        reply=mixed_questions[q_num],
         feedback=_quick_feedback(user_msgs[-1].content) if user_msgs else None,
         is_complete=False,
         question_number=q_num + 1,
+        gap_targeted=is_gap,
+        target_skill=gap_meta.get(q_num),
     )
 
 
@@ -120,17 +256,34 @@ def _generate_basic_feedback(messages: list[InterviewMessage], role: str) -> str
     return "\n".join(parts)
 
 
-def _llm_interview(payload: InterviewRequest, questions: list[str], q_num: int, db: Session) -> InterviewResponse:
+def _llm_interview(
+    payload: InterviewRequest,
+    questions: list[str],
+    gap_meta: dict[int, str],
+    q_num: int,
+    db: Session,
+) -> InterviewResponse:
     from openai import OpenAI
     client = OpenAI(api_key=settings.openai_api_key)
 
     is_complete = q_num >= len(questions)
+
+    # Build gap context for the LLM
+    gap_context = ""
+    if gap_meta:
+        gap_skills = list(gap_meta.values())
+        gap_context = (
+            f"\nThe candidate has skill gaps in: {', '.join(gap_skills)}. "
+            "Tailor follow-up questions to probe these areas. "
+            "For high-severity gaps, ask foundational questions; for medium gaps, ask applied scenarios."
+        )
 
     system_prompt = (
         f"You are an experienced tech interviewer in Singapore conducting a mock interview for a {payload.role_title} role. "
         f"Difficulty level: {payload.difficulty}. "
         "After the candidate answers, provide brief constructive feedback, then ask the next question. "
         "Be encouraging but honest. Reference Singapore job market context when relevant."
+        f"{gap_context}"
     )
     if is_complete:
         system_prompt += " The interview is over. Provide a comprehensive summary of the candidate's performance."
@@ -150,9 +303,12 @@ def _llm_interview(payload: InterviewRequest, questions: list[str], q_num: int, 
     )
     reply = response.choices[0].message.content
 
+    is_gap = q_num in gap_meta
     return InterviewResponse(
         reply=reply,
         feedback=None,
         is_complete=is_complete,
         question_number=q_num + (0 if is_complete else 1),
+        gap_targeted=is_gap,
+        target_skill=gap_meta.get(q_num),
     )

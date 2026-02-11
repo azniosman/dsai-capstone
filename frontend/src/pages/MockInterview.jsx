@@ -46,7 +46,12 @@ export default function MockInterview() {
         messages: [],
         difficulty,
       });
-      setMessages([{ role: "assistant", content: res.data.reply }]);
+      setMessages([{
+        role: "assistant",
+        content: res.data.reply,
+        gapTargeted: res.data.gap_targeted,
+        targetSkill: res.data.target_skill,
+      }]);
       setQuestionNum(res.data.question_number);
     } catch {
       setMessages([{ role: "assistant", content: "Let's start! Tell me about yourself and your experience." }]);
@@ -71,7 +76,12 @@ export default function MockInterview() {
         messages: newMsgs,
         difficulty,
       });
-      setMessages([...newMsgs, { role: "assistant", content: res.data.reply }]);
+      setMessages([...newMsgs, {
+        role: "assistant",
+        content: res.data.reply,
+        gapTargeted: res.data.gap_targeted,
+        targetSkill: res.data.target_skill,
+      }]);
       setQuestionNum(res.data.question_number);
       if (res.data.feedback) setFeedback(res.data.feedback);
       if (res.data.is_complete) setComplete(true);
@@ -126,6 +136,14 @@ export default function MockInterview() {
                 <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                   {msg.content}
                 </Typography>
+                {msg.gapTargeted && msg.targetSkill && (
+                  <Chip
+                    label={`Targets your gap: ${msg.targetSkill}`}
+                    size="small"
+                    color="warning"
+                    sx={{ mt: 0.5 }}
+                  />
+                )}
               </Box>
             ))}
             {loading && <CircularProgress size={20} />}
