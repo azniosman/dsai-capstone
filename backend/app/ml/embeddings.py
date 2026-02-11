@@ -1,6 +1,7 @@
 """Sentence Transformer model wrapper for skill embeddings."""
 
 import logging
+import os
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
@@ -14,8 +15,11 @@ _model = None
 def get_model() -> SentenceTransformer:
     global _model
     if _model is None:
-        logger.info("Loading Sentence Transformer model: %s", settings.sentence_transformer_model)
-        _model = SentenceTransformer(settings.sentence_transformer_model)
+        model_name = settings.sentence_transformer_model
+        logger.info("Loading Sentence Transformer model: %s", model_name)
+        # Try loading; if network is unavailable, the cached model will be used
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        _model = SentenceTransformer(model_name)
         logger.info("Model loaded successfully")
     return _model
 

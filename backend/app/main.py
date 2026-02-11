@@ -97,9 +97,13 @@ def _seed_database():
 async def lifespan(app):
     _seed_database()
     # Pre-load ML model to avoid cold-start timeouts
-    logger.info("Pre-loading ML model...")
-    from app.ml.embeddings import warmup_model
-    warmup_model()
+    try:
+        logger.info("Pre-loading ML model...")
+        from app.ml.embeddings import warmup_model
+        warmup_model()
+        logger.info("ML model loaded successfully")
+    except Exception as e:
+        logger.warning("ML model warmup failed (will retry on first request): %s", e)
     logger.info("Application startup complete")
     yield
 

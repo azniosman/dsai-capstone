@@ -71,9 +71,9 @@ resource "aws_ecs_task_definition" "backend" {
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
         interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 120
+        timeout     = 10
+        retries     = 5
+        startPeriod = 300
       }
     }
   ])
@@ -94,7 +94,7 @@ resource "aws_ecs_service" "backend" {
   task_definition                   = aws_ecs_task_definition.backend.arn
   desired_count                     = var.desired_count
   launch_type                       = "FARGATE"
-  health_check_grace_period_seconds = 120
+  health_check_grace_period_seconds = 300
 
   network_configuration {
     subnets          = [var.private_subnet_id]
