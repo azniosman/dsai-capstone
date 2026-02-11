@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -12,6 +13,9 @@ from app.routers import (
     upload, jd_match, progress, chat, interview,
     market, compare, peer, projects, export,
 )
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "seed_data")
 
@@ -31,7 +35,10 @@ def _seed_database():
     db = SessionLocal()
     try:
         if db.query(Skill).first():
+            logger.info("Database already seeded, skipping")
             return  # already seeded
+
+        logger.info("Seeding database with reference data...")
 
         # Skills
         data = _load_seed_json("skills_taxonomy.json")
@@ -75,9 +82,12 @@ def _seed_database():
 
         # Market insights
         from app.routers.market import DEFAULT_INSIGHTS
-        for ins in DEFAULT_INSIGHTS:
-            db.add(MarketInsight(**ins))
-        db.commit()
+        if not db.query(MarketInsight).first():
+            for ins in DEFAULT_INSIGHTS:
+                db.add(MarketInsight(**ins))
+            db.commit()
+
+        logger.info("Database seeding complete")
 
     finally:
         db.close()
@@ -86,6 +96,11 @@ def _seed_database():
 @asynccontextmanager
 async def lifespan(app):
     _seed_database()
+    # Pre-load ML model to avoid cold-start timeouts
+    logger.info("Pre-loading ML model...")
+    from app.ml.embeddings import warmup_model
+    warmup_model()
+    logger.info("Application startup complete")
     yield
 
 

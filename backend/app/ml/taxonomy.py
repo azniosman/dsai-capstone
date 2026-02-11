@@ -13,11 +13,19 @@ _taxonomy_skills = None
 
 
 def _load_taxonomy() -> list[str]:
-    seed_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "data", "seed", "skills_taxonomy.json"
-    )
-    if not os.path.exists(seed_path):
-        seed_path = "/data/seed/skills_taxonomy.json"  # Docker mount path
+    # Try multiple paths: local dev, Docker container, absolute fallback
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "seed", "skills_taxonomy.json"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "seed_data", "skills_taxonomy.json"),
+        "/app/seed_data/skills_taxonomy.json",
+    ]
+    seed_path = None
+    for p in candidates:
+        if os.path.exists(p):
+            seed_path = p
+            break
+    if not seed_path:
+        raise FileNotFoundError(f"skills_taxonomy.json not found in: {candidates}")
     with open(seed_path) as f:
         data = json.load(f)
     skills = []
