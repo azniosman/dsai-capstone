@@ -22,6 +22,7 @@ import LoginIcon from "@mui/icons-material/Login";
 import SchoolIcon from "@mui/icons-material/School";
 import HomeIcon from "@mui/icons-material/Home";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
+import SettingsIcon from "@mui/icons-material/Settings";
 
 import ProfileInput from "./pages/ProfileInput";
 import Recommendations from "./pages/Recommendations";
@@ -37,6 +38,7 @@ import ProjectSuggestions from "./pages/ProjectSuggestions";
 import ProgressDashboard from "./pages/ProgressDashboard";
 import Login from "./pages/Login";
 import CourseBrowser from "./pages/CourseBrowser";
+import AccountSettings from "./pages/AccountSettings";
 
 const NAV_SECTIONS = [
   {
@@ -67,6 +69,12 @@ const NAV_SECTIONS = [
       { label: "Progress", path: "/progress", icon: <TimelineIcon /> },
     ],
   },
+  {
+    header: "Account",
+    items: [
+      { label: "Settings", path: "/account", icon: <SettingsIcon /> },
+    ],
+  },
 ];
 
 const ROUTE_LABELS = {
@@ -83,6 +91,7 @@ const ROUTE_LABELS = {
   "/projects": "Projects",
   "/progress": "Progress",
   "/courses": "Courses",
+  "/account": "Account Settings",
   "/login": "Login",
 };
 
@@ -177,6 +186,7 @@ function UserMenu() {
     localStorage.removeItem("token");
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");
+    localStorage.removeItem("profileId");
     navigate("/");
   };
 
@@ -193,6 +203,7 @@ function UserMenu() {
         </MenuItem>
         <Divider />
         <MenuItem onClick={() => { setAnchorEl(null); navigate("/"); }}>Profile</MenuItem>
+        <MenuItem onClick={() => { setAnchorEl(null); navigate("/account"); }}>Account Settings</MenuItem>
         <MenuItem onClick={handleLogout}>Logout</MenuItem>
       </Menu>
     </>
@@ -246,6 +257,7 @@ function AppContent() {
             <Route path="/projects" element={<ProjectSuggestions />} />
             <Route path="/progress" element={<ProgressDashboard />} />
             <Route path="/courses" element={<CourseBrowser />} />
+            <Route path="/account" element={<AccountSettings />} />
             <Route path="/login" element={<Login />} />
           </Routes>
         </Box>

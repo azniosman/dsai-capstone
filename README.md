@@ -25,7 +25,9 @@ A career intelligence platform for SCTP learners and career-switchers in Singapo
 ### Tracking & Account
 - **Progress Dashboard** — Record skill acquisitions over time with timeline charts
 - **SkillsFuture Subsidy Calculator** — Standalone subsidy calculation for any SCTP course, factoring in base subsidy, MCES enhancement (90% for career switchers), and SkillsFuture Credit offset
-- **User Authentication** — JWT-based login/register with profile history
+- **User Authentication** — JWT-based login/register with profile history. Profiles are auto-linked to accounts on creation, with ownership guards on edits. Authenticated users auto-load their linked profile on login.
+- **Account Settings** — Update name/email, change password, and delete account with confirmation. Profiles linked to an account are protected from unauthorized edits.
+- **Password Recovery** — Token-based forgot/reset password flow (demo mode returns token directly; production-ready for email delivery)
 
 ## Quick Start
 
@@ -76,9 +78,15 @@ pytest
 | POST | `/api/auth/register` | User registration |
 | POST | `/api/auth/login` | Login (returns JWT) |
 | GET | `/api/auth/me` | Current user info |
+| PATCH | `/api/auth/me` | Update name/email |
+| DELETE | `/api/auth/me` | Delete account + linked profile |
+| POST | `/api/auth/change-password` | Change password (authenticated) |
+| POST | `/api/auth/forgot-password` | Request password reset token |
+| POST | `/api/auth/reset-password` | Reset password with token |
 | POST | `/api/profile` | Create user profile |
+| GET | `/api/profile/me` | Get authenticated user's linked profile |
 | GET | `/api/profile/{id}` | Retrieve user profile |
-| PATCH | `/api/profile/{id}` | Update user profile |
+| PATCH | `/api/profile/{id}` | Update user profile (ownership guard) |
 | POST | `/api/upload-resume` | Upload PDF/DOCX resume |
 | POST | `/api/recommend` | Get job recommendations |
 | GET | `/api/skill-gap/{id}` | Skill gap analysis |
@@ -194,7 +202,7 @@ dsai-capstone/
 │   └── tests/
 ├── frontend/
 │   └── src/
-│       ├── pages/               # 14 React pages
+│       ├── pages/               # 15 React pages
 │       └── components/          # Reusable UI components
 ├── terraform/
 │   ├── main.tf                  # Root module wiring

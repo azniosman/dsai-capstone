@@ -23,6 +23,7 @@ class ProfileUpdate(BaseModel):
 
 class ProfileResponse(BaseModel):
     id: int
+    user_id: int | None = None
     name: str
     education: str | None
     years_experience: int

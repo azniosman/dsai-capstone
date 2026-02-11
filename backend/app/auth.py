@@ -30,6 +30,29 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 
+def create_reset_token(user_id: int) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    return jwt.encode(
+        {"sub": str(user_id), "purpose": "reset", "exp": expire},
+        settings.secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+def verify_reset_token(token: str) -> int:
+    """Decode a password-reset JWT. Returns user_id or raises HTTPException."""
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+        if payload.get("purpose") != "reset":
+            raise HTTPException(status_code=400, detail="Invalid reset token")
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=400, detail="Invalid reset token")
+        return int(user_id)
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+
 def get_current_user_optional(
     token: str | None = Depends(oauth2_scheme),
     db: Session = Depends(get_db),

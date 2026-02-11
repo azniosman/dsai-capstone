@@ -44,24 +44,45 @@ export default function ProfileInput() {
   const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
-    const profileId = localStorage.getItem("profileId");
-    if (profileId) {
-      api.get(`/api/profile/${profileId}`)
-        .then((res) => {
-          const p = res.data;
-          setForm({
-            name: p.name || "",
-            education: p.education || "bachelor",
-            years_experience: p.years_experience || 0,
-            age: p.age ?? "",
-            skills: p.skills || [],
-            resume_text: "",
-            is_career_switcher: p.is_career_switcher || false,
-          });
-          setEditMode(true);
-        })
-        .catch(() => {});
-    }
+    const loadProfile = async () => {
+      let profile = null;
+      // If authenticated, try fetching the linked profile first
+      const token = localStorage.getItem("token");
+      if (token) {
+        try {
+          const res = await api.get("/api/profile/me");
+          profile = res.data;
+          localStorage.setItem("profileId", profile.id);
+        } catch {
+          // No linked profile — fall through to localStorage
+        }
+      }
+      // Fall back to localStorage profileId
+      if (!profile) {
+        const profileId = localStorage.getItem("profileId");
+        if (profileId) {
+          try {
+            const res = await api.get(`/api/profile/${profileId}`);
+            profile = res.data;
+          } catch {
+            // Profile not found
+          }
+        }
+      }
+      if (profile) {
+        setForm({
+          name: profile.name || "",
+          education: profile.education || "bachelor",
+          years_experience: profile.years_experience || 0,
+          age: profile.age ?? "",
+          skills: profile.skills || [],
+          resume_text: "",
+          is_career_switcher: profile.is_career_switcher || false,
+        });
+        setEditMode(true);
+      }
+    };
+    loadProfile();
   }, []);
 
   const toggleSkill = (skill) => {
