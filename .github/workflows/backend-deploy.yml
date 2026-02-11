@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: ap-southeast-1
+  AWS_REGION: us-east-1
   ECR_REPOSITORY: dsai-capstone-backend
   ECS_CLUSTER: dsai-capstone-prod-cluster
   ECS_SERVICE: dsai-capstone-prod-backend-svc
