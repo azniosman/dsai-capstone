@@ -5,25 +5,26 @@ A career intelligence platform for SCTP learners and career-switchers in Singapo
 ## Features
 
 ### Core
-- **Profile Analysis** — Upload a PDF/DOCX resume or manually enter skills; AI extracts and normalizes skills via Sentence Transformers + spaCy
-- **Job Recommendations** — Hybrid AI scoring (60% content similarity + 25% rule-based + 15% career-switcher bonus) with match rationale
+- **Profile Analysis** — Upload a PDF/DOCX resume or manually enter skills; AI extracts and normalizes skills via Sentence Transformers + spaCy. Profiles support age for subsidy eligibility, and can be retrieved and edited via GET/PATCH endpoints.
+- **Job Recommendations** — Hybrid AI scoring (60% content similarity + 25% rule-based + 15% career-switcher bonus) with match rationale. Each recommendation displays a skill match quality badge (strong/moderate/developing), a Profile Fit score bar, and a career-switcher bonus indicator.
 - **Skill Gap Analysis** — Per-role breakdown with radar and bar chart visualizations
 - **Upskilling Roadmap** — Personalized learning plan with SCTP courses, timelines, and PDF export
 
 ### Intelligence
-- **Career Coach Chatbot** — LLM-powered conversational career advisor (OpenAI API with rule-based fallback)
-- **Mock Interview Simulator** — Role-specific interview practice with feedback and performance assessment
+- **WorkD AI Career Advisor** — LLM-powered Senior Career Advisor persona with Singapore labor market expertise (SSG Skills Framework, MCES, SkillsFuture Credit). Includes 2026 market insights context, automatic MCES guidance for users aged 40+, and suggested prompt chips for quick interaction. Falls back to policy-aware rule-based responses when no OpenAI API key is configured.
+- **Mock Interview Simulator** — Role-specific interview practice with feedback and performance assessment. Gap-targeted questions are flagged with the specific skill being tested, so users know which weaknesses are being probed.
 - **JD Match** — Paste any job description for instant skill gap analysis against your profile
 - **Singapore Market Insights** — Salary benchmarks, demand levels, hiring volume, and YoY growth by sector
 
 ### Analysis
+- **SCTP Course Browser** — Browse all 25 SkillsFuture Career Transition Programme courses with real-time subsidy calculations. Filter by provider, level, MCES eligibility, or skill. Each course card shows the full fee breakdown: course fee, subsidy amount, SkillsFuture Credit offset, and net payable.
 - **Multi-Role Comparison** — Side-by-side comparison of 2–4 roles (match score, salary, transition difficulty, skill overlap)
 - **Peer Comparison** — See how your profile stacks up against others targeting similar roles (anonymized)
 - **Portfolio Project Suggestions** — Curated project ideas for each missing skill to build your portfolio
 
 ### Tracking & Account
 - **Progress Dashboard** — Record skill acquisitions over time with timeline charts
-- **SkillsFuture Credit Integration** — Course fee breakdowns with subsidy and SkillsFuture Credit amounts
+- **SkillsFuture Subsidy Calculator** — Standalone subsidy calculation for any SCTP course, factoring in base subsidy, MCES enhancement (90% for career switchers), and SkillsFuture Credit offset
 - **User Authentication** — JWT-based login/register with profile history
 
 ## Quick Start
@@ -76,6 +77,8 @@ pytest
 | POST | `/api/auth/login` | Login (returns JWT) |
 | GET | `/api/auth/me` | Current user info |
 | POST | `/api/profile` | Create user profile |
+| GET | `/api/profile/{id}` | Retrieve user profile |
+| PATCH | `/api/profile/{id}` | Update user profile |
 | POST | `/api/upload-resume` | Upload PDF/DOCX resume |
 | POST | `/api/recommend` | Get job recommendations |
 | GET | `/api/skill-gap/{id}` | Skill gap analysis |
@@ -91,6 +94,8 @@ pytest
 | POST | `/api/progress` | Record skill progress |
 | GET | `/api/progress/{id}` | Progress dashboard |
 | GET | `/api/progress/{id}/timeline` | Progress timeline data |
+| GET | `/api/courses` | List SCTP courses (filterable) |
+| POST | `/api/calculate-subsidy` | Calculate subsidy for a course |
 | GET | `/api/export/roadmap/{id}` | Export roadmap as PDF |
 
 ## Tech Stack
@@ -183,13 +188,13 @@ dsai-capstone/
 │   │   ├── database.py          # SQLAlchemy connection
 │   │   ├── models/              # ORM models (7 models)
 │   │   ├── schemas/             # Pydantic schemas
-│   │   ├── routers/             # API endpoints (15 routers)
-│   │   ├── services/            # Business logic (5 services)
+│   │   ├── routers/             # API endpoints (16 routers)
+│   │   ├── services/            # Business logic (6 services)
 │   │   └── ml/                  # ML pipelines (embeddings, taxonomy)
 │   └── tests/
 ├── frontend/
 │   └── src/
-│       ├── pages/               # 13 React pages
+│       ├── pages/               # 14 React pages
 │       └── components/          # Reusable UI components
 ├── terraform/
 │   ├── main.tf                  # Root module wiring
