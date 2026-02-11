@@ -25,13 +25,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
-# Copy the cached Sentence Transformer model from builder
-COPY --from=builder /root/.cache/huggingface /home/appuser/.cache/huggingface
+# Copy the cached HuggingFace/Sentence Transformer model from builder
+COPY --from=builder /root/.cache/huggingface /opt/models/huggingface
 
 RUN useradd --create-home appuser
 COPY --chown=appuser:appuser backend/ .
 COPY --chown=appuser:appuser data/seed/ ./seed_data/
-RUN chown -R appuser:appuser /home/appuser/.cache
+
+# Point all model caches to /opt/models and enable offline mode
+ENV HF_HOME=/opt/models/huggingface
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/huggingface
+
 USER appuser
 
 EXPOSE 8000
