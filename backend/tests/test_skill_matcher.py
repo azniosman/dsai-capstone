@@ -42,7 +42,7 @@ def test_content_similarity(mock_model):
 
     sim = compute_content_similarity(
         user_skills=["Python", "SQL", "Docker"],
-        required_skills=["Python", "SQL", "Spark", "Airflow"],
+        role_skills=["Python", "SQL", "Spark", "Airflow"],
     )
     assert 0.0 <= sim <= 1.0
 
