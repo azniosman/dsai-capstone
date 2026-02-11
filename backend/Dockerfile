@@ -14,7 +14,8 @@ RUN python -m spacy download en_core_web_sm
 
 # Pre-download the Sentence Transformer model so it's cached in the image
 # (ECS tasks in private subnets cannot download at runtime)
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
+RUN python -c "import os; os.makedirs('/opt/models/sentence-transformers', exist_ok=True); from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
 FROM python:3.11-slim
 
@@ -25,18 +26,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
-# Copy the cached HuggingFace/Sentence Transformer model from builder
+# Verify spaCy model is loadable
+RUN python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy model OK:', nlp.meta['name'])"
+
+# Copy the cached Sentence Transformer model
+COPY --from=builder /opt/models/sentence-transformers /opt/models/sentence-transformers
+# Copy any HuggingFace cache (tokenizers, configs)
 COPY --from=builder /root/.cache/huggingface /opt/models/huggingface
 
 RUN useradd --create-home appuser
 COPY --chown=appuser:appuser backend/ .
 COPY --chown=appuser:appuser data/seed/ ./seed_data/
 
-# Point all model caches to /opt/models and enable offline mode
+# Point all model caches and enable full offline mode
+ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
 ENV HF_HOME=/opt/models/huggingface
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
-ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/huggingface
 
 USER appuser
 
