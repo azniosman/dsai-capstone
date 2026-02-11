@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+ENV PYTHONPATH=/install/lib/python3.11/site-packages
 RUN python -c "import spacy; spacy.cli.download('en_core_web_sm')"
 
 FROM python:3.11-slim
