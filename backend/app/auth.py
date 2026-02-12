@@ -42,7 +42,7 @@ def create_reset_token(user_id: int) -> str:
 def verify_reset_token(token: str) -> int:
     """Decode a password-reset JWT. Returns user_id or raises HTTPException."""
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(token.strip(), settings.secret_key, algorithms=[settings.jwt_algorithm])
         if payload.get("purpose") != "reset":
             raise HTTPException(status_code=400, detail="Invalid reset token")
         user_id = payload.get("sub")

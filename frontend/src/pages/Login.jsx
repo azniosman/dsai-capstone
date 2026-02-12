@@ -115,7 +115,7 @@ export default function Login() {
     setLoading(true);
     setError(null);
     try {
-      await api.post("/api/auth/reset-password", resetForm);
+      await api.post("/api/auth/reset-password", { ...resetForm, token: resetForm.token.trim() });
       showSuccess("Password reset successfully! Please log in.");
       setShowForgot(false);
       setForgotStep(1);
@@ -165,7 +165,7 @@ export default function Login() {
             <Button type="submit" variant="contained" disabled={loading}>
               {loading ? "Sending..." : "Get Reset Token"}
             </Button>
-            <MuiLink component="button" variant="body2" onClick={() => { setShowForgot(false); setError(null); }}>
+            <MuiLink component="button" type="button" variant="body2" onClick={() => { setShowForgot(false); setError(null); }}>
               Back to Login
             </MuiLink>
           </Box>
@@ -201,7 +201,7 @@ export default function Login() {
             <Button type="submit" variant="contained" disabled={loading}>
               {loading ? "Resetting..." : "Reset Password"}
             </Button>
-            <MuiLink component="button" variant="body2" onClick={() => { setShowForgot(false); setForgotStep(1); setError(null); }}>
+            <MuiLink component="button" type="button" variant="body2" onClick={() => { setShowForgot(false); setForgotStep(1); setError(null); }}>
               Back to Login
             </MuiLink>
           </Box>
@@ -226,7 +226,7 @@ export default function Login() {
           <Button type="submit" variant="contained" disabled={loading}>
             {loading ? "Logging in..." : "Login"}
           </Button>
-          <MuiLink component="button" variant="body2" onClick={() => { setShowForgot(true); setError(null); }}>
+          <MuiLink component="button" type="button" variant="body2" onClick={() => { setShowForgot(true); setError(null); }}>
             Forgot Password?
           </MuiLink>
         </Box>
