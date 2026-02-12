@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import inspect as sa_inspect, text
+
 from app.database import engine, SessionLocal, Base
 from app.models import JobRole, Skill, SCTPCourse, MarketInsight
 from app.routers import (
@@ -28,9 +30,34 @@ def _load_seed_json(filename):
         return json.load(f)
 
 
+def _sync_schema():
+    """Add any columns defined in models but missing from the DB.
+
+    SQLAlchemy's create_all() only creates new tables — it does NOT alter
+    existing ones.  This helper inspects every mapped table and issues
+    ALTER TABLE … ADD COLUMN for anything the DB is missing.
+    """
+    inspector = sa_inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not inspector.has_table(table.name):
+                continue  # create_all will handle new tables
+            db_columns = {c["name"] for c in inspector.get_columns(table.name)}
+            for col in table.columns:
+                if col.name not in db_columns:
+                    col_type = col.type.compile(dialect=engine.dialect)
+                    default = ""
+                    if col.default is not None:
+                        default = f" DEFAULT {col.default.arg!r}"
+                    stmt = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}{default}'
+                    logger.info("Schema sync: %s", stmt)
+                    conn.execute(text(stmt))
+
+
 def _seed_database():
     """Create tables and seed reference data if empty."""
     Base.metadata.create_all(bind=engine)
+    _sync_schema()
 
     db = SessionLocal()
     try:
