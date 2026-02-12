@@ -62,6 +62,8 @@ def get_current_user_optional(
         return None
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+        if payload.get("purpose"):
+            return None  # reject non-access tokens (e.g. reset tokens)
         sub = payload.get("sub")
         if sub is None:
             return None

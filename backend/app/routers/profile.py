@@ -34,6 +34,21 @@ def create_profile(
     if payload.resume_text:
         skills = list(set(skills + extract_skills(payload.resume_text)))
 
+    # If authenticated user already has a profile, update it instead of creating a duplicate
+    if user:
+        existing = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+        if existing:
+            existing.name = payload.name
+            existing.education = payload.education
+            existing.years_experience = payload.years_experience
+            existing.age = payload.age
+            existing.skills = skills
+            existing.resume_text = payload.resume_text
+            existing.is_career_switcher = payload.is_career_switcher
+            db.commit()
+            db.refresh(existing)
+            return existing
+
     profile = UserProfile(
         name=payload.name,
         education=payload.education,

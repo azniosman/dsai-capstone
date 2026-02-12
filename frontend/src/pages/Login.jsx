@@ -99,7 +99,9 @@ export default function Login() {
         setResetForm((prev) => ({ ...prev, token: res.data.reset_token }));
       }
       setForgotStep(2);
-      showSuccess("Reset token generated. Use it below to set a new password.");
+      showSuccess(res.data.reset_token
+        ? "Reset token generated. Use it below to set a new password."
+        : "If an account exists with that email, a reset link has been generated.");
     } catch (err) {
       const msg = err.response?.data?.detail || "Failed to request password reset";
       setError(msg);
