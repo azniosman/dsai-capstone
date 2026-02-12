@@ -25,9 +25,10 @@ A career intelligence platform for SCTP learners and career-switchers in Singapo
 ### Tracking & Account
 - **Progress Dashboard** — Record skill acquisitions over time with timeline charts
 - **SkillsFuture Subsidy Calculator** — Standalone subsidy calculation for any SCTP course, factoring in base subsidy, MCES enhancement (90% for career switchers), and SkillsFuture Credit offset
-- **User Authentication** — JWT-based login/register with profile history. Profiles are auto-linked to accounts on creation, with ownership guards on edits. Authenticated users auto-load their linked profile on login.
+- **User Authentication** — JWT access tokens (15 min) with rotating refresh tokens (7 day). Rate-limited login/register endpoints, account lockout after 5 failed attempts, email normalization, and in-memory JTI blacklist for token revocation. Profiles are auto-linked to accounts on creation, with ownership guards on edits.
 - **Account Settings** — Update name/email, change password, and delete account with confirmation. Profiles linked to an account are protected from unauthorized edits.
 - **Password Recovery** — Token-based forgot/reset password flow (demo mode returns token directly; production-ready for email delivery)
+- **Security Hardening** — Security headers middleware (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, HSTS in production), rate limiting via slowapi, input validation with email regex and password confirmation, and startup secret validation in production mode
 
 ## Quick Start
 
@@ -81,6 +82,8 @@ pytest
 | PATCH | `/api/auth/me` | Update name/email |
 | DELETE | `/api/auth/me` | Delete account + linked profile |
 | POST | `/api/auth/change-password` | Change password (authenticated) |
+| POST | `/api/auth/refresh` | Rotate refresh token, get new token pair |
+| POST | `/api/auth/logout` | Revoke refresh token |
 | POST | `/api/auth/forgot-password` | Request password reset token |
 | POST | `/api/auth/reset-password` | Reset password with token |
 | POST | `/api/profile` | Create user profile |
@@ -115,7 +118,7 @@ pytest
 | AI/ML | Sentence Transformers (all-MiniLM-L6-v2), spaCy, FAISS |
 | LLM | OpenAI API (optional, rule-based fallback) |
 | Database | PostgreSQL 16 |
-| Auth | JWT + bcrypt |
+| Auth | JWT (access + refresh tokens) + bcrypt + slowapi rate limiting |
 | Cloud | AWS (ECS Fargate, RDS, S3, CloudFront, ALB) |
 | DNS/TLS | Route 53, ACM (wildcard cert) |
 | IaC | Terraform (modular) |

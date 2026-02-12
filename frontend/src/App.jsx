@@ -181,9 +181,19 @@ function UserMenu() {
     ? userName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setAnchorEl(null);
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (refreshToken) {
+      try {
+        const { default: api } = await import("./api/client");
+        await api.post("/api/auth/logout", { refresh_token: refreshToken });
+      } catch {
+        // Ignore — clearing local state regardless
+      }
+    }
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");
     localStorage.removeItem("profileId");

@@ -75,6 +75,7 @@ export default function AccountSettings() {
     try {
       await api.delete("/api/auth/me");
       localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
       localStorage.removeItem("userName");
       localStorage.removeItem("userEmail");
       localStorage.removeItem("profileId");

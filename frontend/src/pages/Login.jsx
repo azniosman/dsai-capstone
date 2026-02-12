@@ -10,7 +10,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { showSuccess, showError } = useSnackbar();
   const [tab, setTab] = useState(0);
-  const [form, setForm] = useState({ email: "", password: "", name: "" });
+  const [form, setForm] = useState({ email: "", password: "", password_confirm: "", name: "" });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -36,6 +36,9 @@ export default function Login() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
       localStorage.setItem("token", res.data.access_token);
+      if (res.data.refresh_token) {
+        localStorage.setItem("refreshToken", res.data.refresh_token);
+      }
       const me = await api.get("/api/auth/me", {
         headers: { Authorization: `Bearer ${res.data.access_token}` },
       });
@@ -66,7 +69,12 @@ export default function Login() {
     setLoading(true);
     setError(null);
     try {
-      await api.post("/api/auth/register", form);
+      await api.post("/api/auth/register", {
+        email: form.email,
+        password: form.password,
+        password_confirm: form.password_confirm,
+        name: form.name,
+      });
       showSuccess("Account created! Please log in.");
       setTab(0);
       setError(null);
@@ -79,8 +87,17 @@ export default function Login() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (refreshToken) {
+      try {
+        await api.post("/api/auth/logout", { refresh_token: refreshToken });
+      } catch {
+        // Ignore errors — we're logging out regardless
+      }
+    }
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");
     localStorage.removeItem("profileId");
@@ -234,7 +251,8 @@ export default function Login() {
         <Box component="form" onSubmit={handleRegister} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <TextField label="Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <TextField label="Email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <TextField label="Password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <TextField label="Password" type="password" required inputProps={{ minLength: 8 }} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} helperText="Minimum 8 characters" />
+          <TextField label="Confirm Password" type="password" required value={form.password_confirm} onChange={(e) => setForm({ ...form, password_confirm: e.target.value })} />
           <Button type="submit" variant="contained" disabled={loading}>
             {loading ? "Registering..." : "Register"}
           </Button>

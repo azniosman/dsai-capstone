@@ -3,12 +3,17 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from sqlalchemy import inspect as sa_inspect, text
 
+from app.config import settings
 from app.database import engine, SessionLocal, Base
+from app.limiter import limiter
 from app.models import JobRole, Skill, SCTPCourse, MarketInsight
 from app.routers import (
     auth, profile, recommend, skill_gap, upskilling,
@@ -151,6 +156,37 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# --- Rate limiter ---
+app.state.limiter = limiter
+
+
+def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests. Please try again later."},
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# --- Security headers middleware ---
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if settings.environment == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+
+# --- CORS ---
 _default_origins = ["http://localhost:3000", "http://localhost:5173"]
 _env_origins = os.getenv("CORS_ORIGINS", "")
 cors_origins = (
