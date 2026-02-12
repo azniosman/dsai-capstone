@@ -59,6 +59,7 @@ def test_career_switcher_bonus(mock_model):
 
     profile = MagicMock()
     profile.is_career_switcher = True
+    profile.years_experience = 0
 
     friendly_role = MagicMock()
     friendly_role.career_switcher_friendly = True
@@ -66,12 +67,22 @@ def test_career_switcher_bonus(mock_model):
     unfriendly_role = MagicMock()
     unfriendly_role.career_switcher_friendly = False
 
+    # 0 years experience → full bonus (1.0)
     assert _career_switcher_bonus(profile, friendly_role) == 1.0
     assert _career_switcher_bonus(profile, unfriendly_role) == 0.0
 
+    # Gradient: 5 years → 0.5 bonus
+    profile.years_experience = 5
+    assert _career_switcher_bonus(profile, friendly_role) == 0.5
 
+    # 10+ years → 0 bonus (tapered out)
+    profile.years_experience = 10
+    assert _career_switcher_bonus(profile, friendly_role) == 0.0
+
+
+@patch("app.services.skill_matcher.get_skill_category", return_value="technical")
 @patch("app.ml.embeddings.get_model")
-def test_get_recommendations(mock_model, db_session, sample_profile, sample_role):
+def test_get_recommendations(mock_model, mock_category, db_session, sample_profile, sample_role):
     """Test end-to-end recommendation pipeline with in-memory DB."""
     mock_model.return_value.encode = _mock_encode
 

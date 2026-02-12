@@ -1,9 +1,12 @@
 """Sentence Transformer model wrapper for skill embeddings."""
 
+import logging
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 _model = None
 
@@ -11,8 +14,18 @@ _model = None
 def get_model() -> SentenceTransformer:
     global _model
     if _model is None:
-        _model = SentenceTransformer(settings.sentence_transformer_model)
+        model_name = settings.sentence_transformer_model
+        logger.info("Loading Sentence Transformer model: %s", model_name)
+        _model = SentenceTransformer(model_name)
+        logger.info("Model loaded successfully")
     return _model
+
+
+def warmup_model():
+    """Pre-load the model and run a dummy encode to warm up."""
+    model = get_model()
+    model.encode(["warmup"], normalize_embeddings=True)
+    logger.info("Model warmup complete")
 
 
 def encode_texts(texts: list[str]) -> np.ndarray:

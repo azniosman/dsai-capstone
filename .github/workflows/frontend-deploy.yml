@@ -1,6 +1,7 @@
 name: Frontend Deploy
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -12,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: ap-southeast-1
+  AWS_REGION: us-east-1
   S3_BUCKET: dsai-capstone-frontend-prod
   CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
 

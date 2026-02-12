@@ -26,7 +26,8 @@ export default function Roadmap() {
   }, [profileId]);
 
   const downloadPdf = () => {
-    window.open(`${api.defaults.baseURL || ""}/api/export/roadmap/${profileId}`, "_blank");
+    const base = api.defaults.baseURL || window.location.origin;
+    window.open(`${base}/api/export/roadmap/${profileId}`, "_blank");
   };
 
   if (loading) return <Box><WorkflowStepper /><SkeletonCard count={2} /></Box>;

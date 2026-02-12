@@ -1,5 +1,8 @@
 """Hybrid job recommender combining content-based and rule-based scoring."""
 
+import hashlib
+import time
+
 from sqlalchemy.orm import Session
 
 from app.models.job_role import JobRole
@@ -8,9 +11,9 @@ from app.schemas.recommendation import RoleRecommendation
 from app.services.skill_matcher import compute_content_similarity, match_skills
 
 # Hybrid weights
-W_CONTENT = 0.60
+W_CONTENT = 0.55
 W_RULE = 0.25
-W_CAREER_SWITCHER = 0.15
+W_CAREER_SWITCHER = 0.20
 
 EDUCATION_RANK = {
     "diploma": 1,
@@ -18,6 +21,16 @@ EDUCATION_RANK = {
     "master": 3,
     "phd": 4,
 }
+
+# In-memory TTL cache for recommendation results
+_rec_cache: dict[str, tuple[float, list["RoleRecommendation"]]] = {}
+_CACHE_TTL = 300  # seconds
+
+
+def _cache_key(profile: UserProfile, top_n: int) -> str:
+    skills_str = ",".join(sorted(profile.skills or []))
+    raw = f"{profile.id}:{skills_str}:{profile.years_experience}:{profile.education}:{profile.is_career_switcher}:{top_n}"
+    return hashlib.md5(raw.encode()).hexdigest()
 
 
 def _rule_score(profile: UserProfile, role: JobRole) -> float:
@@ -42,14 +55,31 @@ def _rule_score(profile: UserProfile, role: JobRole) -> float:
 
 
 def _career_switcher_bonus(profile: UserProfile, role: JobRole) -> float:
+    """Gradient career-switcher bonus that tapers with experience."""
     if profile.is_career_switcher and role.career_switcher_friendly:
-        return 1.0
+        return max(0.0, 1.0 - profile.years_experience * 0.1)
     return 0.0
+
+
+def _skill_match_quality(content_score: float) -> str:
+    """Classify skill match quality based on content similarity score."""
+    if content_score >= 0.7:
+        return "strong"
+    if content_score >= 0.4:
+        return "moderate"
+    return "developing"
 
 
 def get_recommendations(
     profile: UserProfile, db: Session, top_n: int = 5
 ) -> list[RoleRecommendation]:
+    # Check cache
+    key = _cache_key(profile, top_n)
+    if key in _rec_cache:
+        cached_time, cached_result = _rec_cache[key]
+        if time.time() - cached_time < _CACHE_TTL:
+            return cached_result
+
     roles = db.query(JobRole).all()
     user_skills = profile.skills or []
 
@@ -94,7 +124,13 @@ def get_recommendations(
             missing_skills=missing,
             rationale=rationale,
             salary_range=role.salary_range,
+            skill_match_quality=_skill_match_quality(content_score),
         ))
 
     scored.sort(key=lambda r: r.match_score, reverse=True)
-    return scored[:top_n]
+    result = scored[:top_n]
+
+    # Store in cache
+    _rec_cache[key] = (time.time(), result)
+
+    return result

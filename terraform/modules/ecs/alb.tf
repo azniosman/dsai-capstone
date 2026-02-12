@@ -30,6 +30,7 @@ resource "aws_lb" "main" {
   load_balancer_type = "application"
   security_groups    = [var.alb_security_group_id]
   subnets            = [var.public_subnet_id, aws_subnet.public_alb_b.id]
+  idle_timeout       = 120
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-alb"
@@ -47,6 +48,8 @@ resource "aws_lb_target_group" "backend" {
   protocol    = "HTTP"
   target_type = "ip"
   vpc_id      = var.vpc_id
+
+  deregistration_delay = 30
 
   health_check {
     path                = "/health"

@@ -10,6 +10,7 @@ class UserProfile(Base):
     name = Column(String, nullable=False)
     education = Column(String)
     years_experience = Column(Integer, default=0)
+    age = Column(Integer, nullable=True)
     skills = Column(JSON, nullable=False, default=list)
     resume_text = Column(Text)
     is_career_switcher = Column(Boolean, default=False)

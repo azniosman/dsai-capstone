@@ -10,26 +10,51 @@ from app.ml.embeddings import encode_texts
 
 _taxonomy_index = None
 _taxonomy_skills = None
+_skill_category_map = None
 
 
-def _load_taxonomy() -> list[str]:
-    seed_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "data", "seed", "skills_taxonomy.json"
-    )
-    if not os.path.exists(seed_path):
-        seed_path = "/data/seed/skills_taxonomy.json"  # Docker mount path
+def _load_taxonomy() -> tuple[list[str], dict[str, str]]:
+    # Try multiple paths: local dev, Docker container, absolute fallback
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "seed", "skills_taxonomy.json"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "seed_data", "skills_taxonomy.json"),
+        "/app/seed_data/skills_taxonomy.json",
+    ]
+    seed_path = None
+    for p in candidates:
+        if os.path.exists(p):
+            seed_path = p
+            break
+    if not seed_path:
+        raise FileNotFoundError(f"skills_taxonomy.json not found in: {candidates}")
     with open(seed_path) as f:
         data = json.load(f)
     skills = []
+    category_map = {}
     for category in data["categories"]:
-        skills.extend(category["skills"])
-    return skills
+        ssg_cat = category.get("ssg_category", "generic")
+        for skill in category["skills"]:
+            skills.append(skill)
+            category_map[skill.lower()] = ssg_cat
+    return skills, category_map
+
+
+def _ensure_loaded():
+    global _taxonomy_skills, _skill_category_map
+    if _taxonomy_skills is None:
+        _taxonomy_skills, _skill_category_map = _load_taxonomy()
+
+
+def get_skill_category(skill: str) -> str:
+    """Return the SSG category for a skill: 'critical_core', 'technical', or 'generic'."""
+    _ensure_loaded()
+    return _skill_category_map.get(skill.lower(), "generic")
 
 
 def get_taxonomy_index():
     global _taxonomy_index, _taxonomy_skills
+    _ensure_loaded()
     if _taxonomy_index is None:
-        _taxonomy_skills = _load_taxonomy()
         embeddings = encode_texts(_taxonomy_skills)
         dim = embeddings.shape[1]
         _taxonomy_index = faiss.IndexFlatIP(dim)

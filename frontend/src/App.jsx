@@ -19,8 +19,10 @@ import GroupIcon from "@mui/icons-material/Group";
 import BuildIcon from "@mui/icons-material/Build";
 import TimelineIcon from "@mui/icons-material/Timeline";
 import LoginIcon from "@mui/icons-material/Login";
+import SchoolIcon from "@mui/icons-material/School";
 import HomeIcon from "@mui/icons-material/Home";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
+import SettingsIcon from "@mui/icons-material/Settings";
 
 import ProfileInput from "./pages/ProfileInput";
 import Recommendations from "./pages/Recommendations";
@@ -35,6 +37,8 @@ import PeerComparison from "./pages/PeerComparison";
 import ProjectSuggestions from "./pages/ProjectSuggestions";
 import ProgressDashboard from "./pages/ProgressDashboard";
 import Login from "./pages/Login";
+import CourseBrowser from "./pages/CourseBrowser";
+import AccountSettings from "./pages/AccountSettings";
 
 const NAV_SECTIONS = [
   {
@@ -53,6 +57,7 @@ const NAV_SECTIONS = [
       { label: "Compare Roles", path: "/compare", icon: <CompareIcon /> },
       { label: "Career Coach", path: "/chat", icon: <ChatIcon /> },
       { label: "Mock Interview", path: "/interview", icon: <QuizIcon /> },
+      { label: "Courses", path: "/courses", icon: <SchoolIcon /> },
     ],
   },
   {
@@ -62,6 +67,12 @@ const NAV_SECTIONS = [
       { label: "Peer Comparison", path: "/peers", icon: <GroupIcon /> },
       { label: "Projects", path: "/projects", icon: <BuildIcon /> },
       { label: "Progress", path: "/progress", icon: <TimelineIcon /> },
+    ],
+  },
+  {
+    header: "Account",
+    items: [
+      { label: "Settings", path: "/account", icon: <SettingsIcon /> },
     ],
   },
 ];
@@ -79,6 +90,8 @@ const ROUTE_LABELS = {
   "/peers": "Peer Comparison",
   "/projects": "Projects",
   "/progress": "Progress",
+  "/courses": "Courses",
+  "/account": "Account Settings",
   "/login": "Login",
 };
 
@@ -168,11 +181,22 @@ function UserMenu() {
     ? userName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setAnchorEl(null);
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (refreshToken) {
+      try {
+        const { default: api } = await import("./api/client");
+        await api.post("/api/auth/logout", { refresh_token: refreshToken });
+      } catch {
+        // Ignore — clearing local state regardless
+      }
+    }
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");
+    localStorage.removeItem("profileId");
     navigate("/");
   };
 
@@ -189,6 +213,7 @@ function UserMenu() {
         </MenuItem>
         <Divider />
         <MenuItem onClick={() => { setAnchorEl(null); navigate("/"); }}>Profile</MenuItem>
+        <MenuItem onClick={() => { setAnchorEl(null); navigate("/account"); }}>Account Settings</MenuItem>
         <MenuItem onClick={handleLogout}>Logout</MenuItem>
       </Menu>
     </>
@@ -241,6 +266,8 @@ function AppContent() {
             <Route path="/peers" element={<PeerComparison />} />
             <Route path="/projects" element={<ProjectSuggestions />} />
             <Route path="/progress" element={<ProgressDashboard />} />
+            <Route path="/courses" element={<CourseBrowser />} />
+            <Route path="/account" element={<AccountSettings />} />
             <Route path="/login" element={<Login />} />
           </Routes>
         </Box>

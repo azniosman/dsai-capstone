@@ -34,15 +34,16 @@ def test_match_skills_exact(mock_model):
     assert isinstance(scores["Kubernetes"], float)
 
 
+@patch("app.services.skill_matcher.get_skill_category", return_value="technical")
 @patch("app.ml.embeddings.get_model")
-def test_content_similarity(mock_model):
+def test_content_similarity(mock_model, mock_category):
     """Content similarity should return a float between 0 and 1."""
     mock_model.return_value.encode = _mock_encode
     from app.services.skill_matcher import compute_content_similarity
 
     sim = compute_content_similarity(
         user_skills=["Python", "SQL", "Docker"],
-        required_skills=["Python", "SQL", "Spark", "Airflow"],
+        role_skills=["Python", "SQL", "Spark", "Airflow"],
     )
     assert 0.0 <= sim <= 1.0
 

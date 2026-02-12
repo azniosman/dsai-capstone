@@ -1,18 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box, Button, Card, CardContent, FormControl, InputLabel, MenuItem,
   Paper, Select, TextField, Typography, Alert, Chip, CircularProgress,
 } from "@mui/material";
 import api from "../api/client";
 
-const ROLE_OPTIONS = [
+const FALLBACK_ROLES = [
   "Data Engineer", "Software Engineer", "Data Scientist", "Data Analyst",
   "ML Engineer", "DevOps Engineer", "Cloud Architect", "Cybersecurity Analyst",
   "Full Stack Developer", "Product Manager",
 ];
 
 export default function MockInterview() {
+  const [roleOptions, setRoleOptions] = useState(FALLBACK_ROLES);
   const [role, setRole] = useState("Software Engineer");
+
+  useEffect(() => {
+    api.get("/api/roles")
+      .then((res) => {
+        const titles = res.data.map((r) => r.title);
+        if (titles.length > 0) setRoleOptions(titles);
+      })
+      .catch(() => {});
+  }, []);
   const [difficulty, setDifficulty] = useState("intermediate");
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -36,7 +46,12 @@ export default function MockInterview() {
         messages: [],
         difficulty,
       });
-      setMessages([{ role: "assistant", content: res.data.reply }]);
+      setMessages([{
+        role: "assistant",
+        content: res.data.reply,
+        gapTargeted: res.data.gap_targeted,
+        targetSkill: res.data.target_skill,
+      }]);
       setQuestionNum(res.data.question_number);
     } catch {
       setMessages([{ role: "assistant", content: "Let's start! Tell me about yourself and your experience." }]);
@@ -61,7 +76,12 @@ export default function MockInterview() {
         messages: newMsgs,
         difficulty,
       });
-      setMessages([...newMsgs, { role: "assistant", content: res.data.reply }]);
+      setMessages([...newMsgs, {
+        role: "assistant",
+        content: res.data.reply,
+        gapTargeted: res.data.gap_targeted,
+        targetSkill: res.data.target_skill,
+      }]);
       setQuestionNum(res.data.question_number);
       if (res.data.feedback) setFeedback(res.data.feedback);
       if (res.data.is_complete) setComplete(true);
@@ -84,7 +104,7 @@ export default function MockInterview() {
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Target Role</InputLabel>
             <Select value={role} label="Target Role" onChange={(e) => setRole(e.target.value)}>
-              {ROLE_OPTIONS.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+              {roleOptions.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl fullWidth sx={{ mb: 2 }}>
@@ -116,6 +136,14 @@ export default function MockInterview() {
                 <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                   {msg.content}
                 </Typography>
+                {msg.gapTargeted && msg.targetSkill && (
+                  <Chip
+                    label={`Targets your gap: ${msg.targetSkill}`}
+                    size="small"
+                    color="warning"
+                    sx={{ mt: 0.5 }}
+                  />
+                )}
               </Box>
             ))}
             {loading && <CircularProgress size={20} />}

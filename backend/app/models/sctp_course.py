@@ -18,3 +18,6 @@ class SCTPCourse(Base):
     skillsfuture_credit_amount = Column(Float, default=0.0)
     course_fee = Column(Float, default=0.0)
     nett_fee_after_subsidy = Column(Float, default=0.0)
+    # Subsidy fields
+    subsidy_percent = Column(Float, default=70.0)
+    mces_eligible = Column(Boolean, default=False)

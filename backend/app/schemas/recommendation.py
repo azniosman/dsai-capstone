@@ -13,6 +13,7 @@ class RoleRecommendation(BaseModel):
     missing_skills: list[str]
     rationale: str
     salary_range: str | None
+    skill_match_quality: str = "developing"  # "strong", "moderate", "developing"
 
 
 class RecommendRequest(BaseModel):
