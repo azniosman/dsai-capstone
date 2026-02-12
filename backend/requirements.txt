@@ -25,3 +25,4 @@ bcrypt==4.0.1
 python-jose[cryptography]==3.3.0
 # Feature: Rate limiting
 slowapi==0.1.9
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
