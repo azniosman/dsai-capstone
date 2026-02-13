@@ -52,7 +52,7 @@ def _sync_schema():
         "tenant_id": "1",       # Global tenant
         "is_active": "true",
         "failed_login_attempts": "0",
-        "role": "'member'",
+        "role": "'member'::role",
     }
 
     with engine.begin() as conn:
