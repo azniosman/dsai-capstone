@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
 from app.database import get_db
+from app.models.tenant import Tenant
 
 router = APIRouter(tags=["projects"])
 
@@ -165,15 +167,15 @@ PROJECT_CATALOG = {
 
 
 @router.get("/project-suggestions/{profile_id}", response_model=ProjectSuggestionsResponse)
-def get_project_suggestions(profile_id: int, db: Session = Depends(get_db)):
+def get_project_suggestions(profile_id: int, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
     from app.models.user_profile import UserProfile
     from app.services.gap_analyzer import analyze_gaps
 
-    profile = db.get(UserProfile, profile_id)
+    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    gaps = analyze_gaps(profile, db)
+    gaps = analyze_gaps(profile, db, tenant_id=tenant.id)
 
     suggestions = []
     seen = set()

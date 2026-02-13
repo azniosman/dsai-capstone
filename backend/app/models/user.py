@@ -1,5 +1,13 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, func
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, func, ForeignKey, Enum
+from sqlalchemy.orm import relationship
 from app.database import Base
+import enum
+
+
+class Role(enum.Enum):
+    ADMIN = "admin"
+    MEMBER = "member"
+    VIEWER = "viewer"
 
 
 class User(Base):
@@ -13,3 +21,7 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime(timezone=True), nullable=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
+    role = Column(Enum(Role), default=Role.MEMBER, nullable=False)
+
+    tenant = relationship("Tenant")

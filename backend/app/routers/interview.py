@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.auth import get_current_user_optional
 
 router = APIRouter(tags=["interview"])
 
@@ -138,7 +139,7 @@ def _get_role_questions(role_title: str) -> list[str]:
     return ROLE_QUESTIONS["default"]
 
 
-def _get_gap_targeted_questions(profile_id: int, db: Session) -> list[tuple[str, str, str]]:
+def _get_gap_targeted_questions(profile_id: int, db: Session, tenant_id: int) -> list[tuple[str, str, str]]:
     """Fetch user's skill gaps and return targeted questions.
 
     Returns list of (question, target_skill, category) tuples sorted by gap severity.
@@ -147,11 +148,11 @@ def _get_gap_targeted_questions(profile_id: int, db: Session) -> list[tuple[str,
         from app.models.user_profile import UserProfile
         from app.services.gap_analyzer import analyze_gaps
 
-        profile = db.get(UserProfile, profile_id)
+        profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant_id).first()
         if not profile:
             return []
 
-        gaps = analyze_gaps(profile, db)
+        gaps = analyze_gaps(profile, db, tenant_id=tenant_id)
 
         # Collect gap skills with severity ordering
         gap_skills = []
@@ -180,7 +181,8 @@ def _get_gap_targeted_questions(profile_id: int, db: Session) -> list[tuple[str,
 
 
 @router.post("/interview", response_model=InterviewResponse)
-def mock_interview(payload: InterviewRequest, db: Session = Depends(get_db)):
+def mock_interview(payload: InterviewRequest, db: Session = Depends(get_db), user=Depends(get_current_user_optional)):
+    tenant_id = user.tenant_id if user else 1  # fallback to global tenant
     role_questions = _get_role_questions(payload.role_title)
     # Count user messages to determine question number
     user_msgs = [m for m in payload.messages if m.role == "user"]
@@ -189,7 +191,7 @@ def mock_interview(payload: InterviewRequest, db: Session = Depends(get_db)):
     # Build mixed question set: 3 gap-targeted + 2 role-specific (or fallback to all role)
     gap_questions = []
     if payload.profile_id:
-        gap_questions = _get_gap_targeted_questions(payload.profile_id, db)
+        gap_questions = _get_gap_targeted_questions(payload.profile_id, db, tenant_id)
 
     # Compose final question list: up to 3 gap-targeted, then fill with role questions
     mixed_questions = []

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, JSON, Boolean, Float
+from sqlalchemy import Column, Integer, String, JSON, Boolean, Float, ForeignKey
 from app.database import Base
 
 
@@ -21,3 +21,4 @@ class SCTPCourse(Base):
     # Subsidy fields
     subsidy_percent = Column(Float, default=70.0)
     mces_eligible = Column(Boolean, default=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)

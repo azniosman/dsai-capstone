@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Float, JSON
+from sqlalchemy import Column, Integer, String, Boolean, Float, JSON, ForeignKey
 from app.database import Base
 
 
@@ -15,3 +15,4 @@ class JobRole(Base):
     education_level = Column(String, default="bachelor")
     career_switcher_friendly = Column(Boolean, default=False)
     salary_range = Column(String)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)

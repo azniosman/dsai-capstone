@@ -5,9 +5,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user_optional
 from app.config import settings
 from app.database import get_db
 from app.routers.market import DEFAULT_INSIGHTS
+
 
 router = APIRouter(tags=["chat"])
 
@@ -103,13 +105,15 @@ def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap
 
 
 @router.post("/chat", response_model=ChatResponse)
-def career_chat(payload: ChatRequest, db: Session = Depends(get_db)):
+def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depends(get_current_user_optional)):
+    tenant_id = user.tenant_id if user else 1  # fallback to global tenant
     if not settings.openai_api_key:
         # Fallback: rule-based response when no API key configured
         return ChatResponse(reply=_fallback_response(
             payload.messages[-1].content if payload.messages else "",
-            payload.profile_id,
-            db,
+            profile_id=payload.profile_id,
+            db=db,
+            tenant_id=tenant_id
         ))
 
     from openai import OpenAI
@@ -121,15 +125,15 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db)):
     roadmap_courses = None
     if payload.profile_id:
         from app.models.user_profile import UserProfile
-        profile = db.get(UserProfile, payload.profile_id)
+        profile = db.query(UserProfile).filter(UserProfile.id == payload.profile_id, UserProfile.tenant_id == tenant_id).first()
         if profile:
             from app.services.recommender import get_recommendations
             from app.services.gap_analyzer import analyze_gaps
             from app.services.roadmap_generator import generate_roadmap
             try:
-                recommendations = get_recommendations(profile, db, top_n=3)
-                skill_gaps = analyze_gaps(profile, db)
-                roadmap_courses = generate_roadmap(profile, db)
+                recommendations = get_recommendations(profile, db, tenant_id=tenant_id, top_n=3)
+                skill_gaps = analyze_gaps(profile, db, tenant_id=tenant_id)
+                roadmap_courses = generate_roadmap(profile, db, tenant_id=tenant_id)
             except Exception:
                 pass
 
@@ -148,20 +152,20 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db)):
     return ChatResponse(reply=response.choices[0].message.content)
 
 
-def _fallback_response(user_msg: str, profile_id: int | None = None, db: Session | None = None) -> str:
+def _fallback_response(user_msg: str, profile_id: int | None = None, db: Session | None = None, tenant_id: int | None = None) -> str:
     """WorkD AI rule-based fallback when no LLM API key is configured."""
     msg = user_msg.lower()
 
     # Try to load user context for personalised responses
     course_hint = ""
     mces_hint = ""
-    if profile_id and db:
+    if profile_id and db and tenant_id:
         try:
             from app.models.user_profile import UserProfile
             from app.services.roadmap_generator import generate_roadmap
-            profile = db.get(UserProfile, profile_id)
+            profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant_id).first()
             if profile:
-                roadmap = generate_roadmap(profile, db)
+                roadmap = generate_roadmap(profile, db, tenant_id=tenant_id)
                 if roadmap:
                     course_hint = f" Based on your profile, I'd suggest starting with the {roadmap[0].course_title} by {roadmap[0].provider}."
                 is_over_40 = (profile.age and profile.age >= 40) or (profile.years_experience >= 15)

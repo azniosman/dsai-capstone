@@ -8,6 +8,8 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+from app.models.tenant import Tenant
+from app.models.user import User, Role # Added User and Role import
 
 from app.config import settings
 from app.database import get_db
@@ -35,12 +37,13 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, tenant_id: int) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     to_encode.update({
         "exp": expire,
         "jti": secrets.token_urlsafe(32),
+        "tenant_id": tenant_id,
     })
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.jwt_algorithm)
 
@@ -117,10 +120,13 @@ def get_current_user_optional(
         if sub is None:
             return None
         user_id = int(sub)
+        tenant_id = payload.get("tenant_id")
+        if tenant_id is None:
+            return None
     except JWTError:
         return None
     from app.models.user import User
-    user = db.get(User, user_id)
+    user = db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
     if user is None or not user.is_active:
         return None
     return user
@@ -139,3 +145,19 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+def get_current_tenant(user: User = Depends(get_current_user)) -> "Tenant":
+    """Get the current tenant from the authenticated user."""
+    return user.tenant
+
+
+def has_role(required_roles: list[Role]):
+    def role_checker(user: User = Depends(get_current_user)):
+        if user.role not in required_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions",
+            )
+        return user
+    return role_checker

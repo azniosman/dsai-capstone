@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     max_login_attempts: int = 5
     lockout_duration_minutes: int = 15
+    sso_enabled: bool = False
 
     # Environment
     environment: str = "development"

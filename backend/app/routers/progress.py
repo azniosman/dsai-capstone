@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
 from app.database import get_db
 from app.models.skill_progress import SkillProgress
 from app.models.user_profile import UserProfile
+from app.models.tenant import Tenant
 
 router = APIRouter(tags=["progress"])
 
@@ -39,8 +41,8 @@ class ProgressSnapshot(BaseModel):
 
 
 @router.post("/progress", response_model=ProgressEntry)
-def record_progress(payload: ProgressUpdate, db: Session = Depends(get_db)):
-    profile = db.get(UserProfile, payload.profile_id)
+def record_progress(payload: ProgressUpdate, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
+    profile = db.query(UserProfile).filter(UserProfile.id == payload.profile_id, UserProfile.tenant_id == tenant.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
@@ -48,6 +50,7 @@ def record_progress(payload: ProgressUpdate, db: Session = Depends(get_db)):
         profile_id=payload.profile_id,
         skill=payload.skill,
         level=payload.level,
+        tenant_id=tenant.id,
     )
     db.add(entry)
 
@@ -66,14 +69,14 @@ def record_progress(payload: ProgressUpdate, db: Session = Depends(get_db)):
 
 
 @router.get("/progress/{profile_id}", response_model=ProgressResponse)
-def get_progress(profile_id: int, db: Session = Depends(get_db)):
-    profile = db.get(UserProfile, profile_id)
+def get_progress(profile_id: int, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
+    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     entries = (
         db.query(SkillProgress)
-        .filter_by(profile_id=profile_id)
+        .filter_by(profile_id=profile_id, tenant_id=tenant.id)
         .order_by(SkillProgress.recorded_at.desc())
         .all()
     )
@@ -97,11 +100,15 @@ def get_progress(profile_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/progress/{profile_id}/timeline")
-def get_progress_timeline(profile_id: int, db: Session = Depends(get_db)):
+def get_progress_timeline(profile_id: int, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
     """Get skill progress grouped by date for timeline visualization."""
+    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
     entries = (
         db.query(SkillProgress)
-        .filter_by(profile_id=profile_id)
+        .filter_by(profile_id=profile_id, tenant_id=tenant.id)
         .order_by(SkillProgress.recorded_at.asc())
         .all()
     )

@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
 from app.database import get_db
+from app.models.tenant import Tenant
 from app.schemas.skill_gap import SkillGapItem
 
 router = APIRouter(tags=["jd-match"])
@@ -26,12 +28,12 @@ class JDMatchResponse(BaseModel):
 
 
 @router.post("/jd-match", response_model=JDMatchResponse)
-def jd_match(payload: JDMatchRequest, db: Session = Depends(get_db)):
+def jd_match(payload: JDMatchRequest, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
     from app.models.user_profile import UserProfile
     from app.services.resume_parser import extract_skills
     from app.services.skill_matcher import match_skills, compute_content_similarity
 
-    profile = db.get(UserProfile, payload.profile_id)
+    profile = db.query(UserProfile).filter(UserProfile.id == payload.profile_id, UserProfile.tenant_id == tenant.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 

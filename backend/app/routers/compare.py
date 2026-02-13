@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
 from app.database import get_db
 from app.models.job_role import JobRole
 from app.models.user_profile import UserProfile
+from app.models.tenant import Tenant
 from app.services.skill_matcher import match_skills, compute_content_similarity
 
 router = APIRouter(tags=["compare"])
@@ -40,11 +42,11 @@ class CompareResponse(BaseModel):
 
 
 @router.post("/compare-roles", response_model=CompareResponse)
-def compare_roles(payload: CompareRequest, db: Session = Depends(get_db)):
+def compare_roles(payload: CompareRequest, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
     if len(payload.role_ids) < 2 or len(payload.role_ids) > 4:
         raise HTTPException(status_code=400, detail="Select 2-4 roles to compare")
 
-    profile = db.get(UserProfile, payload.profile_id)
+    profile = db.query(UserProfile).filter(UserProfile.id == payload.profile_id, UserProfile.tenant_id == tenant.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
@@ -53,7 +55,7 @@ def compare_roles(payload: CompareRequest, db: Session = Depends(get_db)):
     all_role_skills = {}
 
     for role_id in payload.role_ids:
-        role = db.get(JobRole, role_id)
+        role = db.query(JobRole).filter(JobRole.id == role_id, JobRole.tenant_id == tenant.id).first()
         if not role:
             raise HTTPException(status_code=404, detail=f"Role {role_id} not found")
 
@@ -112,7 +114,7 @@ def compare_roles(payload: CompareRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/roles")
-def list_roles(db: Session = Depends(get_db)):
+def list_roles(db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
     """List all available roles for comparison picker."""
-    roles = db.query(JobRole).all()
+    roles = db.query(JobRole).filter(JobRole.tenant_id == tenant.id).all()
     return [{"id": r.id, "title": r.title, "category": r.category} for r in roles]

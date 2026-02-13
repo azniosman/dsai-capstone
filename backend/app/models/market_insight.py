@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, JSON, DateTime, func
+from sqlalchemy import Column, Integer, String, Float, JSON, DateTime, func, ForeignKey
 from app.database import Base
 
 
@@ -13,3 +13,4 @@ class MarketInsight(Base):
     hiring_volume = Column(Integer)
     yoy_growth_pct = Column(Float)
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)

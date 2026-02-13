@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
 from app.database import get_db
 from app.models.user_profile import UserProfile
+from app.models.tenant import Tenant
 
 router = APIRouter(tags=["peer"])
 
@@ -28,16 +30,16 @@ class PeerComparisonResponse(BaseModel):
 
 
 @router.get("/peer-comparison/{profile_id}", response_model=PeerComparisonResponse)
-def peer_comparison(profile_id: int, db: Session = Depends(get_db)):
-    profile = db.get(UserProfile, profile_id)
+def peer_comparison(profile_id: int, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
+    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     # Get recommended roles for this profile
     from app.services.recommender import get_recommendations
-    recs = get_recommendations(profile, db, top_n=3)
+    recs = get_recommendations(profile, db, tenant_id=tenant.id)
 
-    all_profiles = db.query(UserProfile).all()
+    all_profiles = db.query(UserProfile).filter(UserProfile.tenant_id == tenant.id).all()
     user_skills = set(s.lower() for s in (profile.skills or []))
 
     insights = []

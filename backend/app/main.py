@@ -14,11 +14,11 @@ from sqlalchemy import inspect as sa_inspect, text
 from app.config import settings
 from app.database import engine, SessionLocal, Base
 from app.limiter import limiter
-from app.models import JobRole, Skill, SCTPCourse, MarketInsight
+from app.models import JobRole, Skill, SCTPCourse, MarketInsight, Tenant
 from app.routers import (
     auth, profile, recommend, skill_gap, upskilling,
     upload, jd_match, progress, chat, interview,
-    market, compare, peer, projects, export, courses,
+    market, compare, peer, projects, export, courses, sso, api_keys, audit_logs,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -66,18 +66,28 @@ def _seed_database():
 
     db = SessionLocal()
     try:
-        if db.query(Skill).first():
-            logger.info("Database already seeded, skipping")
-            return  # already seeded
+        # Check if the 'Global' tenant exists, create if not
+        global_tenant = db.query(Tenant).filter(Tenant.name == 'Global').first()
+        if not global_tenant:
+            global_tenant = Tenant(name='Global')
+            db.add(global_tenant)
+            db.commit()
+            db.refresh(global_tenant)
+            logger.info("Created 'Global' tenant.")
+        
+        # Check if any skills are present for the global tenant to determine if seeding is needed
+        if db.query(Skill).filter(Skill.tenant_id == global_tenant.id).first():
+            logger.info("Database already seeded for 'Global' tenant, skipping.")
+            return
 
-        logger.info("Seeding database with reference data...")
+        logger.info("Seeding database with reference data for 'Global' tenant...")
 
         # Skills
         data = _load_seed_json("skills_taxonomy.json")
         if data:
             for cat in data["categories"]:
                 for name in cat["skills"]:
-                    db.add(Skill(name=name, category=cat["name"]))
+                    db.add(Skill(name=name, category=cat["name"], tenant_id=global_tenant.id))
             db.commit()
 
         # Job roles
@@ -93,6 +103,7 @@ def _seed_database():
                     education_level=r["education_level"],
                     career_switcher_friendly=r["career_switcher_friendly"],
                     salary_range=r.get("salary_range"),
+                    tenant_id=global_tenant.id
                 ))
             db.commit()
 
@@ -111,14 +122,15 @@ def _seed_database():
                     nett_fee_after_subsidy=c.get("nett_fee_after_subsidy", 500.0),
                     subsidy_percent=c.get("subsidy_percent", 70),
                     mces_eligible=c.get("mces_eligible", False),
+                    tenant_id=global_tenant.id
                 ))
             db.commit()
 
         # Market insights
         from app.routers.market import DEFAULT_INSIGHTS
-        if not db.query(MarketInsight).first():
+        if not db.query(MarketInsight).filter(MarketInsight.tenant_id == global_tenant.id).first():
             for ins in DEFAULT_INSIGHTS:
-                db.add(MarketInsight(**ins))
+                db.add(MarketInsight(**ins, tenant_id=global_tenant.id))
             db.commit()
 
         logger.info("Database seeding complete")
@@ -221,6 +233,9 @@ app.include_router(peer.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
 app.include_router(courses.router, prefix="/api")
+app.include_router(sso.router, prefix="/api")
+app.include_router(api_keys.router, prefix="/api")
+app.include_router(audit_logs.router, prefix="/api")
 
 
 @app.get("/health")

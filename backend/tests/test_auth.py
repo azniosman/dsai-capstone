@@ -2,7 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -34,6 +34,8 @@ limiter.enabled = False
 
 client = TestClient(app)
 
+TENANT_NAME = "TestTenant"
+
 
 @pytest.fixture(autouse=True)
 def reset_db():
@@ -46,12 +48,13 @@ def reset_db():
     yield
 
 
-def _register(email="test@example.com", password="securepass123", name="Test User"):
+def _register(email="test@example.com", password="securepass123", name="Test User", tenant_name=TENANT_NAME):
     return client.post("/api/auth/register", json={
         "email": email,
         "password": password,
         "password_confirm": password,
         "name": name,
+        "tenant_name": tenant_name,
     })
 
 
@@ -79,6 +82,7 @@ def test_register_password_too_short():
         "password": "short",
         "password_confirm": "short",
         "name": "Test",
+        "tenant_name": TENANT_NAME,
     })
     assert res.status_code == 422
 
@@ -89,6 +93,7 @@ def test_register_password_mismatch():
         "password": "securepass123",
         "password_confirm": "differentpass",
         "name": "Test",
+        "tenant_name": TENANT_NAME,
     })
     assert res.status_code == 422
 
@@ -99,6 +104,7 @@ def test_register_invalid_email():
         "password": "securepass123",
         "password_confirm": "securepass123",
         "name": "Test",
+        "tenant_name": TENANT_NAME,
     })
     assert res.status_code == 422
 

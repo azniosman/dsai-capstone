@@ -1,11 +1,11 @@
-"""SCTP Course Browser with subsidy calculator."""
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
 from app.database import get_db
 from app.models.sctp_course import SCTPCourse
+from app.models.tenant import Tenant
 from app.services.subsidy_calculator import calculate_subsidies
 
 router = APIRouter(tags=["courses"])
@@ -57,8 +57,11 @@ def list_courses(
     level: str | None = None,
     mces_eligible: bool | None = None,
     db: Session = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
 ):
-    query = db.query(SCTPCourse)
+    query = db.query(SCTPCourse).filter(
+        (SCTPCourse.tenant_id == tenant.id) | (SCTPCourse.tenant_id == None)
+    )
 
     if provider:
         query = query.filter(SCTPCourse.provider == provider)
@@ -98,10 +101,14 @@ def list_courses(
 
 
 @router.post("/calculate-subsidy", response_model=SubsidyResponse)
-def calculate_course_subsidy(payload: SubsidyRequest, db: Session = Depends(get_db)):
-    course = db.get(SCTPCourse, payload.course_id)
+def calculate_course_subsidy(payload: SubsidyRequest, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
+    course = db.query(SCTPCourse).filter(
+        SCTPCourse.id == payload.course_id,
+        (SCTPCourse.tenant_id == tenant.id) | (SCTPCourse.tenant_id == None)
+    ).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
     result = calculate_subsidies(course, is_career_switcher=payload.is_career_switcher)
     return SubsidyResponse(**result)
+

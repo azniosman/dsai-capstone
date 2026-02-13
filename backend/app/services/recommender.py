@@ -27,9 +27,9 @@ _rec_cache: dict[str, tuple[float, list["RoleRecommendation"]]] = {}
 _CACHE_TTL = 300  # seconds
 
 
-def _cache_key(profile: UserProfile, top_n: int) -> str:
+def _cache_key(profile: UserProfile, top_n: int, tenant_id: int) -> str:
     skills_str = ",".join(sorted(profile.skills or []))
-    raw = f"{profile.id}:{skills_str}:{profile.years_experience}:{profile.education}:{profile.is_career_switcher}:{top_n}"
+    raw = f"{profile.id}:{skills_str}:{profile.years_experience}:{profile.education}:{profile.is_career_switcher}:{top_n}:{tenant_id}"
     return hashlib.md5(raw.encode()).hexdigest()
 
 
@@ -71,16 +71,16 @@ def _skill_match_quality(content_score: float) -> str:
 
 
 def get_recommendations(
-    profile: UserProfile, db: Session, top_n: int = 5
+    profile: UserProfile, db: Session, tenant_id: int, top_n: int = 5
 ) -> list[RoleRecommendation]:
     # Check cache
-    key = _cache_key(profile, top_n)
+    key = _cache_key(profile, top_n, tenant_id)
     if key in _rec_cache:
         cached_time, cached_result = _rec_cache[key]
         if time.time() - cached_time < _CACHE_TTL:
             return cached_result
 
-    roles = db.query(JobRole).all()
+    roles = db.query(JobRole).filter(JobRole.tenant_id == tenant_id).all()
     user_skills = profile.skills or []
 
     scored = []

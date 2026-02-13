@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useContext } from "react"; // Added useContext
 import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AppBar, Toolbar, Typography, Button, Container, Box, IconButton,
@@ -39,6 +39,7 @@ import ProgressDashboard from "./pages/ProgressDashboard";
 import Login from "./pages/Login";
 import CourseBrowser from "./pages/CourseBrowser";
 import AccountSettings from "./pages/AccountSettings";
+import { TenantContext } from "./contexts/TenantContext"; // Import TenantContext
 
 const NAV_SECTIONS = [
   {
@@ -97,12 +98,19 @@ const ROUTE_LABELS = {
 
 function NavDrawer({ open, onClose }) {
   const location = useLocation();
+  const { tenantConfig } = useContext(TenantContext); // Use tenantConfig
   return (
     <Drawer anchor="left" open={open} onClose={onClose}>
       <Box sx={{ width: 260, pt: 2 }}>
-        <Typography variant="h6" sx={{ px: 2, mb: 1, fontWeight: 700 }}>
-          WorkD
-        </Typography>
+        {tenantConfig.logoUrl ? (
+          <Box sx={{ px: 2, mb: 1 }}>
+            <img src={tenantConfig.logoUrl} alt={tenantConfig.name} style={{ maxWidth: "100%", height: "auto" }} />
+          </Box>
+        ) : (
+          <Typography variant="h6" sx={{ px: 2, mb: 1, fontWeight: 700 }}>
+            {tenantConfig.name}
+          </Typography>
+        )}
         <Typography variant="caption" sx={{ px: 2, color: "text.secondary" }}>
           Career Intelligence Platform
         </Typography>
@@ -128,6 +136,16 @@ function NavDrawer({ open, onClose }) {
               ))}
             </Box>
           ))}
+          <Divider sx={{ my: 1 }} />
+          <ListSubheader sx={{ bgcolor: "transparent", fontWeight: 600, fontSize: "0.75rem", letterSpacing: "0.05em", textTransform: "uppercase", color: "text.secondary" }}>
+            Help
+          </ListSubheader>
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => { onClose(); alert("Simulating guided tour!"); }}> {/* Placeholder for tour */}
+              <ListItemIcon sx={{ minWidth: 36 }}><HomeIcon /></ListItemIcon>
+              <ListItemText primary="Show Tour" />
+            </ListItemButton>
+          </ListItem>
         </List>
       </Box>
     </Drawer>
@@ -162,6 +180,7 @@ function UserMenu() {
   const [anchorEl, setAnchorEl] = useState(null);
   const token = localStorage.getItem("token");
   const userName = localStorage.getItem("userName");
+  const { tenantConfig } = useContext(TenantContext); // Use tenantConfig
 
   if (!token) {
     return (
@@ -197,13 +216,14 @@ function UserMenu() {
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");
     localStorage.removeItem("profileId");
+    localStorage.removeItem("tenantName"); // Clear tenant name
     navigate("/");
   };
 
   return (
     <>
       <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ ml: 1 }}>
-        <Avatar sx={{ width: 32, height: 32, bgcolor: "secondary.main", fontSize: "0.875rem" }}>
+        <Avatar sx={{ width: 32, height: 32, bgcolor: tenantConfig.primaryColor, fontSize: "0.875rem" }}>
           {initials}
         </Avatar>
       </IconButton>
@@ -222,6 +242,7 @@ function UserMenu() {
 
 function AppContent() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { tenantConfig } = useContext(TenantContext); // Use tenantConfig
 
   return (
     <>
@@ -229,16 +250,20 @@ function AppContent() {
         position="static"
         elevation={0}
         sx={{
-          background: "linear-gradient(135deg, #0d47a1 0%, #00897b 100%)",
+          background: `linear-gradient(135deg, ${tenantConfig.primaryColor} 0%, ${tenantConfig.secondaryColor} 100%)`,
         }}
       >
         <Toolbar>
           <IconButton color="inherit" edge="start" onClick={() => setDrawerOpen(true)} sx={{ mr: 1 }}>
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700, letterSpacing: "-0.01em" }}>
-            WorkD
-          </Typography>
+          {tenantConfig.logoUrl ? (
+            <img src={tenantConfig.logoUrl} alt={tenantConfig.name} style={{ height: 32, marginRight: 8 }} />
+          ) : (
+            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700, letterSpacing: "-0.01em" }}>
+              {tenantConfig.name}
+            </Typography>
+          )}
           <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.5 }}>
             <Button color="inherit" component={Link} to="/" size="small">Profile</Button>
             <Button color="inherit" component={Link} to="/recommendations" size="small">Jobs</Button>

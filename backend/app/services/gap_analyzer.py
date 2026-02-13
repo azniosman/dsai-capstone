@@ -32,14 +32,14 @@ def _priority(severity: str, required_level: str) -> int:
     return p
 
 
-def analyze_gaps(profile: UserProfile, db: Session) -> list[RoleGap]:
-    recommendations = get_recommendations(profile, db, top_n=3)
+def analyze_gaps(profile: UserProfile, db: Session, tenant_id: int) -> list[RoleGap]:
+    recommendations = get_recommendations(profile, db, tenant_id=tenant_id, top_n=3)
     user_skills = profile.skills or []
 
     results = []
     for rec in recommendations:
         from app.models.job_role import JobRole
-        role = db.get(JobRole, rec.role_id)
+        role = db.query(JobRole).filter(JobRole.id == rec.role_id, JobRole.tenant_id == tenant_id).first()
         if not role:
             continue
 

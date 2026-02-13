@@ -99,7 +99,7 @@ def test_get_recommendations(mock_model, mock_category, db_session, sample_profi
     db_session.commit()
     db_session.refresh(profile)
 
-    recs = get_recommendations(profile, db_session, top_n=5)
+    recs = get_recommendations(profile, db_session, tenant_id=db_session._test_tenant_id, top_n=5)
     assert len(recs) == 1
     assert recs[0].title == "Data Engineer"
     assert 0.0 <= recs[0].match_score <= 1.0

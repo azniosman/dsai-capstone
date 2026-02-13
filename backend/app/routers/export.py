@@ -6,13 +6,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
 from app.database import get_db
+from app.models.tenant import Tenant
 
 router = APIRouter(tags=["export"])
 
 
 @router.get("/export/roadmap/{profile_id}")
-def export_roadmap_pdf(profile_id: int, db: Session = Depends(get_db)):
+def export_roadmap_pdf(profile_id: int, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
     from app.models.user_profile import UserProfile
     from app.services.roadmap_generator import generate_roadmap
     from reportlab.lib.pagesizes import A4
@@ -21,7 +23,7 @@ def export_roadmap_pdf(profile_id: int, db: Session = Depends(get_db)):
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
 
-    profile = db.get(UserProfile, profile_id)
+    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 

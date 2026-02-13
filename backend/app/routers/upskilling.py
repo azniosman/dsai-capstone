@@ -1,18 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
 from app.database import get_db
+from app.models.tenant import Tenant
 from app.schemas.skill_gap import RoadmapResponse
 
 router = APIRouter(tags=["upskilling"])
 
 
 @router.get("/upskilling/{profile_id}", response_model=RoadmapResponse)
-def get_upskilling_roadmap(profile_id: int, db: Session = Depends(get_db)):
+def get_upskilling_roadmap(profile_id: int, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
     from app.models.user_profile import UserProfile
     from app.services.roadmap_generator import generate_roadmap
 
-    profile = db.get(UserProfile, profile_id)
+    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 

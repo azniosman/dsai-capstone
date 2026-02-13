@@ -9,9 +9,11 @@ from app.services.gap_analyzer import analyze_gaps
 from app.services.subsidy_calculator import calculate_subsidies
 
 
-def generate_roadmap(profile: UserProfile, db: Session) -> list[RoadmapItem]:
-    gaps = analyze_gaps(profile, db)
-    courses = db.query(SCTPCourse).all()
+def generate_roadmap(profile: UserProfile, db: Session, tenant_id: int) -> list[RoadmapItem]:
+    gaps = analyze_gaps(profile, db, tenant_id=tenant_id)
+    courses = db.query(SCTPCourse).filter(
+        (SCTPCourse.tenant_id == tenant_id) | (SCTPCourse.tenant_id == None)
+    ).all()
 
     is_career_switcher = profile.is_career_switcher or False
 

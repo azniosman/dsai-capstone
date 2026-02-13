@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, JSON, Text, DateTime, func
+from sqlalchemy import Column, Integer, String, Boolean, JSON, Text, DateTime, func, ForeignKey
 from app.database import Base
 
 
@@ -7,6 +7,7 @@ class UserProfile(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, index=True, nullable=True)  # FK to users, nullable for anonymous
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)
     name = Column(String, nullable=False)
     education = Column(String)
     years_experience = Column(Integer, default=0)

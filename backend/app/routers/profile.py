@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_db
+from app.models.tenant import Tenant
 from app.schemas.profile import ProfileCreate, ProfileResponse, ProfileUpdate
 
 router = APIRouter(tags=["profile"])
@@ -15,7 +16,7 @@ def get_my_profile(
 ):
     from app.models.user_profile import UserProfile
 
-    profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user.id, UserProfile.tenant_id == user.tenant_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="No profile linked to this account")
     return profile
@@ -34,9 +35,13 @@ def create_profile(
     if payload.resume_text:
         skills = list(set(skills + extract_skills(payload.resume_text)))
 
+    tenant_id = 1  # default to global tenant
+    if user:
+        tenant_id = user.tenant_id
+
     # If authenticated user already has a profile, update it instead of creating a duplicate
     if user:
-        existing = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+        existing = db.query(UserProfile).filter(UserProfile.user_id == user.id, UserProfile.tenant_id == tenant_id).first()
         if existing:
             existing.name = payload.name
             existing.education = payload.education
@@ -58,6 +63,7 @@ def create_profile(
         resume_text=payload.resume_text,
         is_career_switcher=payload.is_career_switcher,
         user_id=user.id if user else None,
+        tenant_id=tenant_id,
     )
     db.add(profile)
     db.commit()
@@ -66,10 +72,10 @@ def create_profile(
 
 
 @router.get("/profile/{profile_id}", response_model=ProfileResponse)
-def get_profile(profile_id: int, db: Session = Depends(get_db)):
+def get_profile(profile_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     from app.models.user_profile import UserProfile
 
-    profile = db.get(UserProfile, profile_id)
+    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == user.tenant_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile
@@ -84,7 +90,12 @@ def update_profile(
 ):
     from app.models.user_profile import UserProfile
 
-    profile = db.get(UserProfile, profile_id)
+    # If authenticated, filter by tenant; otherwise allow update by profile ID only
+    if user:
+        profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == user.tenant_id).first()
+    else:
+        profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.user_id == None).first()
+
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 

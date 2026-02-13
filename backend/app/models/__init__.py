@@ -5,8 +5,11 @@ from app.models.user_profile import UserProfile
 from app.models.user import User
 from app.models.skill_progress import SkillProgress
 from app.models.market_insight import MarketInsight
+from app.models.tenant import Tenant
+from app.models.api_key import APIKey
+from app.models.audit_log import AuditLog # Added import
 
 __all__ = [
     "JobRole", "Skill", "SCTPCourse", "UserProfile",
-    "User", "SkillProgress", "MarketInsight",
+    "User", "SkillProgress", "MarketInsight", "Tenant", "APIKey", "AuditLog",
 ]

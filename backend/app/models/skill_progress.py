@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, func
+from sqlalchemy import Column, Integer, String, Float, DateTime, func, ForeignKey
 from app.database import Base
 
 
@@ -10,3 +10,4 @@ class SkillProgress(Base):
     skill = Column(String, nullable=False)
     level = Column(Float, default=0.0)  # 0.0, 0.5, 1.0
     recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
