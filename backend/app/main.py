@@ -64,25 +64,25 @@ def _sync_schema():
                 if col.name not in db_columns:
                     col_type = col.type.compile(dialect=engine.dialect)
 
-                    # Always add as nullable first to avoid breaking existing rows
-                    stmt = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}'
-                    logger.info("Schema sync: %s", stmt)
-                    conn.execute(text(stmt))
+                    try:
+                        # Always add as nullable first to avoid breaking existing rows
+                        stmt = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}'
+                        logger.info("Schema sync: %s", stmt)
+                        conn.execute(text(stmt))
 
-                    # Backfill existing rows if we know a safe default
-                    if col.name in _BACKFILL_DEFAULTS:
-                        backfill = f"UPDATE {table.name} SET {col.name} = {_BACKFILL_DEFAULTS[col.name]} WHERE {col.name} IS NULL"
-                        logger.info("Schema sync backfill: %s", backfill)
-                        conn.execute(text(backfill))
+                        # Backfill existing rows if we know a safe default
+                        if col.name in _BACKFILL_DEFAULTS:
+                            backfill = f"UPDATE {table.name} SET {col.name} = {_BACKFILL_DEFAULTS[col.name]} WHERE {col.name} IS NULL"
+                            logger.info("Schema sync backfill: %s", backfill)
+                            conn.execute(text(backfill))
 
-                    # Apply NOT NULL constraint after backfill
-                    if not col.nullable and col.name in _BACKFILL_DEFAULTS:
-                        alter = f"ALTER TABLE {table.name} ALTER COLUMN {col.name} SET NOT NULL"
-                        logger.info("Schema sync constraint: %s", alter)
-                        try:
+                        # Apply NOT NULL constraint after backfill
+                        if not col.nullable and col.name in _BACKFILL_DEFAULTS:
+                            alter = f"ALTER TABLE {table.name} ALTER COLUMN {col.name} SET NOT NULL"
+                            logger.info("Schema sync constraint: %s", alter)
                             conn.execute(text(alter))
-                        except Exception as e:
-                            logger.warning("Could not set NOT NULL on %s.%s: %s", table.name, col.name, e)
+                    except Exception as e:
+                        logger.warning("Schema sync failed for %s.%s: %s", table.name, col.name, e)
 
 
 def _seed_database():
@@ -103,7 +103,10 @@ def _seed_database():
     finally:
         db.close()
 
-    _sync_schema()
+    try:
+        _sync_schema()
+    except Exception as e:
+        logger.warning("Schema sync encountered errors (app will continue): %s", e)
 
     db = SessionLocal()
     try:
