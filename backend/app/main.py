@@ -41,8 +41,20 @@ def _sync_schema():
     SQLAlchemy's create_all() only creates new tables — it does NOT alter
     existing ones.  This helper inspects every mapped table and issues
     ALTER TABLE … ADD COLUMN for anything the DB is missing.
+
+    New NOT NULL columns are added as nullable first, backfilled with a
+    sensible default, then altered to NOT NULL — so existing rows survive.
     """
     inspector = sa_inspect(engine)
+
+    # Known safe defaults for backfilling existing rows
+    _BACKFILL_DEFAULTS = {
+        "tenant_id": "1",       # Global tenant
+        "is_active": "true",
+        "failed_login_attempts": "0",
+        "role": "'member'",
+    }
+
     with engine.begin() as conn:
         for table in Base.metadata.sorted_tables:
             if not inspector.has_table(table.name):
@@ -51,29 +63,51 @@ def _sync_schema():
             for col in table.columns:
                 if col.name not in db_columns:
                     col_type = col.type.compile(dialect=engine.dialect)
-                    default = ""
-                    if col.default is not None:
-                        default = f" DEFAULT {col.default.arg!r}"
-                    stmt = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}{default}'
+
+                    # Always add as nullable first to avoid breaking existing rows
+                    stmt = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}'
                     logger.info("Schema sync: %s", stmt)
                     conn.execute(text(stmt))
+
+                    # Backfill existing rows if we know a safe default
+                    if col.name in _BACKFILL_DEFAULTS:
+                        backfill = f"UPDATE {table.name} SET {col.name} = {_BACKFILL_DEFAULTS[col.name]} WHERE {col.name} IS NULL"
+                        logger.info("Schema sync backfill: %s", backfill)
+                        conn.execute(text(backfill))
+
+                    # Apply NOT NULL constraint after backfill
+                    if not col.nullable and col.name in _BACKFILL_DEFAULTS:
+                        alter = f"ALTER TABLE {table.name} ALTER COLUMN {col.name} SET NOT NULL"
+                        logger.info("Schema sync constraint: %s", alter)
+                        try:
+                            conn.execute(text(alter))
+                        except Exception as e:
+                            logger.warning("Could not set NOT NULL on %s.%s: %s", table.name, col.name, e)
 
 
 def _seed_database():
     """Create tables and seed reference data if empty."""
     Base.metadata.create_all(bind=engine)
-    _sync_schema()
 
+    # Ensure the Global tenant exists BEFORE _sync_schema runs,
+    # because _sync_schema backfills tenant_id=1 on existing rows.
     db = SessionLocal()
     try:
-        # Check if the 'Global' tenant exists, create if not
         global_tenant = db.query(Tenant).filter(Tenant.name == 'Global').first()
         if not global_tenant:
             global_tenant = Tenant(name='Global')
             db.add(global_tenant)
             db.commit()
             db.refresh(global_tenant)
-            logger.info("Created 'Global' tenant.")
+            logger.info("Created 'Global' tenant (id=%s).", global_tenant.id)
+    finally:
+        db.close()
+
+    _sync_schema()
+
+    db = SessionLocal()
+    try:
+        global_tenant = db.query(Tenant).filter(Tenant.name == 'Global').first()
         
         # Check if any skills are present for the global tenant to determine if seeding is needed
         if db.query(Skill).filter(Skill.tenant_id == global_tenant.id).first():

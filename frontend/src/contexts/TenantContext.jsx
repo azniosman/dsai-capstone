@@ -1,6 +1,5 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, { createContext, useState, useEffect } from "react";
 import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
-import { SnackbarContext } from "./SnackbarContext";
 
 export const TenantContext = createContext(null);
 
@@ -45,7 +44,6 @@ export const TenantProvider = ({ children }) => {
     secondaryColor: "#00897b",
   });
   const [currentTheme, setCurrentTheme] = useState(defaultTheme);
-  const { showSnackbar } = useContext(SnackbarContext);
 
   // In a real application, you'd fetch tenant config from an API
   // based on hostname, subdomain, or user's tenant_id after login.
