@@ -1,9 +1,12 @@
 """Singapore labor market insights endpoint."""
 
+from app.models.tenant import Tenant
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
+from app.api_key_auth import get_current_tenant_by_api_key
 from app.database import get_db
 from app.models.market_insight import MarketInsight
 
@@ -80,8 +83,10 @@ DEFAULT_INSIGHTS = [
 
 
 @router.get("/market-insights", response_model=MarketOverview)
-def get_market_insights(db: Session = Depends(get_db)):
-    insights = db.query(MarketInsight).all()
+def get_market_insights(db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant_by_api_key)):
+    insights = db.query(MarketInsight).filter(
+        (MarketInsight.tenant_id == tenant.id) | (MarketInsight.tenant_id == None)
+    ).all()
 
     if not insights:
         # Use default data
