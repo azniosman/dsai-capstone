@@ -24,12 +24,26 @@ from app.routers import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "seed_data")
+# Try multiple path candidates: Docker image, backend/seed_data, repo data/seed (local dev)
+_SEED_CANDIDATES = [
+    os.path.join(os.path.dirname(__file__), "..", "seed_data"),
+    os.path.join(os.path.dirname(__file__), "..", "..", "data", "seed"),
+    "/app/seed_data",
+]
 
 
-def _load_seed_json(filename):
-    path = os.path.join(SEED_DIR, filename)
-    if not os.path.exists(path):
+def _resolve_seed_path(filename: str) -> str | None:
+    """Return the first path where filename exists under a seed candidate directory."""
+    for base in _SEED_CANDIDATES:
+        path = os.path.join(base, filename)
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _load_seed_json(filename: str):
+    path = _resolve_seed_path(filename)
+    if path is None:
         return None
     with open(path) as f:
         return json.load(f)
@@ -82,26 +96,26 @@ def _sync_schema():
                         elif col.name in _BACKFILL_DEFAULTS:
                             default_clause = ""  # backfill via UPDATE instead
 
-                        stmt = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}{default_clause}'
+                        stmt = f'ALTER TABLE "{table.name}" ADD COLUMN "{col.name}" {col_type}{default_clause}'
                         logger.info("Schema sync: %s", stmt)
                         conn.execute(text(stmt))
 
                         # Backfill existing rows if we know a safe default
                         if col.name in _BACKFILL_DEFAULTS:
-                            backfill = f"UPDATE {table.name} SET {col.name} = {_BACKFILL_DEFAULTS[col.name]} WHERE {col.name} IS NULL"
+                            backfill = f'UPDATE "{table.name}" SET "{col.name}" = {_BACKFILL_DEFAULTS[col.name]} WHERE "{col.name}" IS NULL'
                             logger.info("Schema sync backfill: %s", backfill)
                             conn.execute(text(backfill))
 
                         # Apply NOT NULL constraint after backfill / default
                         has_default = col.name in _BACKFILL_DEFAULTS or col.name in _COLUMN_DEFAULTS
                         if not col.nullable and has_default:
-                            alter = f"ALTER TABLE {table.name} ALTER COLUMN {col.name} SET NOT NULL"
+                            alter = f'ALTER TABLE "{table.name}" ALTER COLUMN "{col.name}" SET NOT NULL'
                             logger.info("Schema sync constraint: %s", alter)
                             conn.execute(text(alter))
 
                         # Drop the temporary DEFAULT (keep schema clean)
                         if col.name in _COLUMN_DEFAULTS:
-                            conn.execute(text(f"ALTER TABLE {table.name} ALTER COLUMN {col.name} DROP DEFAULT"))
+                            conn.execute(text(f'ALTER TABLE "{table.name}" ALTER COLUMN "{col.name}" DROP DEFAULT'))
 
                         savepoint.commit()
                     except Exception as e:
@@ -271,8 +285,9 @@ cors_origins = (
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 # Core

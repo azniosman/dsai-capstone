@@ -1,6 +1,7 @@
 """JWT authentication utilities."""
 
 import secrets
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -9,7 +10,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from app.models.tenant import Tenant
-from app.models.user import User, Role # Added User and Role import
+from app.models.user import User, Role
 
 from app.config import settings
 from app.database import get_db
@@ -17,15 +18,33 @@ from app.database import get_db
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
-# In-memory JTI blacklist (cleared on restart — acceptable for single-process demo)
-_revoked_tokens: set[str] = set()
+# In-memory JTI blacklist with TTL cleanup.
+# For production, use Redis or a database table instead.
+_revoked_tokens: OrderedDict[str, float] = OrderedDict()  # jti -> expiry timestamp
+_MAX_BLACKLIST_SIZE = 10000
 
 
-def revoke_token(jti: str) -> None:
-    _revoked_tokens.add(jti)
+def _cleanup_expired_tokens() -> None:
+    now = datetime.now(timezone.utc).timestamp()
+    while _revoked_tokens:
+        jti, exp = next(iter(_revoked_tokens.items()))
+        if exp < now:
+            _revoked_tokens.pop(jti)
+        else:
+            break
+
+
+def revoke_token(jti: str, expires_at: float | None = None) -> None:
+    if expires_at is None:
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)).timestamp()
+    _cleanup_expired_tokens()
+    _revoked_tokens[jti] = expires_at
+    if len(_revoked_tokens) > _MAX_BLACKLIST_SIZE:
+        _revoked_tokens.popitem(last=False)
 
 
 def is_token_revoked(jti: str) -> bool:
+    _cleanup_expired_tokens()
     return jti in _revoked_tokens
 
 

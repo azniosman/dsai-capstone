@@ -57,7 +57,8 @@ export default function ProfileInput() {
           const res = await api.get("/api/profile/me");
           profile = res.data;
           localStorage.setItem("profileId", profile.id);
-        } catch {
+        } catch (err) {
+          console.error(err);
           // No linked profile
         }
       }
@@ -67,7 +68,8 @@ export default function ProfileInput() {
           try {
             const res = await api.get(`/api/profile/${profileId}`);
             profile = res.data;
-          } catch {
+          } catch (err) {
+            console.error(err);
             // Profile not found
           }
         }
@@ -121,7 +123,8 @@ export default function ProfileInput() {
         skills: [...new Set([...prev.skills, ...res.data.skills])],
       }));
       toast.success("Resume parsed successfully!");
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError("Failed to parse resume file. Try pasting text instead.");
     } finally {
       setUploading(false);
@@ -150,7 +153,8 @@ export default function ProfileInput() {
         toast.success("Profile created! Fetching your job matches...");
         router.push("/recommendations");
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("Failed to save profile. Please try again.");
       setError("Failed to save profile. Please try again.");
     } finally {

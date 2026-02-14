@@ -1,23 +1,23 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ProfileCreate(BaseModel):
-    name: str
-    education: str | None = None
+    name: str = Field(max_length=200)
+    education: str | None = Field(None, max_length=500)
     years_experience: int = 0
     age: int | None = None
     skills: list[str] = []
-    resume_text: str | None = None
+    resume_text: str | None = Field(None, max_length=50000)
     is_career_switcher: bool = False
 
 
 class ProfileUpdate(BaseModel):
-    name: str | None = None
-    education: str | None = None
+    name: str | None = Field(None, max_length=200)
+    education: str | None = Field(None, max_length=500)
     years_experience: int | None = None
     age: int | None = None
     skills: list[str] | None = None
-    resume_text: str | None = None
+    resume_text: str | None = Field(None, max_length=50000)
     is_career_switcher: bool | None = None
 
 

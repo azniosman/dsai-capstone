@@ -10,6 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import api from "@/lib/api-client";
+import { extractApiError } from "@/lib/utils";
 
 const DIFFICULTY_CLASSES: Record<string, string> = {
   easy: "bg-green-100 text-green-800 hover:bg-green-100",
@@ -73,7 +74,8 @@ export default function RoleComparison() {
       });
       setResult(res.data);
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Comparison failed");
+      console.error(err);
+      setError(extractApiError(err, "Comparison failed"));
     } finally {
       setLoading(false);
     }

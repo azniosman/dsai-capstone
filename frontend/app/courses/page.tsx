@@ -40,29 +40,33 @@ export default function CourseBrowser() {
   const [providers, setProviders] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchCourses();
-  }, [provider, level, mcesOnly]);
-
-  const fetchCourses = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: Record<string, string | boolean> = {};
-      if (provider) params.provider = provider;
-      if (level) params.level = level;
-      if (mcesOnly) params.mces_eligible = true;
-      const res = await api.get("/api/courses", { params });
-      setCourses(res.data.courses);
-      if (providers.length === 0 && res.data.courses.length > 0) {
-        const uniqueProviders = [...new Set(res.data.courses.map((c: Course) => c.provider))].sort() as string[];
-        setProviders(uniqueProviders);
+    const controller = new AbortController();
+    const fetchCourses = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params: Record<string, string | boolean> = {};
+        if (provider) params.provider = provider;
+        if (level) params.level = level;
+        if (mcesOnly) params.mces_eligible = true;
+        const res = await api.get("/api/courses", { params, signal: controller.signal });
+        setCourses(res.data.courses);
+        if (providers.length === 0 && res.data.courses.length > 0) {
+          const uniqueProviders = [...new Set(res.data.courses.map((c: Course) => c.provider))].sort() as string[];
+          setProviders(uniqueProviders);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.error(err);
+          setError("Failed to load courses.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
-    } catch {
-      setError("Failed to load courses.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    fetchCourses();
+    return () => controller.abort();
+  }, [provider, level, mcesOnly]);
 
   const filtered = skillSearch
     ? courses.filter((c) =>

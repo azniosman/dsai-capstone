@@ -6,7 +6,7 @@ class UserProfile(Base):
     __tablename__ = "user_profiles"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True, nullable=True)  # FK to users, nullable for anonymous
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)
     name = Column(String, nullable=False)
     education = Column(String)

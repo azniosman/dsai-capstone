@@ -65,7 +65,8 @@ export default function CareerChat() {
         messages: newMsgs.map((m) => ({ role: m.role, content: m.content })),
       });
       setMessages([...newMsgs, { role: "assistant", content: res.data.reply }]);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setMessages([...newMsgs, { role: "assistant", content: "Sorry, I encountered an error. Please try again." }]);
     } finally {
       setLoading(false);
@@ -80,7 +81,7 @@ export default function CareerChat() {
         <CardContent className="p-0">
           {messages.map((msg, i) => (
             <div
-              key={i}
+              key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`}
               className={`flex gap-2 mb-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {msg.role === "assistant" && (

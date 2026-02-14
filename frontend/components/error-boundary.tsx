@@ -40,7 +40,6 @@ export default class ErrorBoundary extends Component<Props, State> {
               </p>
               <Button
                 onClick={() => {
-                  this.setState({ hasError: false });
                   window.location.href = "/";
                 }}
               >

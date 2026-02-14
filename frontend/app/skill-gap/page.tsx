@@ -89,7 +89,7 @@ export default function SkillGap() {
       <Tabs value={tab} onValueChange={setTab} className="mb-4">
         <TabsList>
           {gaps.map((g, i) => (
-            <TabsTrigger key={i} value={String(i)}>{g.role_title}</TabsTrigger>
+            <TabsTrigger key={g.role_title} value={String(i)}>{g.role_title}</TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
@@ -124,8 +124,8 @@ export default function SkillGap() {
                   <YAxis type="category" dataKey="skill" width={100} tick={{ fontSize: 12 }} />
                   <Tooltip formatter={(v) => `${Math.round(Number(v) * 100)}%`} />
                   <Bar dataKey="level" name="Your Level">
-                    {chartData.map((entry, i) => (
-                      <Cell key={i} fill={GAP_COLORS[entry.severity]} />
+                    {chartData.map((entry) => (
+                      <Cell key={entry.skill} fill={GAP_COLORS[entry.severity]} />
                     ))}
                   </Bar>
                 </BarChart>

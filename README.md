@@ -25,10 +25,10 @@ A career intelligence platform for SCTP learners and career-switchers in Singapo
 ### Tracking & Account
 - **Progress Dashboard** — Record skill acquisitions over time with timeline charts
 - **SkillsFuture Subsidy Calculator** — Standalone subsidy calculation for any SCTP course, factoring in base subsidy, MCES enhancement (90% for career switchers), and SkillsFuture Credit offset
-- **User Authentication** — JWT access tokens (15 min) with rotating refresh tokens (7 day). Rate-limited login/register endpoints, account lockout after 5 failed attempts, email normalization, and in-memory JTI blacklist for token revocation. Profiles are auto-linked to accounts on creation, with ownership guards on edits.
-- **Account Settings** — Update name/email, change password, and delete account with confirmation. Profiles linked to an account are protected from unauthorized edits.
-- **Password Recovery** — Token-based forgot/reset password flow (demo mode returns token directly; production-ready for email delivery)
-- **Security Hardening** — Security headers middleware (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, HSTS in production), rate limiting via slowapi, input validation with email regex and password confirmation, and startup secret validation in production mode
+- **User Authentication** — JWT access tokens (15 min) with rotating refresh tokens (7 day). Rate-limited login/register endpoints, account lockout after 5 failed attempts, email normalization, and bounded TTL token blacklist for revocation. Profiles are auto-linked to accounts on creation, with ownership guards on edits.
+- **Account Settings** — Update name/email, change password, and soft-delete account (PII cleared, user deactivated). Profiles linked to an account are protected from unauthorized edits.
+- **Password Recovery** — Token-based forgot/reset password flow (demo mode returns token directly; production-ready for email delivery). Password complexity enforced: 8+ chars with uppercase, lowercase, digit, and special character.
+- **Security Hardening** — Backend security headers middleware (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, HSTS in production). Frontend Next.js middleware with CSP, X-Frame-Options, Permissions-Policy. CORS restricted headers and credentials. Rate limiting via slowapi on auth, API key, and admin endpoints. File uploads validated by MIME type and capped at 10 MB. Profile schema string length limits. OpenAI API calls have 30-second timeouts. Database connection pooling with pre-ping. IDOR protection on profile endpoints. SQL identifier quoting in schema sync. Audit log detail truncation.
 
 ## Quick Start
 
@@ -72,6 +72,12 @@ cd backend
 pytest
 ```
 
+Tests use an in-memory SQLite database by default. To run against PostgreSQL (e.g. to catch dialect-specific issues), set `DATABASE_URL_TEST`:
+
+```bash
+DATABASE_URL_TEST=postgresql://user:pass@localhost:5432/test_db pytest -v
+```
+
 ## API Endpoints
 
 | Method | Path | Description |
@@ -80,7 +86,7 @@ pytest
 | POST | `/api/auth/login` | Login (returns JWT) |
 | GET | `/api/auth/me` | Current user info |
 | PATCH | `/api/auth/me` | Update name/email |
-| DELETE | `/api/auth/me` | Delete account + linked profile |
+| DELETE | `/api/auth/me` | Soft-delete account (deactivate + clear PII) |
 | POST | `/api/auth/change-password` | Change password (authenticated) |
 | POST | `/api/auth/refresh` | Rotate refresh token, get new token pair |
 | POST | `/api/auth/logout` | Revoke refresh token |
@@ -108,12 +114,18 @@ pytest
 | GET | `/api/courses` | List SCTP courses (filterable) |
 | POST | `/api/calculate-subsidy` | Calculate subsidy for a course |
 | GET | `/api/export/roadmap/{id}` | Export roadmap as PDF |
+| GET | `/api/sso/login` | SSO login redirect (dev only) |
+| GET | `/api/sso/callback` | SSO callback (dev only) |
+| POST | `/api/api-keys/` | Create API key (admin) |
+| GET | `/api/api-keys/` | List API keys (admin) |
+| DELETE | `/api/api-keys/{id}` | Revoke API key (admin) |
+| GET | `/api/audit-logs/` | List audit logs (admin) |
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 18, Vite, MUI 6, Recharts |
+| Frontend | Next.js 16, React 19, Tailwind, shadcn/radix, Recharts |
 | Backend | Python 3.11, FastAPI, SQLAlchemy 2 |
 | AI/ML | Sentence Transformers (all-MiniLM-L6-v2), spaCy, FAISS |
 | LLM | OpenAI API (optional, rule-based fallback) |
@@ -134,7 +146,7 @@ pytest
               │   Route 53 + ACM│
               └───┬─────────┬───┘
                   │         │
-        ┌─────────▼──┐  ┌──▼──────────┐
+        ┌─────────▼──-┐  ┌──▼──────────┐
         │ CloudFront  │  │  ALB (HTTPS)│
         │ S3 Origin   │  │  /api/*     │
         │ (Frontend)  │  └──────┬──────┘

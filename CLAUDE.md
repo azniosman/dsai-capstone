@@ -8,7 +8,7 @@ DSAI Capstone — Job Recommendation & Skill Gap Analysis System for SCTP learne
 
 ## Tech Stack
 
-- **Frontend**: React 18 + Vite + MUI 6 + Recharts
+- **Frontend**: Next.js 16 + React 19 + Tailwind + shadcn/radix + Recharts
 - **Backend**: Python 3.11 + FastAPI + SQLAlchemy 2
 - **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), spaCy, FAISS
 - **Database**: PostgreSQL 16
@@ -49,16 +49,30 @@ python data/scripts/seed_db.py
 - `backend/app/ml/` — ML pipelines (embeddings, taxonomy normalization)
 - `backend/app/models/` — SQLAlchemy ORM models (job_role, skill, sctp_course, user_profile, user, skill_progress, market_insight)
 - `backend/app/schemas/` — Pydantic request/response schemas
-- `frontend/src/pages/` — React pages (ProfileInput, Recommendations, SkillGap, Roadmap, JDMatch, CareerChat, MockInterview, MarketInsights, RoleComparison, PeerComparison, ProjectSuggestions, ProgressDashboard, Login)
+- `frontend/app/` — Next.js App Router pages (page.tsx under recommendations, skill-gap, roadmap, jd-match, chat, interview, market, compare, peers, projects, progress, courses, login, account)
 - `data/seed/` — Seed JSON data files
 
 ## Key Design Decisions
 
-- Hybrid scoring: `0.6 × content_similarity + 0.25 × rule_match + 0.15 × career_switcher_bonus`
+- Hybrid scoring: `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
 - Skill levels: 0 (missing), 0.5 (partial), 1.0 (strong)
 - FAISS in-memory for vector similarity search
 - LLM chatbot/interview uses OpenAI API when configured, falls back to rule-based responses
 - Auth is optional — core features work without login
+
+## Security
+
+- Password complexity: 8+ chars, 1 uppercase, 1 lowercase, 1 digit, 1 special char (validated in Pydantic schemas)
+- File uploads: 10 MB limit (chunked read), MIME type allowlist
+- Account deletion: soft delete (deactivate + PII cleared), not hard delete
+- Token blacklist: bounded OrderedDict with TTL cleanup (max 10K entries)
+- DB pool: `pool_size=5, max_overflow=10, pool_pre_ping=True`
+- CORS: credentials enabled, restricted allowed headers (`Authorization`, `Content-Type`, `Accept`)
+- Profile endpoints: IDOR-protected with `user_id` check on authenticated requests
+- Schema sync: double-quoted SQL identifiers for defense in depth
+- OpenAI calls: 30-second timeout
+- Frontend: Next.js middleware for CSP, X-Frame-Options, Permissions-Policy; token refresh uses shared Promise (no race condition); AbortController cleanup on unmount
+- Audit logger: truncates detail values >1000 chars
 
 ## API Endpoints
 
@@ -84,3 +98,11 @@ python data/scripts/seed_db.py
 | GET | /api/progress/{id} | Get progress dashboard |
 | GET | /api/progress/{id}/timeline | Progress timeline data |
 | GET | /api/export/roadmap/{id} | Export roadmap as PDF |
+| GET | /api/courses | List SCTP courses |
+| POST | /api/calculate-subsidy | Calculate subsidy for a course |
+| GET | /api/sso/login | SSO login (dev only) |
+| GET | /api/sso/callback | SSO callback (dev only) |
+| POST | /api/api-keys/ | Create API key (admin) |
+| GET | /api/api-keys/ | List API keys (admin) |
+| DELETE | /api/api-keys/{id} | Revoke API key (admin) |
+| GET | /api/audit-logs/ | List audit logs (admin) |

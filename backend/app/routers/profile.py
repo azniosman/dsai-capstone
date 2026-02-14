@@ -75,7 +75,11 @@ def create_profile(
 def get_profile(profile_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     from app.models.user_profile import UserProfile
 
-    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == user.tenant_id).first()
+    profile = db.query(UserProfile).filter(
+        UserProfile.id == profile_id,
+        UserProfile.tenant_id == user.tenant_id,
+        UserProfile.user_id == user.id,
+    ).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile

@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
+import { extractApiError } from "@/lib/utils";
 
 export default function Login() {
   const router = useRouter();
@@ -57,7 +58,7 @@ export default function Login() {
       toast.success(`Welcome back, ${me.data.name}!`);
       router.push("/");
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Login failed";
+      const msg = extractApiError(err, "Login failed");
       setError(msg);
       toast.error(msg);
     } finally {
@@ -80,7 +81,7 @@ export default function Login() {
       setTab("login");
       setError(null);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Registration failed";
+      const msg = extractApiError(err, "Registration failed");
       setError(msg);
       toast.error(msg);
     } finally {
@@ -117,7 +118,7 @@ export default function Login() {
         ? "Reset token generated. Use it below to set a new password."
         : "If an account exists with that email, a reset link has been generated.");
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to request password reset");
+      setError(extractApiError(err, "Failed to request password reset"));
     } finally {
       setLoading(false);
     }
@@ -137,7 +138,7 @@ export default function Login() {
       setForgotEmail("");
       setTab("login");
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Password reset failed";
+      const msg = extractApiError(err, "Password reset failed");
       setError(msg);
       toast.error(msg);
     } finally {

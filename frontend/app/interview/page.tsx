@@ -44,7 +44,7 @@ export default function MockInterview() {
         const titles = res.data.map((r: { title: string }) => r.title);
         if (titles.length > 0) setRoleOptions(titles);
       })
-      .catch(() => {});
+      .catch((err) => { console.error(err); });
   }, []);
 
   const startInterview = async () => {
@@ -68,7 +68,8 @@ export default function MockInterview() {
         targetSkill: res.data.target_skill,
       }]);
       setQuestionNum(res.data.question_number);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setMessages([{ role: "assistant", content: "Let's start! Tell me about yourself and your experience." }]);
       setQuestionNum(1);
     } finally {
@@ -100,7 +101,8 @@ export default function MockInterview() {
       setQuestionNum(res.data.question_number);
       if (res.data.feedback) setFeedback(res.data.feedback);
       if (res.data.is_complete) setComplete(true);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setMessages([...newMsgs, { role: "assistant", content: "Could you elaborate on that?" }]);
     } finally {
       setLoading(false);
@@ -157,7 +159,7 @@ export default function MockInterview() {
           <Card className="p-4 mb-4 max-h-[400px] overflow-auto">
             <CardContent className="p-0">
               {messages.map((msg, i) => (
-                <div key={i} className="mb-4">
+                <div key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`} className="mb-4">
                   <p className="text-xs text-muted-foreground">
                     {msg.role === "assistant" ? "Interviewer" : "You"}
                   </p>

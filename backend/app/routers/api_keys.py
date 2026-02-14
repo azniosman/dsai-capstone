@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -8,6 +8,7 @@ from app.models.api_key import APIKey
 from app.models.user import User, Role
 from app.auth import has_role
 from app.api_key_auth import create_api_key, revoke_api_key
+from app.limiter import limiter
 
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
@@ -29,7 +30,9 @@ class APIKeyResponse(BaseModel):
 
 
 @router.post("/", response_model=APIKeyResponse)
+@limiter.limit("10/minute")
 def generate_new_api_key(
+    request: Request,
     payload: APIKeyCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(has_role([Role.ADMIN])),
@@ -38,7 +41,9 @@ def generate_new_api_key(
     return new_key
 
 @router.get("/", response_model=list[APIKeyResponse])
+@limiter.limit("10/minute")
 def get_all_api_keys(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(has_role([Role.ADMIN])),
 ):

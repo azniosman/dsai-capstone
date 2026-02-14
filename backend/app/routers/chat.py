@@ -1,5 +1,7 @@
 """LLM career coach chatbot endpoint — WorkD AI persona."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -12,6 +14,8 @@ from app.routers.market import DEFAULT_INSIGHTS
 
 
 router = APIRouter(tags=["chat"])
+
+OPENAI_TIMEOUT_SECONDS = 30
 
 
 class ChatMessage(BaseModel):
@@ -130,12 +134,18 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
             from app.services.recommender import get_recommendations
             from app.services.gap_analyzer import analyze_gaps
             from app.services.roadmap_generator import generate_roadmap
+
             try:
                 recommendations = get_recommendations(profile, db, tenant_id=tenant_id, top_n=3)
                 skill_gaps = analyze_gaps(profile, db, tenant_id=tenant_id)
                 roadmap_courses = generate_roadmap(profile, db, tenant_id=tenant_id)
-            except Exception:
-                pass
+            except Exception as e:
+                logging.getLogger(__name__).exception(
+                    "Chat context load failed for profile_id=%s, responding without user context: %s",
+                    payload.profile_id,
+                    e,
+                )
+                # recommendations, skill_gaps, roadmap_courses remain None; chat continues without context
 
     system_prompt = _build_system_prompt(profile, recommendations, skill_gaps, roadmap_courses)
 
@@ -148,6 +158,7 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
         messages=messages,
         max_tokens=1024,
         temperature=0.7,
+        timeout=OPENAI_TIMEOUT_SECONDS,
     )
     return ChatResponse(reply=response.choices[0].message.content)
 
@@ -163,6 +174,7 @@ def _fallback_response(user_msg: str, profile_id: int | None = None, db: Session
         try:
             from app.models.user_profile import UserProfile
             from app.services.roadmap_generator import generate_roadmap
+
             profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant_id).first()
             if profile:
                 roadmap = generate_roadmap(profile, db, tenant_id=tenant_id)
@@ -173,8 +185,13 @@ def _fallback_response(user_msg: str, profile_id: int | None = None, db: Session
                     mces_hint = (" As you're eligible for the Mid-Career Enhanced Subsidy (MCES), "
                                  "you can get up to 90% course fee subsidy, plus a $4,000 SkillsFuture Credit top-up "
                                  "and Training Allowance of up to $6,000 during SCTP enrolment.")
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).exception(
+                "Fallback response context load failed for profile_id=%s, responding without hints: %s",
+                profile_id,
+                e,
+            )
+            # course_hint, mces_hint remain ""; response continues without context
 
     if any(w in msg for w in ["salary", "pay", "compensation"]):
         return ("Great question! Singapore tech salaries vary by role and experience. "

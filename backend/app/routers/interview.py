@@ -1,5 +1,7 @@
 """Mock interview simulator endpoint with skill-gap-aware question selection."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -9,6 +11,8 @@ from app.database import get_db
 from app.auth import get_current_user_optional
 
 router = APIRouter(tags=["interview"])
+
+OPENAI_TIMEOUT_SECONDS = 30
 
 
 class InterviewMessage(BaseModel):
@@ -176,8 +180,9 @@ def _get_gap_targeted_questions(profile_id: int, db: Session, tenant_id: int) ->
                         break
 
         return targeted
-    except Exception:
-        return []
+    except Exception as e:
+        logging.exception("Failed to load gap-targeted questions for profile_id=%s: %s", profile_id, e)
+        raise
 
 
 @router.post("/interview", response_model=InterviewResponse)
@@ -191,7 +196,15 @@ def mock_interview(payload: InterviewRequest, db: Session = Depends(get_db), use
     # Build mixed question set: 3 gap-targeted + 2 role-specific (or fallback to all role)
     gap_questions = []
     if payload.profile_id:
-        gap_questions = _get_gap_targeted_questions(payload.profile_id, db, tenant_id)
+        try:
+            gap_questions = _get_gap_targeted_questions(payload.profile_id, db, tenant_id)
+        except Exception as e:
+            logging.exception(
+                "Gap-targeted questions failed for profile_id=%s, using generic questions: %s",
+                payload.profile_id,
+                e,
+            )
+            # gap_questions remains []; interview continues with role questions only
 
     # Compose final question list: up to 3 gap-targeted, then fill with role questions
     mixed_questions = []
@@ -302,6 +315,7 @@ def _llm_interview(
         messages=messages,
         max_tokens=512,
         temperature=0.7,
+        timeout=OPENAI_TIMEOUT_SECONDS,
     )
     reply = response.choices[0].message.content
 

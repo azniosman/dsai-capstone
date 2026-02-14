@@ -15,8 +15,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let isRefreshing = false;
-let pendingRequests: ((token: string | null) => void)[] = [];
+let refreshPromise: Promise<string | null> | null = null;
 
 function clearAuth() {
   if (typeof window === "undefined") return;
@@ -27,14 +26,24 @@ function clearAuth() {
   localStorage.removeItem("profileId");
 }
 
-function onRefreshed(newToken: string) {
-  pendingRequests.forEach((cb) => cb(newToken));
-  pendingRequests = [];
-}
-
-function onRefreshFailed() {
-  pendingRequests.forEach((cb) => cb(null));
-  pendingRequests = [];
+async function doRefresh(): Promise<string | null> {
+  try {
+    const res = await axios.post(
+      `${api.defaults.baseURL}/api/auth/refresh`,
+      { refresh_token: localStorage.getItem("refreshToken") },
+      { timeout: 10000 }
+    );
+    const { access_token, refresh_token } = res.data;
+    localStorage.setItem("token", access_token);
+    localStorage.setItem("refreshToken", refresh_token);
+    return access_token;
+  } catch {
+    clearAuth();
+    if (window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+    return null;
+  }
 }
 
 api.interceptors.response.use(
@@ -51,42 +60,18 @@ api.interceptors.response.use(
     ) {
       originalRequest._retry = true;
 
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          pendingRequests.push((newToken) => {
-            if (newToken) {
-              originalRequest.headers.Authorization = `Bearer ${newToken}`;
-              resolve(api(originalRequest));
-            } else {
-              reject(error);
-            }
-          });
+      if (!refreshPromise) {
+        refreshPromise = doRefresh().finally(() => {
+          refreshPromise = null;
         });
       }
 
-      isRefreshing = true;
-      try {
-        const res = await axios.post(
-          `${api.defaults.baseURL}/api/auth/refresh`,
-          { refresh_token: localStorage.getItem("refreshToken") },
-          { timeout: 10000 }
-        );
-        const { access_token, refresh_token } = res.data;
-        localStorage.setItem("token", access_token);
-        localStorage.setItem("refreshToken", refresh_token);
-        isRefreshing = false;
-        onRefreshed(access_token);
-        originalRequest.headers.Authorization = `Bearer ${access_token}`;
+      const newToken = await refreshPromise;
+      if (newToken) {
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
-      } catch {
-        isRefreshing = false;
-        onRefreshFailed();
-        clearAuth();
-        if (window.location.pathname !== "/login") {
-          window.location.href = "/login";
-        }
-        return Promise.reject(error);
       }
+      return Promise.reject(error);
     }
 
     if (error.response?.status === 401) {

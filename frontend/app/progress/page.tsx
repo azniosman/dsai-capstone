@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
+import { extractApiError } from "@/lib/utils";
 
 interface ProgressEntry {
   skill: string;
@@ -50,7 +51,27 @@ export default function ProgressDashboard() {
 
   useEffect(() => {
     if (!profileId) { router.push("/"); return; }
+    const controller = new AbortController();
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [progRes, timeRes] = await Promise.all([
+          api.get(`/api/progress/${profileId}`, { signal: controller.signal }),
+          api.get(`/api/progress/${profileId}/timeline`, { signal: controller.signal }),
+        ]);
+        setProgress(progRes.data);
+        setTimeline(timeRes.data.timeline);
+      } catch (err: unknown) {
+        if (!controller.signal.aborted) {
+          console.error(err);
+          setError(extractApiError(err, "Failed to load progress"));
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
     loadData();
+    return () => controller.abort();
   }, [profileId, router]);
 
   const loadData = async () => {
@@ -63,7 +84,8 @@ export default function ProgressDashboard() {
       setProgress(progRes.data);
       setTimeline(timeRes.data.timeline);
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to load progress");
+      console.error(err);
+      setError(extractApiError(err, "Failed to load progress"));
     } finally {
       setLoading(false);
     }
@@ -183,8 +205,8 @@ export default function ProgressDashboard() {
         <Card className="p-6">
           <CardContent className="p-0">
             <h2 className="text-lg font-bold mb-3">Recent Activity</h2>
-            {progress.entries.slice(0, 20).map((e, i) => (
-              <div key={i} className="flex items-center gap-2 mb-2">
+            {progress.entries.slice(0, 20).map((e) => (
+              <div key={`${e.skill}-${e.recorded_at}`} className="flex items-center gap-2 mb-2">
                 <Badge
                   className={
                     e.level >= 1.0
