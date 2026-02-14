@@ -30,16 +30,25 @@ A career intelligence platform for SCTP learners and career-switchers in Singapo
 - **Password Recovery** — Token-based forgot/reset password flow (demo mode returns token directly; production-ready for email delivery)
 - **Security Hardening** — Security headers middleware (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, HSTS in production), rate limiting via slowapi, input validation with email regex and password confirmation, and startup secret validation in production mode
 
-## Quick Start
+## Quick Start (Local-First)
 
 ```bash
 cp .env.example .env
-docker compose up
+./scripts/rebuild-local.sh
 ```
 
-- Frontend: http://localhost:3000
+- Frontend (Vite dev): http://localhost:5173
 - Backend API: http://localhost:8000
 - API docs: http://localhost:8000/docs
+- DB UI (Adminer): http://localhost:8080
+
+If you prefer the production-style static frontend container:
+
+```bash
+docker compose up --build
+```
+
+- Frontend (Nginx): http://localhost:3000
 
 ## Development
 
@@ -119,73 +128,25 @@ pytest
 | LLM | OpenAI API (optional, rule-based fallback) |
 | Database | PostgreSQL 16 |
 | Auth | JWT (access + refresh tokens) + bcrypt + slowapi rate limiting |
-| Cloud | AWS (ECS Fargate, RDS, S3, CloudFront, ALB) |
-| DNS/TLS | Route 53, ACM (wildcard cert) |
-| IaC | Terraform (modular) |
+| Cloud | Optional (repository includes legacy Terraform AWS modules) |
+| DNS/TLS | Localhost by default (optional reverse proxy/domain in self-hosted setups) |
+| IaC | Docker Compose for local orchestration |
 | CI/CD | GitHub Actions |
-| Deploy | Docker Compose (local), AWS ECS Fargate (production) |
+| Deploy | Docker Compose (local/self-hosted) |
 
-## AWS Architecture
+## Local Hosting Architecture
 
 ```
-                    Internet
-                       │
-              ┌────────┴────────┐
-              │   Route 53 + ACM│
-              └───┬─────────┬───┘
-                  │         │
-        ┌─────────▼──┐  ┌──▼──────────┐
-        │ CloudFront  │  │  ALB (HTTPS)│
-        │ S3 Origin   │  │  /api/*     │
-        │ (Frontend)  │  └──────┬──────┘
-        └─────────────┘         │
-                        ┌───────▼────────┐
-                        │  ECS Fargate   │
-                        │  FastAPI + ML  │
-                        │  2 vCPU, 4GB   │
-                        └───────┬────────┘
-                                │
-                        ┌───────▼────────┐
-                        │ RDS PostgreSQL │
-                        │ db.t4g.micro   │
-                        └────────────────┘
+Browser (localhost:5173 or :3000)
+            │
+            ▼
+      FastAPI (localhost:8000)
+            │
+            ▼
+   PostgreSQL 16 (localhost:5432)
 ```
 
-| Layer | Service | Rationale |
-|-------|---------|-----------|
-| Frontend | S3 + CloudFront | Static SPA, global CDN, ~$2/month |
-| Backend | ECS Fargate | Container-native, handles 135MB ML models |
-| Database | RDS PostgreSQL | Managed, single-AZ, ~$15/month |
-| Networking | VPC + VPC Endpoints | No NAT Gateway — saves ~$32/month |
-| Secrets | Secrets Manager + SSM | Secure injection into ECS tasks |
-| CI/CD | GitHub Actions + OIDC | No long-lived AWS credentials |
-| DNS/TLS | Route 53 + ACM | Custom domain (workd.my), wildcard cert, HTTPS everywhere |
-| IaC | Terraform (8 modules) | Modular, reproducible infrastructure |
-
-Estimated monthly cost: **~$50–70**
-
-### Production URLs
-
-- Frontend: https://workd.my
-- Backend API: https://api.workd.my
-- API docs: https://api.workd.my/docs
-
-### Deploy to AWS
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars  # edit with your domain
-terraform init
-terraform plan
-terraform apply
-```
-
-After first deploy, update your domain's nameservers to the Route 53 values from `terraform output route53_nameservers` to activate DNS and HTTPS.
-
-CI/CD auto-deploys on push to `main`:
-- Backend changes → pytest → Docker build → ECR push → ECS rolling update
-- Frontend changes → npm build → S3 sync → CloudFront invalidation
-- Terraform changes → plan on PR → apply on merge
+This repo is now optimized for local/self-hosted development. Use `docker-compose.yml` for a production-like container run, or combine it with `docker-compose.local.yml` for hot reload + Adminer. Detailed steps live in `docs/LOCAL_HOSTING.md`.
 
 ## Project Structure
 
@@ -220,6 +181,10 @@ dsai-capstone/
 │   │   └── monitoring/          # CloudWatch logs + alarms
 │   └── providers.tf
 ├── .github/workflows/           # CI/CD pipelines (4 workflows)
+├── docs/
+│   └── LOCAL_HOSTING.md         # Local-first runbook
+├── scripts/
+│   └── rebuild-local.sh         # Clean rebuild + migrate + seed
 ├── data/
 │   ├── seed/                    # 50 job roles, 83 skills, 25 courses
 │   └── scripts/                 # Database seed script
