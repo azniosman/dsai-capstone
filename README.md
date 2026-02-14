@@ -31,6 +31,10 @@ SkillBridge AI is a comprehensive career acceleration platform designed to bridg
 - **n8n Workflows**: Automated pipelines for resume ingestion, market data updates, and notification triggers.
 
 ---
+### 🤖 SkillBridge AI Overview
+![Dashboard](misc/images/overview.png)
+
+---
 
 ## 🛠️ Technology Stack
 
