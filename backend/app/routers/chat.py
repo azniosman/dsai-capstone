@@ -143,9 +143,6 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
             tenant_id=tenant_id
         ))
 
-    import google.generativeai as genai
-    genai.configure(api_key=settings.gemini_api_key)
-
     profile = None
     recommendations = None
     skill_gaps = None
@@ -194,27 +191,44 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
 
     system_prompt = _build_system_prompt(profile, recommendations, skill_gaps, roadmap_courses, market_insights, pathways)
 
-    # Convert messages to Gemini format
-    history = []
-    for msg in payload.messages[:-1]:  # All except last (which is the new prompt)
-        role = "user" if msg.role == "user" else "model"
-        history.append({"role": role, "parts": [msg.content]})
-
-    # Initialize model with system instruction
-    model = genai.GenerativeModel(
-        model_name=settings.gemini_model,
-        system_instruction=system_prompt
-    )
-
-    # Start chat with history
-    chat = model.start_chat(history=history)
-    
     try:
+        import google.generativeai as genai
+        genai.configure(api_key=settings.gemini_api_key)
+
+        # Convert messages to Gemini format
+        history = []
+        for msg in payload.messages[:-1]:  # All except last (which is the new prompt)
+            role = "user" if msg.role == "user" else "model"
+            history.append({"role": role, "parts": [msg.content]})
+
+        # Initialize model with system instruction
+        model = genai.GenerativeModel(
+            model_name=settings.gemini_model,
+            system_instruction=system_prompt
+        )
+
+        # Start chat with history
+        chat = model.start_chat(history=history)
         response = chat.send_message(payload.messages[-1].content)
         return ChatResponse(reply=response.text)
+
     except Exception as e:
+        error_str = str(e)
         logging.error(f"Gemini API error: {e}")
-        return ChatResponse(reply="I'm having trouble connecting to my brain right now. Please try again later.")
+
+        if "429" in error_str or "ResourceExhausted" in error_str or "quota" in error_str.lower():
+            return ChatResponse(reply=(
+                "I'm currently experiencing high demand. The AI service rate limit has been reached. "
+                "Please wait a minute and try again. In the meantime, I can still help with basic career guidance!"
+            ))
+
+        # Fallback to rule-based response on any other error
+        return ChatResponse(reply=_fallback_response(
+            payload.messages[-1].content if payload.messages else "",
+            profile_id=payload.profile_id,
+            db=db,
+            tenant_id=tenant_id
+        ))
 
 
 def _fallback_response(user_msg: str, profile_id: int | None = None, db: Session | None = None, tenant_id: int | None = None) -> str:

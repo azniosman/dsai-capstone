@@ -318,7 +318,13 @@ def _llm_interview(
         response = chat.send_message(last_msg)
         reply = response.text
     except Exception as e:
-        reply = f"Error generating interview response: {e}"
+        error_str = str(e)
+        if "429" in error_str or "ResourceExhausted" in error_str or "quota" in error_str.lower():
+            reply = ("The AI service rate limit has been reached. "
+                     "Please wait a minute and try again.")
+        else:
+            reply = f"Error generating interview response. Please try again."
+        logging.error(f"Gemini interview error: {e}")
 
 
 

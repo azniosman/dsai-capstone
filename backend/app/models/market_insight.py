@@ -12,5 +12,7 @@ class MarketInsight(Base):
     demand_level = Column(String)  # "high", "medium", "low"
     hiring_volume = Column(Integer)
     yoy_growth_pct = Column(Float)
+    forecast_2026 = Column(String, nullable=True)  # "High Growth", "Stable", etc.
+    outlook = Column(String, nullable=True)  # Brief text description of future trends
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)

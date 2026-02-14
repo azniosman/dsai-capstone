@@ -219,7 +219,12 @@ def get_project_suggestions(profile_id: int, db: Session = Depends(get_db), tena
             )
             response = model.generate_content(prompt)
             
-            parsed = json.loads(response.text)
+            # Clean up potential markdown formatting
+            text_response = response.text.strip()
+            if text_response.startswith("```"):
+                text_response = text_response.strip("`").replace("json", "", 1).strip()
+            
+            parsed = json.loads(text_response)
             for item in parsed.get("suggestions", []):
                 suggestions.append(ProjectSuggestion(**item))
         except Exception as e:

@@ -21,6 +21,8 @@ interface Insight {
   yoy_growth_pct: number;
   hiring_volume: number;
   trending_skills: string[];
+  forecast_2026?: string;
+  outlook?: string;
 }
 
 interface MarketData {
@@ -148,10 +150,22 @@ export default function MarketInsights() {
                 </Badge>
               </div>
               <p className="text-lg font-bold">SGD {ins.avg_salary_sgd.toLocaleString()}/mo</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground mb-3">
                 {ins.hiring_volume} openings &middot; {ins.yoy_growth_pct}% YoY growth
               </p>
-              <div className="mt-2 flex flex-wrap gap-1">
+
+              {ins.forecast_2026 && (
+                <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider mb-1">
+                    2026 Outlook: {ins.forecast_2026}
+                  </p>
+                  <p className="text-sm text-blue-600 dark:text-blue-200 leading-snug">
+                    {ins.outlook}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-1">
                 {ins.trending_skills.slice(0, 4).map((s) => (
                   <Badge key={s} variant="outline">{s}</Badge>
                 ))}
