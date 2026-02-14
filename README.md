@@ -131,73 +131,7 @@ DATABASE_URL_TEST=postgresql://user:pass@localhost:5432/test_db pytest -v
 | LLM | OpenAI API (optional, rule-based fallback) |
 | Database | PostgreSQL 16 |
 | Auth | JWT (access + refresh tokens) + bcrypt + slowapi rate limiting |
-| Cloud | AWS (ECS Fargate, RDS, S3, CloudFront, ALB) |
-| DNS/TLS | Route 53, ACM (wildcard cert) |
-| IaC | Terraform (modular) |
-| CI/CD | GitHub Actions |
-| Deploy | Docker Compose (local), AWS ECS Fargate (production) |
-
-## AWS Architecture
-
-```
-                    Internet
-                       │
-              ┌────────┴────────┐
-              │   Route 53 + ACM│
-              └───┬─────────┬───┘
-                  │         │
-        ┌─────────▼──-┐  ┌──▼──────────┐
-        │ CloudFront  │  │  ALB (HTTPS)│
-        │ S3 Origin   │  │  /api/*     │
-        │ (Frontend)  │  └──────┬──────┘
-        └─────────────┘         │
-                        ┌───────▼────────┐
-                        │  ECS Fargate   │
-                        │  FastAPI + ML  │
-                        │  2 vCPU, 4GB   │
-                        └───────┬────────┘
-                                │
-                        ┌───────▼────────┐
-                        │ RDS PostgreSQL │
-                        │ db.t4g.micro   │
-                        └────────────────┘
-```
-
-| Layer | Service | Rationale |
-|-------|---------|-----------|
-| Frontend | S3 + CloudFront | Static SPA, global CDN, ~$2/month |
-| Backend | ECS Fargate | Container-native, handles 135MB ML models |
-| Database | RDS PostgreSQL | Managed, single-AZ, ~$15/month |
-| Networking | VPC + VPC Endpoints | No NAT Gateway — saves ~$32/month |
-| Secrets | Secrets Manager + SSM | Secure injection into ECS tasks |
-| CI/CD | GitHub Actions + OIDC | No long-lived AWS credentials |
-| DNS/TLS | Route 53 + ACM | Custom domain (workd.my), wildcard cert, HTTPS everywhere |
-| IaC | Terraform (8 modules) | Modular, reproducible infrastructure |
-
-Estimated monthly cost: **~$50–70**
-
-### Production URLs
-
-- Frontend: https://workd.my
-- Backend API: https://api.workd.my
-- API docs: https://api.workd.my/docs
-
-### Deploy to AWS
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars  # edit with your domain
-terraform init
-terraform plan
-terraform apply
-```
-
-After first deploy, update your domain's nameservers to the Route 53 values from `terraform output route53_nameservers` to activate DNS and HTTPS.
-
-CI/CD auto-deploys on push to `main`:
-- Backend changes → pytest → Docker build → ECR push → ECS rolling update
-- Frontend changes → npm build → S3 sync → CloudFront invalidation
-- Terraform changes → plan on PR → apply on merge
+| Deploy | Docker Compose |
 
 ## Project Structure
 
@@ -216,22 +150,8 @@ dsai-capstone/
 │   │   └── ml/                  # ML pipelines (embeddings, taxonomy)
 │   └── tests/
 ├── frontend/
-│   └── src/
-│       ├── pages/               # 15 React pages
+│   └── app/                     # Next.js App Router pages
 │       └── components/          # Reusable UI components
-├── terraform/
-│   ├── main.tf                  # Root module wiring
-│   ├── modules/
-│   │   ├── networking/          # VPC, subnets, SGs, VPC endpoints
-│   │   ├── database/            # RDS PostgreSQL
-│   │   ├── ecs/                 # Fargate cluster, ALB, IAM
-│   │   ├── ecr/                 # Container registry
-│   │   ├── frontend/            # S3 + CloudFront
-│   │   ├── dns/                 # Route 53, ACM certificate, DNS records
-│   │   ├── secrets/             # Secrets Manager + SSM
-│   │   └── monitoring/          # CloudWatch logs + alarms
-│   └── providers.tf
-├── .github/workflows/           # CI/CD pipelines (4 workflows)
 ├── data/
 │   ├── seed/                    # 50 job roles, 83 skills, 25 courses
 │   └── scripts/                 # Database seed script
