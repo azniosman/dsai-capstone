@@ -52,7 +52,12 @@ def _sync_schema():
         "tenant_id": "1",       # Global tenant
         "is_active": "true",
         "failed_login_attempts": "0",
-        "role": "'member'::role",
+    }
+
+    # Columns that need a DEFAULT clause in the ALTER TABLE statement
+    # (e.g. PostgreSQL enum types that reject raw string casts)
+    _COLUMN_DEFAULTS = {
+        "role": "'member'",
     }
 
     with engine.begin() as conn:
@@ -64,9 +69,20 @@ def _sync_schema():
                 if col.name not in db_columns:
                     col_type = col.type.compile(dialect=engine.dialect)
 
+                    # Use a savepoint per column so one failure doesn't
+                    # roll back the entire transaction (PostgreSQL aborts
+                    # the whole tx on any error without savepoints).
+                    savepoint = conn.begin_nested()
                     try:
-                        # Always add as nullable first to avoid breaking existing rows
-                        stmt = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}'
+                        # Add column — use DEFAULT clause if available so
+                        # PostgreSQL populates existing rows automatically.
+                        default_clause = ""
+                        if col.name in _COLUMN_DEFAULTS:
+                            default_clause = f" DEFAULT {_COLUMN_DEFAULTS[col.name]}"
+                        elif col.name in _BACKFILL_DEFAULTS:
+                            default_clause = ""  # backfill via UPDATE instead
+
+                        stmt = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}{default_clause}'
                         logger.info("Schema sync: %s", stmt)
                         conn.execute(text(stmt))
 
@@ -76,12 +92,20 @@ def _sync_schema():
                             logger.info("Schema sync backfill: %s", backfill)
                             conn.execute(text(backfill))
 
-                        # Apply NOT NULL constraint after backfill
-                        if not col.nullable and col.name in _BACKFILL_DEFAULTS:
+                        # Apply NOT NULL constraint after backfill / default
+                        has_default = col.name in _BACKFILL_DEFAULTS or col.name in _COLUMN_DEFAULTS
+                        if not col.nullable and has_default:
                             alter = f"ALTER TABLE {table.name} ALTER COLUMN {col.name} SET NOT NULL"
                             logger.info("Schema sync constraint: %s", alter)
                             conn.execute(text(alter))
+
+                        # Drop the temporary DEFAULT (keep schema clean)
+                        if col.name in _COLUMN_DEFAULTS:
+                            conn.execute(text(f"ALTER TABLE {table.name} ALTER COLUMN {col.name} DROP DEFAULT"))
+
+                        savepoint.commit()
                     except Exception as e:
+                        savepoint.rollback()
                         logger.warning("Schema sync failed for %s.%s: %s", table.name, col.name, e)
 
 
