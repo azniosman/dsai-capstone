@@ -4,6 +4,8 @@
 
 SkillBridge AI is a comprehensive career acceleration platform designed to bridge the gap between current skills and future-ready tech roles. Leveraging advanced AI, real-time market data, and the SkillsFuture Singapore (SSG) framework, it provides personalized upskilling pathways, job recommendations, and interactive career coaching.
 
+![Overview](misc/images/overview.png)
+
 ---
 
 ## ✨ Key Features
@@ -29,10 +31,6 @@ SkillBridge AI is a comprehensive career acceleration platform designed to bridg
 ### ⚡ Automation & Experience
 - **Seamless Onboarding**: "Guest Mode" allows instant value exploration before account creation.
 - **n8n Workflows**: Automated pipelines for resume ingestion, market data updates, and notification triggers.
-
----
-### 🤖 SkillBridge AI Overview
-![Overview](misc/images/overview.png)
 
 ---
 
