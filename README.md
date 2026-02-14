@@ -6,6 +6,8 @@ SkillBridge AI is a comprehensive career acceleration platform designed to bridg
 
 ![Overview](misc/images/aioverview.png)
 
+View the [Technical Roadmap](Technical_Roadmap.md) for SkillBridge AI's production evolution.
+
 ---
 
 ## ✨ Key Features
@@ -162,8 +164,6 @@ Deploy the entire stack to AWS (ECS Fargate, RDS, ALB) using Infrastructure as C
 ---
 
 ## 📂 Project Structure
-
-View the [Technical Roadmap](Technical_Roadmap.md) for SkillBridge AI's production evolution.
 
 ```text
 dsai-capstone/
