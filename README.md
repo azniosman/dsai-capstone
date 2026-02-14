@@ -205,13 +205,22 @@ SENTENCE_TRANSFORMER_MODEL=all-MiniLM-L6-v2
 
 ## 📸 Screenshots
 
-| Dashboard | Job Matching |
-|-----------|--------------|
-| ![Home](misc/images/home.png) | ![Jobs](misc/images/jobmatch.png) |
 
-| Skill Gaps | Learning Roadmap |
-|------------|------------------|
-| ![Gaps](misc/images/skillgaps.png) | ![Roadmap](misc/images/roadmap.png) |
+
+### 📊 Dashboard & Insights
+| Profile Dashboard | Market Trends |
+|-------------------|---------------|
+| ![Dashboard](misc/images/dashboard.png) | ![Market Insights](misc/images/market_insights.png) |
+
+### 🚀 Career Growth
+| Job Recommendations | Skill Gap Analysis |
+|---------------------|--------------------|
+| ![Jobs](misc/images/jobs.png) | ![Skill Gaps](misc/images/skill_gaps.png) |
+
+### 🎓 Learning & Coaching
+| Personalized Roadmap | AI Career Coach |
+|----------------------|-----------------|
+| ![Roadmap](misc/images/roadmap.png) | ![Coach](misc/images/coach.png) |
 
 ---
 

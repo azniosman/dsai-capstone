@@ -36,6 +36,10 @@ def analyze_gaps(profile: UserProfile, db: Session, tenant_id: int) -> list[Role
     recommendations = get_recommendations(profile, db, tenant_id=tenant_id, top_n=3)
     user_skills = profile.skills or []
 
+    # Pre-build skill index (optimization)
+    from app.services.skill_matcher import build_skill_index
+    cached_index = build_skill_index(user_skills) if user_skills else None
+
     results = []
     for rec in recommendations:
         from app.models.job_role import JobRole
@@ -45,7 +49,7 @@ def analyze_gaps(profile: UserProfile, db: Session, tenant_id: int) -> list[Role
 
         gaps = []
         # Score required skills
-        req_scores = match_skills(user_skills, role.required_skills)
+        req_scores = match_skills(user_skills, role.required_skills, cached_index=cached_index)
         for skill, score in req_scores.items():
             sev = _severity(score, "required")
             gaps.append(SkillGapItem(
@@ -58,7 +62,7 @@ def analyze_gaps(profile: UserProfile, db: Session, tenant_id: int) -> list[Role
             ))
 
         # Score preferred skills
-        pref_scores = match_skills(user_skills, role.preferred_skills)
+        pref_scores = match_skills(user_skills, role.preferred_skills, cached_index=cached_index)
         for skill, score in pref_scores.items():
             sev = _severity(score, "preferred")
             gaps.append(SkillGapItem(

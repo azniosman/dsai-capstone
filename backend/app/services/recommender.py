@@ -85,13 +85,20 @@ def get_recommendations(
             return cached_result
 
     roles = db.query(JobRole).filter(JobRole.tenant_id == tenant_id).all()
+    
+    # Pre-build skill index for the user (optimization)
+    from app.services.skill_matcher import build_skill_index
     user_skills = profile.skills or []
+    
+    # Only build index if user has skills
+    cached_index = build_skill_index(user_skills) if user_skills else None
 
     scored = []
     for role in roles:
+            
         all_role_skills = role.required_skills + role.preferred_skills
 
-        content_score = compute_content_similarity(user_skills, all_role_skills)
+        content_score = compute_content_similarity(user_skills, all_role_skills, cached_index=cached_index)
         rule_score = _rule_score(profile, role)
         cs_bonus = _career_switcher_bonus(profile, role)
 
@@ -102,7 +109,7 @@ def get_recommendations(
         )
 
         # Determine matched/missing skills
-        skill_scores = match_skills(user_skills, role.required_skills)
+        skill_scores = match_skills(user_skills, role.required_skills, cached_index=cached_index)
         matched = [s for s, v in skill_scores.items() if v >= 0.5]
         missing = [s for s, v in skill_scores.items() if v < 0.5]
 

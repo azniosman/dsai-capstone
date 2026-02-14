@@ -24,7 +24,7 @@ const NAV_SECTIONS = [
   {
     header: "Core",
     items: [
-      { label: "Profile", path: "/", icon: User },
+      { label: "Dashboard", path: "/dashboard", icon: User },
       { label: "Jobs", path: "/recommendations", icon: Briefcase },
       { label: "Skill Gap", path: "/skill-gap", icon: BarChart3 },
       { label: "Roadmap", path: "/roadmap", icon: Route },
@@ -88,8 +88,8 @@ function NavDrawerContent({ onClose }: { onClose: () => void }) {
                       href={item.path}
                       onClick={onClose}
                       className={`flex items-center gap-3 px-4 py-2 mx-2 rounded-lg text-sm transition-colors ${active
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "hover:bg-muted text-foreground"
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "hover:bg-muted text-foreground"
                         }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
@@ -178,7 +178,7 @@ function UserMenu() {
           {userName || "User"}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/")}>Profile</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/dashboard")}>Dashboard</DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/account")}>Account Settings</DropdownMenuItem>
         <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
       </DropdownMenuContent>
@@ -225,6 +225,7 @@ export default function Navbar() {
         </Link>
         <nav className="flex items-center space-x-6 text-sm font-medium">
           {[
+            { label: "Dashboard", path: "/dashboard" },
             { label: "Jobs", path: "/recommendations" },
             { label: "Gaps", path: "/skill-gap" },
             { label: "Roadmap", path: "/roadmap" },
