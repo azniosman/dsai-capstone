@@ -176,3 +176,12 @@ dsai-capstone/
 - **~83 skills** in 9 taxonomy categories
 - **25 SCTP courses** from 6 providers (NUS-ISS, NTU, SMU Academy, NTUC LearningHub, General Assembly, Vertical Institute)
 - **6 market insight sectors** with salary, demand, and growth data
+
+## Screenshots
+
+![Home](misc/images/home.png)
+![Resume](misc/images/resume.png)
+![Jobs](misc/images/jobmatch.png)
+![Gaps](misc/images/skillgaps.png)
+![Roadmap](misc/images/roadmap.png)
+![Chat](misc/images/ai.png)
