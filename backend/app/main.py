@@ -19,6 +19,7 @@ from app.routers import (
     auth, profile, recommend, skill_gap, upskilling,
     upload, jd_match, progress, chat, interview,
     market, compare, peer, projects, export, courses, sso, api_keys, audit_logs,
+    resume_rewriter,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -238,7 +239,7 @@ async def lifespan(app):
 
 
 app = FastAPI(
-    title="Job Recommendation & Skill Gap Analysis",
+    title="SkillBridge AI",
     version="0.2.0",
     lifespan=lifespan,
 )
@@ -312,6 +313,7 @@ app.include_router(courses.router, prefix="/api")
 app.include_router(sso.router, prefix="/api")
 app.include_router(api_keys.router, prefix="/api")
 app.include_router(audit_logs.router, prefix="/api")
+app.include_router(resume_rewriter.router, prefix="/api")
 
 
 @app.get("/health")

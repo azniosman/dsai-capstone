@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_tenant
 from app.api_key_auth import get_current_tenant_for_read
 from app.database import get_db
 from app.models.market_insight import MarketInsight
@@ -114,3 +115,12 @@ def get_market_insights(db: Session = Depends(get_db), tenant: Tenant = Depends(
         top_skills_overall=top_skills,
         highest_demand_sectors=highest_demand,
     )
+
+
+@router.post("/simulate")
+def trigger_market_simulation(
+    db: Session = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant)
+):
+    from app.services.market_simulator import simulate_market_changes
+    return simulate_market_changes(db, tenant.id)

@@ -43,7 +43,8 @@ class RegisterRequest(BaseModel):
     password_confirm: str
     name: str = Field(min_length=1)
     tenant_name: str = Field(min_length=1)
-    role: str | None = None # Added optional role field
+    role: str | None = None
+    profile_id: int | None = None  # Added profile_id
 
     @field_validator("email")
     @classmethod
@@ -186,6 +187,15 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     db.add(user)
     db.commit()
     db.refresh(user)
+    
+    # Link existing profile if profile_id provided
+    if payload.profile_id:
+        from app.models.user_profile import UserProfile
+        profile = db.query(UserProfile).filter(UserProfile.id == payload.profile_id).first()
+        if profile and not profile.user_id:
+            profile.user_id = user.id
+            db.commit()
+
     log_audit_event(db, tenant.id, user.id, "user.register", {"email": user.email, "name": user.name, "role": str(user.role)})
     return user
 
@@ -326,8 +336,11 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
         return {"message": "If the email exists, a reset link has been generated."}
     token = create_reset_token(user.id)
     log_audit_event(db, user.tenant_id, user.id, "user.forgot_password.request", {"email": email, "status": "link_generated"})
-    # In production: send email. For demo: return token directly.
-    return {"message": "If the email exists, a reset link has been generated.", "reset_token": token}
+    # In production: send email. For demo: log token and return message only.
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Password reset token for {email}: {token}")
+    return {"message": "If the email exists, a reset link has been generated."}
 
 
 @router.post("/reset-password")

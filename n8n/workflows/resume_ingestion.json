@@ -1,0 +1,72 @@
+{
+    "name": "Resume Ingestion Pipeline",
+    "nodes": [
+        {
+            "parameters": {
+                "path": "/webhook/resume-upload",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                460,
+                280
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://backend:8000/api/upload/resume",
+                "method": "POST",
+                "sendBinaryData": true,
+                "binaryPropertyName": "data",
+                "options": {}
+            },
+            "name": "Upload to Backend",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 1,
+            "position": [
+                680,
+                280
+            ]
+        },
+        {
+            "parameters": {
+                "message": "Resume processed for profile ID: {{$json[\"profile_id\"]}}",
+                "channel": "general"
+            },
+            "name": "Notify Slack",
+            "type": "n8n-nodes-base.slack",
+            "typeVersion": 1,
+            "position": [
+                900,
+                280
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Upload to Backend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Upload to Backend": {
+            "main": [
+                [
+                    {
+                        "node": "Notify Slack",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

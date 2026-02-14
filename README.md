@@ -43,11 +43,23 @@ docker compose up
 
 ## Development
 
+### Environment
+
+```bash
+conda create -n dsai-capstone python=3.11 -y
+conda activate dsai-capstone
+python -m pip install --upgrade pip
+conda install -c conda-forge faiss-cpu==1.9.0 -y
+uv pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+python -c "import faiss; import spacy; import sentence_transformers; import fastapi; print('All OK')"
+conda env export > environment.yml
+```
+
 ### Backend
 
 ```bash
 cd backend
-pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 

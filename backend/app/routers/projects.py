@@ -171,32 +171,79 @@ PROJECT_CATALOG = {
 def get_project_suggestions(profile_id: int, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant), user: User = Depends(get_current_user)):
     from app.models.user_profile import UserProfile
     from app.services.gap_analyzer import analyze_gaps
+    from app.config import settings
 
     profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant.id, UserProfile.user_id == user.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     gaps = analyze_gaps(profile, db, tenant_id=tenant.id)
-
-    suggestions = []
+    
+    # Identify top 3 unique skill gaps
+    target_skills = []
     seen = set()
     for role_gap in gaps:
         for gap in role_gap.gaps:
             if gap.gap_severity in ("high", "medium") and gap.skill.lower() not in seen:
                 seen.add(gap.skill.lower())
-                project = PROJECT_CATALOG.get(gap.skill.lower())
-                if project:
-                    suggestions.append(project)
-                else:
-                    # Generate generic project suggestion
-                    suggestions.append(ProjectSuggestion(
-                        skill=gap.skill,
-                        title=f"Build a {gap.skill} Portfolio Project",
-                        description=f"Create a project that demonstrates your proficiency in {gap.skill}. Focus on a real-world use case relevant to your target roles.",
-                        difficulty="intermediate",
-                        estimated_hours=20,
-                        technologies=[gap.skill],
-                        learning_outcomes=[f"{gap.skill} fundamentals", "Project documentation", "Version control"],
-                    ))
+                target_skills.append(gap.skill)
+                if len(target_skills) >= 3:
+                    break
+        if len(target_skills) >= 3:
+            break
 
-    return ProjectSuggestionsResponse(profile_id=profile_id, suggestions=suggestions)
+    if not target_skills:
+        # No major gaps? Suggest advanced projects based on existing skills
+        target_skills = profile.skills[:3] if profile.skills else ["Python", "SQL"]
+
+    suggestions = []
+
+    # 1. Try to generate dynamic suggestions if API key exists
+    if settings.openai_api_key:
+        try:
+            from openai import OpenAI
+            import json
+            client = OpenAI(api_key=settings.openai_api_key)
+
+            prompt = (
+                f"Suggest 3 unique portfolio projects for a developer who needs to learn: {', '.join(target_skills)}. "
+                "The projects should be distinct and practical. "
+                "Output ONLY valid JSON in the following format: "
+                '{"suggestions": [{"title": "...", "skill": "...", "description": "...", "difficulty": "...", "estimated_hours": 0, "technologies": ["..."], "learning_outcomes": ["..."]}]}'
+            )
+
+            response = client.chat.completions.create(
+                model=settings.openai_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=600,
+                temperature=0.7,
+                response_format={"type": "json_object"}
+            )
+            content = response.choices[0].message.content
+            parsed = json.loads(content)
+            for item in parsed.get("suggestions", []):
+                suggestions.append(ProjectSuggestion(**item))
+        except Exception as e:
+            # logging.warning(f"LLM project generation failed: {e}")
+            pass
+
+    # 2. Fallback to static catalog if LLM failed or returned nothing
+    if not suggestions:
+        for skill in target_skills:
+            project = PROJECT_CATALOG.get(skill.lower())
+            if project:
+                suggestions.append(project)
+            else:
+                 suggestions.append(ProjectSuggestion(
+                    skill=skill,
+                    title=f"Build a {skill} Portfolio Project",
+                    description=f"Create a project that demonstrates your proficiency in {skill}. Focus on a real-world use case.",
+                    difficulty="intermediate",
+                    estimated_hours=20,
+                    technologies=[skill],
+                    learning_outcomes=[f"{skill} fundamentals", "Project documentation"],
+                ))
+
+    # Dedupe by title
+    unique_suggestions = {s.title: s for s in suggestions}.values()
+    return ProjectSuggestionsResponse(profile_id=profile_id, suggestions=list(unique_suggestions)[:6])

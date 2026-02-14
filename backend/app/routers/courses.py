@@ -112,3 +112,16 @@ def calculate_course_subsidy(payload: SubsidyRequest, db: Session = Depends(get_
     result = calculate_subsidies(course, is_career_switcher=payload.is_career_switcher)
     return SubsidyResponse(**result)
 
+
+class PathwayRequest(BaseModel):
+    skills_needed: list[str]
+
+
+@router.post("/pathways")
+def get_learning_pathways(
+    payload: PathwayRequest,
+    db: Session = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant)
+):
+    from app.services.course_pathways import generate_learning_pathways
+    return generate_learning_pathways(payload.skills_needed, db, tenant.id)

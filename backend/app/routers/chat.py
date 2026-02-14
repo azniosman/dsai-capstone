@@ -32,9 +32,23 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-def _build_market_insights_table() -> str:
-    """Format DEFAULT_INSIGHTS as a ranked table sorted by YoY growth."""
-    sorted_insights = sorted(DEFAULT_INSIGHTS, key=lambda x: x["yoy_growth_pct"], reverse=True)
+def _build_market_insights_table(insights: list | None = None) -> str:
+    """Format market insights as a ranked table sorted by YoY growth."""
+    source = insights if insights else DEFAULT_INSIGHTS
+    # Handle DB objects or dicts
+    data_list = []
+    for item in source:
+        if hasattr(item, "role_category"):
+            data_list.append({
+                "role_category": item.role_category,
+                "yoy_growth_pct": item.yoy_growth_pct,
+                "avg_salary_sgd": item.avg_salary_sgd,
+                "demand_level": item.demand_level
+            })
+        else:
+            data_list.append(item)
+
+    sorted_insights = sorted(data_list, key=lambda x: x["yoy_growth_pct"], reverse=True)
     rows = []
     for ins in sorted_insights:
         rows.append(
@@ -44,7 +58,7 @@ def _build_market_insights_table() -> str:
     return "--- 2026 Singapore Market Insights (sorted by growth) ---\n" + "\n".join(rows)
 
 
-def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap_courses=None):
+def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap_courses=None, market_insights=None, pathways=None):
     parts = [
         "You are 'WorkD AI,' a Senior Career Advisor specialising in the Singapore Labor Market.",
         "You have deep knowledge of the SSG Skills Framework, MySkillsFuture portal, and SCTP initiatives.",
@@ -54,7 +68,7 @@ def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap
         "",
         "Your Task:",
         "1. Analyse the user's current Profile JSON (provided in context).",
-        "2. When asked for advice, prioritise roles with 'High Growth' labels from the 2026 Singapore Market Insights.",
+        "2. When asked for advice, prioritise roles with 'High Growth' labels from the Market Insights.",
         "3. If a user is over 40, always mention the $4,000 credit top-up and the Training Allowance eligibility.",
         "4. Keep responses concise. Focus on actionable steps (e.g., 'Apply for the NUS-ISS SCTP in Data Science').",
         "",
@@ -63,7 +77,7 @@ def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap
         "2. Provide specific, personalised advice referencing their profile data",
         "3. End with 1-2 concrete next steps they can take today",
         "",
-        _build_market_insights_table(),
+        _build_market_insights_table(market_insights),
     ]
 
     if profile:
@@ -99,12 +113,21 @@ def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap
                     gap_skills.append(g.skill)
         if gap_skills:
             parts.append(f"\n--- Key Skill Gaps ---\n  {', '.join(gap_skills[:8])}")
-    if roadmap_courses:
+
+    # Inject structured pathways if available, else fallback to raw roadmap
+    if pathways:
+        parts.append("\n--- Recommended Learning Pathways (SCTP) ---")
+        for p in pathways[:3]: # Limit to top 3 skills
+            parts.append(f"Skill: {p['skill']}")
+            for c in p['courses'][:2]: # Limit to 2 courses per skill
+                parts.append(f"  - {c['level'].title()}: {c['title']} ({c['provider']}, ${c['course_fee']})")
+    elif roadmap_courses:
         course_text = "\n".join(
             f"  - {item.course_title} ({item.provider}, {item.duration_weeks}wks, nett ${item.nett_fee_after_subsidy:.0f})"
             for item in roadmap_courses[:4]
         )
         parts.append(f"\n--- Recommended Courses ---\n{course_text}")
+
     return "\n".join(parts)
 
 
@@ -127,6 +150,15 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
     recommendations = None
     skill_gaps = None
     roadmap_courses = None
+    market_insights = None
+    pathways = None
+
+    # Load market insights (global or tenant specific)
+    from app.models.market_insight import MarketInsight
+    market_insights = db.query(MarketInsight).filter(
+        (MarketInsight.tenant_id == tenant_id) | (MarketInsight.tenant_id == None)
+    ).all()
+
     if payload.profile_id:
         from app.models.user_profile import UserProfile
         profile = db.query(UserProfile).filter(UserProfile.id == payload.profile_id, UserProfile.tenant_id == tenant_id).first()
@@ -134,11 +166,24 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
             from app.services.recommender import get_recommendations
             from app.services.gap_analyzer import analyze_gaps
             from app.services.roadmap_generator import generate_roadmap
+            from app.services.course_pathways import generate_learning_pathways
 
             try:
                 recommendations = get_recommendations(profile, db, tenant_id=tenant_id, top_n=3)
                 skill_gaps = analyze_gaps(profile, db, tenant_id=tenant_id)
                 roadmap_courses = generate_roadmap(profile, db, tenant_id=tenant_id)
+                
+                # Extract missing skills for pathways
+                missing_skills = []
+                if skill_gaps:
+                    for role_gap in skill_gaps[:2]:
+                        for g in role_gap.gaps:
+                            if g.gap_severity in ("high", "medium") and g.skill not in missing_skills:
+                                missing_skills.append(g.skill)
+                
+                if missing_skills:
+                    pathways = generate_learning_pathways(missing_skills, db, tenant_id=tenant_id)
+
             except Exception as e:
                 logging.getLogger(__name__).exception(
                     "Chat context load failed for profile_id=%s, responding without user context: %s",
@@ -147,7 +192,7 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
                 )
                 # recommendations, skill_gaps, roadmap_courses remain None; chat continues without context
 
-    system_prompt = _build_system_prompt(profile, recommendations, skill_gaps, roadmap_courses)
+    system_prompt = _build_system_prompt(profile, recommendations, skill_gaps, roadmap_courses, market_insights, pathways)
 
     messages = [{"role": "system", "content": system_prompt}]
     for msg in payload.messages:

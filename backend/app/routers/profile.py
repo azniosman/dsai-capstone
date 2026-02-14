@@ -28,47 +28,53 @@ def create_profile(
     db: Session = Depends(get_db),
     user=Depends(get_current_user_optional),
 ):
-    from app.services.resume_parser import extract_skills
-    from app.models.user_profile import UserProfile
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from app.services.resume_parser import extract_skills
+        from app.models.user_profile import UserProfile
 
-    skills = payload.skills or []
-    if payload.resume_text:
-        skills = list(set(skills + extract_skills(payload.resume_text)))
+        skills = payload.skills or []
+        if payload.resume_text:
+            skills = list(set(skills + extract_skills(payload.resume_text)))
 
-    tenant_id = 1  # default to global tenant
-    if user:
-        tenant_id = user.tenant_id
+        tenant_id = 1  # default to global tenant
+        if user:
+            tenant_id = user.tenant_id
 
-    # If authenticated user already has a profile, update it instead of creating a duplicate
-    if user:
-        existing = db.query(UserProfile).filter(UserProfile.user_id == user.id, UserProfile.tenant_id == tenant_id).first()
-        if existing:
-            existing.name = payload.name
-            existing.education = payload.education
-            existing.years_experience = payload.years_experience
-            existing.age = payload.age
-            existing.skills = skills
-            existing.resume_text = payload.resume_text
-            existing.is_career_switcher = payload.is_career_switcher
-            db.commit()
-            db.refresh(existing)
-            return existing
+        # If authenticated user already has a profile, update it instead of creating a duplicate
+        if user:
+            existing = db.query(UserProfile).filter(UserProfile.user_id == user.id, UserProfile.tenant_id == tenant_id).first()
+            if existing:
+                existing.name = payload.name
+                existing.education = payload.education
+                existing.years_experience = payload.years_experience
+                existing.age = payload.age
+                existing.skills = skills
+                existing.resume_text = payload.resume_text
+                existing.is_career_switcher = payload.is_career_switcher
+                db.commit()
+                db.refresh(existing)
+                return existing
 
-    profile = UserProfile(
-        name=payload.name,
-        education=payload.education,
-        years_experience=payload.years_experience,
-        age=payload.age,
-        skills=skills,
-        resume_text=payload.resume_text,
-        is_career_switcher=payload.is_career_switcher,
-        user_id=user.id if user else None,
-        tenant_id=tenant_id,
-    )
-    db.add(profile)
-    db.commit()
-    db.refresh(profile)
-    return profile
+        profile = UserProfile(
+            name=payload.name,
+            education=payload.education,
+            years_experience=payload.years_experience,
+            age=payload.age,
+            skills=skills,
+            resume_text=payload.resume_text,
+            is_career_switcher=payload.is_career_switcher,
+            user_id=user.id if user else None,
+            tenant_id=tenant_id,
+        )
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+        return profile
+    except Exception as e:
+        logger.exception("Profile creation failed")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
 @router.get("/profile/{profile_id}", response_model=ProfileResponse)
@@ -95,13 +101,15 @@ def update_profile(
     from app.models.user_profile import UserProfile
 
     # If authenticated, filter by tenant + ownership; otherwise allow update only for unclaimed profiles
+    # SECURITY FIX: restrict updates to owner only.
     if user:
         profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == user.tenant_id, UserProfile.user_id == user.id).first()
     else:
-        profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.user_id == None).first()
+        # Prevent unauthenticated updates to any profile
+        raise HTTPException(status_code=401, detail="Authentication required to update profile")
 
     if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        raise HTTPException(status_code=404, detail="Profile not found or access denied")
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(profile, field, value)

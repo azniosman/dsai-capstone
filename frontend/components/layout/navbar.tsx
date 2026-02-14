@@ -87,11 +87,10 @@ function NavDrawerContent({ onClose }: { onClose: () => void }) {
                     <Link
                       href={item.path}
                       onClick={onClose}
-                      className={`flex items-center gap-3 px-4 py-2 mx-2 rounded-lg text-sm transition-colors ${
-                        active
+                      className={`flex items-center gap-3 px-4 py-2 mx-2 rounded-lg text-sm transition-colors ${active
                           ? "bg-primary/10 text-primary font-medium"
                           : "hover:bg-muted text-foreground"
-                      }`}
+                        }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
                       {item.label}
@@ -193,13 +192,12 @@ export default function Navbar() {
 
   return (
     <header
-      className="sticky top-0 z-50"
-      style={{ background: `var(--tenant-gradient)` }}
+      className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
     >
-      <div className="container mx-auto flex items-center h-14 px-4">
+      <div className="container mx-auto flex items-center h-16 px-4">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="mr-2 text-white hover:bg-white/20">
+            <Button variant="ghost" size="icon" className="mr-2 md:hidden">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
@@ -211,29 +209,40 @@ export default function Navbar() {
           </SheetContent>
         </Sheet>
 
-        {tenantConfig.logoUrl ? (
-          <img src={tenantConfig.logoUrl} alt={tenantConfig.name} className="h-8 mr-2" />
-        ) : (
-          <h1 className="text-lg font-bold text-white tracking-tight flex-1">
-            {tenantConfig.name}
-          </h1>
-        )}
-
-        <nav className="hidden md:flex gap-1 ml-auto mr-2">
+        <Link href="/" className="mr-6 flex items-center space-x-2">
+          {tenantConfig.logoUrl ? (
+            <img src={tenantConfig.logoUrl} alt={tenantConfig.name} className="h-8 w-auto" />
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold">
+                {tenantConfig.name.substring(0, 1)}
+              </div>
+              <span className="hidden font-bold sm:inline-block">
+                {tenantConfig.name}
+              </span>
+            </div>
+          )}
+        </Link>
+        <nav className="flex items-center space-x-6 text-sm font-medium">
           {[
-            { label: "Profile", path: "/" },
             { label: "Jobs", path: "/recommendations" },
             { label: "Gaps", path: "/skill-gap" },
             { label: "Roadmap", path: "/roadmap" },
             { label: "Coach", path: "/chat" },
           ].map((link) => (
-            <Button key={link.path} variant="ghost" size="sm" asChild className="text-white hover:bg-white/20">
-              <Link href={link.path}>{link.label}</Link>
-            </Button>
+            <Link
+              key={link.path}
+              href={link.path}
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              {link.label}
+            </Link>
           ))}
         </nav>
 
-        <UserMenu />
+        <div className="ml-auto flex items-center space-x-4">
+          <UserMenu />
+        </div>
       </div>
     </header>
   );

@@ -1,0 +1,48 @@
+{
+    "name": "Analysis Notification",
+    "nodes": [
+        {
+            "parameters": {
+                "path": "/webhook/notify-user",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                460,
+                280
+            ]
+        },
+        {
+            "parameters": {
+                "fromEmail": "notifications@workd.ai",
+                "toEmail": "={{$json[\"email\"]}}",
+                "subject": "Your Career Analysis is Ready",
+                "text": "Hi {{$json[\"name\"]}},\n\nYour profile analysis is complete! Log in to view your personalized job recommendations and skill gap analysis.\n\nBest,\nWorkD AI Team",
+                "html": "<p>Hi <b>{{$json[\"name\"]}}</b>,</p><p>Your profile analysis is complete! <a href=\"http://localhost:3000\">Log in</a> to view your personalized job recommendations and skill gap analysis.</p><p>Best,<br>WorkD AI Team</p>"
+            },
+            "name": "Send Email",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 1,
+            "position": [
+                680,
+                280
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Send Email",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

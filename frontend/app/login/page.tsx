@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +13,10 @@ import { toast } from "sonner";
 import api from "@/lib/api-client";
 import { extractApiError } from "@/lib/utils";
 
-export default function Login() {
+function LoginForm() {
   const router = useRouter();
-  const [tab, setTab] = useState("login");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get("tab") || "login");
   const [form, setForm] = useState({ email: "", password: "", password_confirm: "", name: "" });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,6 +29,14 @@ export default function Login() {
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const userName = typeof window !== "undefined" ? localStorage.getItem("userName") : null;
+
+  // Clear query params after reading to clean up URL, but keep profileId contextually if needed
+  useEffect(() => {
+    if (searchParams.get("tab")) {
+      // Optional: clear param from URL without refresh
+      // window.history.replaceState(null, "", "/login");
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,14 +79,19 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    const profileId = searchParams.get("profileId");
+
     try {
       await api.post("/api/auth/register", {
         email: form.email,
         password: form.password,
         password_confirm: form.password_confirm,
         name: form.name,
+        tenant_name: "Global", // Default tenant
+        profile_id: profileId ? parseInt(profileId) : undefined,
       });
-      toast.success("Account created! Please log in.");
+      toast.success("Account created! Profile linked. Please log in.");
       setTab("login");
       setError(null);
     } catch (err: unknown) {
@@ -267,5 +281,13 @@ export default function Login() {
         </Tabs>
       </CardContent>
     </Card>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Briefcase } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import MatchScoreBar from "@/components/match-score-bar";
 import SkillChip from "@/components/skill-chip";
@@ -55,6 +56,26 @@ export default function Recommendations() {
 
       {loading && <SkeletonCard count={3} />}
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+
+      {!loading && !error && !localStorage.getItem("token") && localStorage.getItem("profileId") && (
+        <Alert className="mb-6 bg-primary/10 border-primary/20">
+          <AlertDescription className="flex items-center justify-between">
+            <div>
+              <span className="font-semibold block mb-1">Save your results!</span>
+              Create an account to save your profile and get updated recommendations later.
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                const pid = localStorage.getItem("profileId");
+                window.location.href = `/login?tab=register&profileId=${pid}`;
+              }}
+            >
+              Sign Up to Save
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {!loading && !error && !localStorage.getItem("profileId") && (
         <EmptyState

@@ -10,18 +10,20 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-capstone}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-capstone}" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-capstone}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-capstone}
-      SENTENCE_TRANSFORMER_MODEL: ${SENTENCE_TRANSFORMER_MODEL:-all-MiniLM-L6-v2}
+      SENTENCE_TRANSFORMER_MODEL: ${SENTENCE_TRANSFORMERS_MODEL:-all-MiniLM-L6-v2}
     depends_on:
       db:
         condition: service_healthy
@@ -30,14 +32,35 @@ services:
       - ./data:/data
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: ""
+      NEXT_PUBLIC_API_URL: http://localhost:8000
       BACKEND_URL: http://backend:8000
     depends_on:
       - backend
 
+  n8n:
+    image: n8nio/n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_ basic_auth_active=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-changeme}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://${N8N_HOST:-localhost}:5678/
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Asia/Singapore}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  n8n_data:
