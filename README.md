@@ -4,7 +4,7 @@
 
 SkillBridge AI is a comprehensive career acceleration platform designed to bridge the gap between current skills and future-ready tech roles. Leveraging advanced AI, real-time market data, and the SkillsFuture Singapore (SSG) framework, it provides personalized upskilling pathways, job recommendations, and interactive career coaching.
 
-![Overview](misc/images/overview.png)
+![Overview](misc/images/aioverview.png)
 
 ---
 
