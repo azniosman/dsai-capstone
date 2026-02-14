@@ -202,7 +202,7 @@ def _fallback_response(user_msg: str, profile_id: int | None = None, db: Session
 
     if any(w in msg for w in ["sctp", "skillsfuture", "course", "training", "subsidy"]):
         return ("SCTP courses are one of the best ways to upskill in Singapore! "
-                "The government subsidises up to 70%% of course fees (or 90%% under MCES for mid-career switchers aged 40+). "
+                "The government subsidises up to 70% of course fees (or 90% under MCES for mid-career switchers aged 40+). "
                 "Plus, you can use your $500 SkillsFuture Credit to offset the remaining cost. "
                 f"Check your Roadmap tab for personalised course recommendations.{course_hint}{mces_hint}")
 

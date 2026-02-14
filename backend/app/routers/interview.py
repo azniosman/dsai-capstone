@@ -1,7 +1,5 @@
 """Mock interview simulator endpoint with skill-gap-aware question selection."""
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -180,9 +178,8 @@ def _get_gap_targeted_questions(profile_id: int, db: Session, tenant_id: int) ->
                         break
 
         return targeted
-    except Exception as e:
-        logging.exception("Failed to load gap-targeted questions for profile_id=%s: %s", profile_id, e)
-        raise
+    except Exception:
+        return []
 
 
 @router.post("/interview", response_model=InterviewResponse)
@@ -196,15 +193,7 @@ def mock_interview(payload: InterviewRequest, db: Session = Depends(get_db), use
     # Build mixed question set: 3 gap-targeted + 2 role-specific (or fallback to all role)
     gap_questions = []
     if payload.profile_id:
-        try:
-            gap_questions = _get_gap_targeted_questions(payload.profile_id, db, tenant_id)
-        except Exception as e:
-            logging.exception(
-                "Gap-targeted questions failed for profile_id=%s, using generic questions: %s",
-                payload.profile_id,
-                e,
-            )
-            # gap_questions remains []; interview continues with role questions only
+        gap_questions = _get_gap_targeted_questions(payload.profile_id, db, tenant_id)
 
     # Compose final question list: up to 3 gap-targeted, then fill with role questions
     mixed_questions = []
