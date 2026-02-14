@@ -38,7 +38,7 @@ SkillBridge AI is a comprehensive career acceleration platform designed to bridg
 |--------|--------------|
 | **Frontend** | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui |
 | **Backend** | Python 3.11, FastAPI, SQLAlchemy 2.0, Pydantic |
-| **AI / ML** | PyTorch, Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, OpenAI API |
+| **AI / ML** | PyTorch, Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, Google Gemini API |
 | **Database** | PostgreSQL 16 |
 | **Automation**| n8n, Docker Compose |
 | **DevOps** | Docker, Shell Scripts |
@@ -49,7 +49,7 @@ SkillBridge AI is a comprehensive career acceleration platform designed to bridg
 
 ### Prerequisites
 - [Docker & Docker Compose](https://www.docker.com/products/docker-desktop/)
-- [OpenAI API Key](https://platform.openai.com/) (Optional, for full AI features)
+- [Gemini API Key](https://aistudio.google.com/) (Optional, for full AI features)
 
 ### Quick Start (Docker)
 The easiest way to run the full stack (Frontend, Backend, DB, Automation) is via Docker.
@@ -63,7 +63,7 @@ The easiest way to run the full stack (Frontend, Backend, DB, Automation) is via
 2. **Configure Environment**
    ```bash
    cp .env.example .env
-   # Edit .env to add your AI_API_KEY
+   # Edit .env to add your GEMINI_API_KEY
    ```
 
 3. **Launch the Application**
@@ -112,6 +112,53 @@ python data/scripts/seed_db.py
 
 ---
 
+## ☁️ AWS Deployment (Terraform)
+
+Deploy the entire stack to AWS (ECS Fargate, RDS, ALB) using Infrastructure as Code.
+
+### Prerequisites
+1. **AWS CLI**: Installed and configured with `aws configure`.
+2. **Terraform**: [Install Terraform](https://developer.hashicorp.com/terraform/downloads).
+
+### Deployment Steps
+
+1. **Initialize Terraform**
+   ```bash
+   cd terraform
+   terraform init
+   ```
+
+2. **Build & Push Docker Images**
+   This script builds images and pushes them to Amazon ECR.
+   ```bash
+   # Make script executable
+   chmod +x ../scripts/build_and_push.sh
+   # Run build script
+   ../scripts/build_and_push.sh
+   ```
+
+3. **Plan Infrastructure**
+   Review changes before applying.
+   ```bash
+   terraform plan -out=tfplan
+   ```
+
+4. **Apply Deployment**
+   Provision VPC, RDS, ECS, and Load Balancers.
+   ```bash
+   terraform apply tfplan
+   ```
+
+5. **Access the App**
+   After deployment, Terraform will output the **Load Balancer DNS**.
+   ```bash
+   # Example Output
+   alb_dns_name = "skillbridge-dev-alb-123456789.ap-southeast-1.elb.amazonaws.com"
+   ```
+   Access the app at `http://<alb_dns_name>`.
+
+---
+
 ## 📂 Project Structure
 
 ```text
@@ -149,7 +196,8 @@ POSTGRES_DB=capstone
 DATABASE_URL=postgresql://capstone:changeme@db:5432/capstone
 
 # AI Services
-OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AIzaSy...
+GEMINI_MODEL=gemini-2.0-flash
 SENTENCE_TRANSFORMER_MODEL=all-MiniLM-L6-v2
 ```
 

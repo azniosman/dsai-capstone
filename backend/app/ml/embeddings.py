@@ -16,7 +16,7 @@ def get_model() -> SentenceTransformer:
     if _model is None:
         model_name = settings.sentence_transformer_model
         logger.info("Loading Sentence Transformer model: %s", model_name)
-        _model = SentenceTransformer(model_name)
+        _model = SentenceTransformer(model_name, device="cpu")
         logger.info("Model loaded successfully")
     return _model
 

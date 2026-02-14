@@ -14,6 +14,8 @@ DEFAULT_INSIGHTS = [
         "avg_salary_sgd": 7500,
         "hiring_volume": 2400,
         "yoy_growth_pct": 18.5,
+        "forecast_2026": "High Growth",
+        "outlook": "Demand for data engineering will outpace pure data science roles."
     },
     {
         "role_category": "Software Engineering",
@@ -21,6 +23,8 @@ DEFAULT_INSIGHTS = [
         "avg_salary_sgd": 8000,
         "hiring_volume": 3200,
         "yoy_growth_pct": 12.3,
+        "forecast_2026": "Stable",
+        "outlook": "Shift towards platform engineering and full-stack capabilities."
     },
     {
         "role_category": "Cloud & DevOps",
@@ -28,6 +32,8 @@ DEFAULT_INSIGHTS = [
         "avg_salary_sgd": 8500,
         "hiring_volume": 1800,
         "yoy_growth_pct": 22.1,
+        "forecast_2026": "Very High Growth",
+        "outlook": "Critical infrastructure role, essential for AI scaling."
     },
     {
         "role_category": "Cybersecurity",
@@ -35,6 +41,8 @@ DEFAULT_INSIGHTS = [
         "avg_salary_sgd": 9000,
         "hiring_volume": 1200,
         "yoy_growth_pct": 25.8,
+        "forecast_2026": "Strategic Priority",
+        "outlook": "Focus on AI security and regulatory compliance (CSA)."
     },
     {
         "role_category": "AI/ML",
@@ -42,6 +50,8 @@ DEFAULT_INSIGHTS = [
         "avg_salary_sgd": 9500,
         "hiring_volume": 1500,
         "yoy_growth_pct": 30.2,
+        "forecast_2026": "Explosive Growth",
+        "outlook": "Generative AI integration across all sectors."
     },
     {
         "role_category": "Product/Management",
@@ -49,6 +59,8 @@ DEFAULT_INSIGHTS = [
         "avg_salary_sgd": 10000,
         "hiring_volume": 900,
         "yoy_growth_pct": 8.7,
+        "forecast_2026": "Evolving",
+        "outlook": "Product managers required to have technical/AI fluency."
     },
 ]
 

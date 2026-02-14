@@ -20,6 +20,8 @@ class MarketInsightResponse(BaseModel):
     demand_level: str
     hiring_volume: int
     yoy_growth_pct: float
+    forecast_2026: str | None = None
+    outlook: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -29,57 +31,7 @@ class MarketOverview(BaseModel):
     highest_demand_sectors: list[str]
 
 
-# Seed data for market insights (used if DB is empty)
-DEFAULT_INSIGHTS = [
-    {
-        "role_category": "Data & Analytics",
-        "trending_skills": ["Python", "SQL", "Spark", "dbt", "Snowflake", "Power BI"],
-        "avg_salary_sgd": 7500,
-        "demand_level": "high",
-        "hiring_volume": 2400,
-        "yoy_growth_pct": 18.5,
-    },
-    {
-        "role_category": "Software Engineering",
-        "trending_skills": ["TypeScript", "React", "Node.js", "Docker", "Kubernetes", "Go"],
-        "avg_salary_sgd": 8000,
-        "demand_level": "high",
-        "hiring_volume": 3200,
-        "yoy_growth_pct": 12.3,
-    },
-    {
-        "role_category": "Cloud & DevOps",
-        "trending_skills": ["AWS", "Terraform", "Kubernetes", "CI/CD", "Docker", "Azure"],
-        "avg_salary_sgd": 8500,
-        "demand_level": "high",
-        "hiring_volume": 1800,
-        "yoy_growth_pct": 22.1,
-    },
-    {
-        "role_category": "Cybersecurity",
-        "trending_skills": ["Network Security", "SIEM", "Penetration Testing", "IAM", "Compliance"],
-        "avg_salary_sgd": 9000,
-        "demand_level": "high",
-        "hiring_volume": 1200,
-        "yoy_growth_pct": 25.8,
-    },
-    {
-        "role_category": "AI/ML",
-        "trending_skills": ["Python", "PyTorch", "NLP", "MLOps", "Computer Vision", "TensorFlow"],
-        "avg_salary_sgd": 9500,
-        "demand_level": "high",
-        "hiring_volume": 1500,
-        "yoy_growth_pct": 30.2,
-    },
-    {
-        "role_category": "Product/Management",
-        "trending_skills": ["Agile", "Scrum", "Data Science", "Communication", "Leadership"],
-        "avg_salary_sgd": 10000,
-        "demand_level": "medium",
-        "hiring_volume": 900,
-        "yoy_growth_pct": 8.7,
-    },
-]
+from app.services.market_simulator import DEFAULT_INSIGHTS
 
 
 @router.get("/market-insights", response_model=MarketOverview)

@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from pydantic_settings import BaseSettings
 from pydantic import model_validator
@@ -6,6 +7,13 @@ from pydantic import model_validator
 logger = logging.getLogger(__name__)
 
 _DEFAULT_SECRET = "change-me-in-production-use-a-real-secret"
+
+# Locate .env: check CWD first, then parent (project root)
+_env_file = Path(".env")
+if not _env_file.exists():
+    _parent_env = Path(__file__).resolve().parent.parent.parent / ".env"
+    if _parent_env.exists():
+        _env_file = _parent_env
 
 
 class Settings(BaseSettings):
@@ -26,11 +34,11 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
 
-    # LLM (OpenAI-compatible)
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    # LLM (Gemini)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": str(_env_file), "extra": "ignore"}
 
     @model_validator(mode="after")
     def validate_secret_key(self):

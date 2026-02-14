@@ -10,9 +10,6 @@ from app.auth import get_current_user_optional
 
 router = APIRouter(tags=["interview"])
 
-OPENAI_TIMEOUT_SECONDS = 30
-
-
 class InterviewMessage(BaseModel):
     role: str
     content: str
@@ -212,7 +209,7 @@ def mock_interview(payload: InterviewRequest, db: Session = Depends(get_db), use
     if not mixed_questions:
         mixed_questions = role_questions
 
-    if settings.openai_api_key and payload.messages:
+    if settings.gemini_api_key and payload.messages:
         return _llm_interview(payload, mixed_questions, gap_meta, q_num, db)
 
     # Rule-based flow
@@ -267,8 +264,8 @@ def _llm_interview(
     q_num: int,
     db: Session,
 ) -> InterviewResponse:
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
+    import google.generativeai as genai
+    genai.configure(api_key=settings.gemini_api_key)
 
     is_complete = q_num >= len(questions)
 
@@ -292,21 +289,44 @@ def _llm_interview(
     if is_complete:
         system_prompt += " The interview is over. Provide a comprehensive summary of the candidate's performance."
 
-    messages = [{"role": "system", "content": system_prompt}]
-    for msg in payload.messages:
-        messages.append({"role": msg.role, "content": msg.content})
+    # Convert to Gemini history format
+    history = []
+    # Skip the last message if checking completion, handled differently below? 
+    # Actually payload.messages includes all history.
+    # If is_complete is true, we appened a user prompt.
+    
+    messages_to_process = [
+        {"role": msg.role, "content": msg.content} for msg in payload.messages
+    ]
 
     if is_complete:
-        messages.append({"role": "user", "content": "Please provide your overall assessment of my interview performance."})
+        messages_to_process.append({"role": "user", "content": "Please provide your overall assessment of my interview performance."})
 
-    response = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=messages,
-        max_tokens=512,
-        temperature=0.7,
-        timeout=OPENAI_TIMEOUT_SECONDS,
-    )
-    reply = response.choices[0].message.content
+    # Convert to Gemini format
+    for msg in messages_to_process[:-1]:
+        role = "user" if msg["role"] == "user" else "model"
+        history.append({"role": role, "parts": [msg["content"]]})
+
+    last_msg = messages_to_process[-1]["content"]
+
+    try:
+        model = genai.GenerativeModel(
+            model_name=settings.gemini_model,
+            system_instruction=system_prompt
+        )
+        chat = model.start_chat(history=history)
+        response = chat.send_message(last_msg)
+        reply = response.text
+    except Exception as e:
+        error_str = str(e)
+        if "429" in error_str or "ResourceExhausted" in error_str or "quota" in error_str.lower():
+            reply = ("The AI service rate limit has been reached. "
+                     "Please wait a minute and try again.")
+        else:
+            reply = f"Error generating interview response. Please try again."
+        logging.error(f"Gemini interview error: {e}")
+
+
 
     is_gap = q_num in gap_meta
     return InterviewResponse(
