@@ -22,16 +22,16 @@ class RewriteResponse(BaseModel):
 
 @router.post("/resume/rewrite", response_model=RewriteResponse)
 def rewrite_bullet_point(payload: RewriteRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if not settings.openai_api_key:
+    if not settings.gemini_api_key:
         # Fallback for demo without API key
         return RewriteResponse(
             original=payload.bullet_point,
             rewritten=f"Optimized: {payload.bullet_point} (demonstrating impact and metrics)",
-            improvement_notes="Add specific metrics (e.g., 'improved by 20%') to make this stronger. (OpenAI API key missing)"
+            improvement_notes="Add specific metrics (e.g., 'improved by 20%') to make this stronger. (Gemini API key missing)"
         )
 
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
+    import google.generativeai as genai
+    genai.configure(api_key=settings.gemini_api_key)
 
     prompt = (
         f"You are an expert tech resume writer. Rewrite the following resume bullet point for a {payload.target_role} role. "
@@ -44,13 +44,9 @@ def rewrite_bullet_point(payload: RewriteRequest, db: Session = Depends(get_db),
     )
 
     try:
-        response = client.chat.completions.create(
-            model=settings.openai_model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-            temperature=0.7,
-        )
-        content = response.choices[0].message.content
+        model = genai.GenerativeModel(settings.gemini_model)
+        response = model.generate_content(prompt)
+        content = response.text
         
         # Simple parsing logic (robustness improvements could be added)
         lines = content.split('\n')

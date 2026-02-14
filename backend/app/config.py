@@ -26,9 +26,9 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
 
-    # LLM (OpenAI-compatible)
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    # LLM (Gemini)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

@@ -199,11 +199,12 @@ def get_project_suggestions(profile_id: int, db: Session = Depends(get_db), tena
     suggestions = []
 
     # 1. Try to generate dynamic suggestions if API key exists
-    if settings.openai_api_key:
+    # 1. Try to generate dynamic suggestions if API key exists
+    if settings.gemini_api_key:
         try:
-            from openai import OpenAI
+            import google.generativeai as genai
             import json
-            client = OpenAI(api_key=settings.openai_api_key)
+            genai.configure(api_key=settings.gemini_api_key)
 
             prompt = (
                 f"Suggest 3 unique portfolio projects for a developer who needs to learn: {', '.join(target_skills)}. "
@@ -212,15 +213,13 @@ def get_project_suggestions(profile_id: int, db: Session = Depends(get_db), tena
                 '{"suggestions": [{"title": "...", "skill": "...", "description": "...", "difficulty": "...", "estimated_hours": 0, "technologies": ["..."], "learning_outcomes": ["..."]}]}'
             )
 
-            response = client.chat.completions.create(
-                model=settings.openai_model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=600,
-                temperature=0.7,
-                response_format={"type": "json_object"}
+            model = genai.GenerativeModel(
+                model_name=settings.gemini_model,
+                generation_config={"response_mime_type": "application/json"}
             )
-            content = response.choices[0].message.content
-            parsed = json.loads(content)
+            response = model.generate_content(prompt)
+            
+            parsed = json.loads(response.text)
             for item in parsed.get("suggestions", []):
                 suggestions.append(ProjectSuggestion(**item))
         except Exception as e:

@@ -38,7 +38,7 @@ SkillBridge AI is a comprehensive career acceleration platform designed to bridg
 |--------|--------------|
 | **Frontend** | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui |
 | **Backend** | Python 3.11, FastAPI, SQLAlchemy 2.0, Pydantic |
-| **AI / ML** | PyTorch, Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, OpenAI API |
+| **AI / ML** | PyTorch, Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, Google Gemini API |
 | **Database** | PostgreSQL 16 |
 | **Automation**| n8n, Docker Compose |
 | **DevOps** | Docker, Shell Scripts |
@@ -49,7 +49,7 @@ SkillBridge AI is a comprehensive career acceleration platform designed to bridg
 
 ### Prerequisites
 - [Docker & Docker Compose](https://www.docker.com/products/docker-desktop/)
-- [OpenAI API Key](https://platform.openai.com/) (Optional, for full AI features)
+- [Gemini API Key](https://aistudio.google.com/) (Optional, for full AI features)
 
 ### Quick Start (Docker)
 The easiest way to run the full stack (Frontend, Backend, DB, Automation) is via Docker.
@@ -63,7 +63,7 @@ The easiest way to run the full stack (Frontend, Backend, DB, Automation) is via
 2. **Configure Environment**
    ```bash
    cp .env.example .env
-   # Edit .env to add your AI_API_KEY
+   # Edit .env to add your GEMINI_API_KEY
    ```
 
 3. **Launch the Application**
@@ -196,7 +196,8 @@ POSTGRES_DB=capstone
 DATABASE_URL=postgresql://capstone:changeme@db:5432/capstone
 
 # AI Services
-OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AIzaSy...
+GEMINI_MODEL=gemini-2.0-flash
 SENTENCE_TRANSFORMER_MODEL=all-MiniLM-L6-v2
 ```
 

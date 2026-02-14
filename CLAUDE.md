@@ -57,7 +57,7 @@ python data/scripts/seed_db.py
 - Hybrid scoring: `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
 - Skill levels: 0 (missing), 0.5 (partial), 1.0 (strong)
 - FAISS in-memory for vector similarity search
-- LLM chatbot/interview uses OpenAI API when configured, falls back to rule-based responses
+- LLM chatbot/interview uses Google Gemini API when configured, falls back to rule-based responses
 - Auth is optional — core features work without login
 
 ## Security
@@ -70,7 +70,7 @@ python data/scripts/seed_db.py
 - CORS: credentials enabled, restricted allowed headers (`Authorization`, `Content-Type`, `Accept`)
 - Profile endpoints: IDOR-protected with `user_id` check on authenticated requests
 - Schema sync: double-quoted SQL identifiers for defense in depth
-- OpenAI calls: 30-second timeout
+- Gemini calls: 30-second timeout
 - Frontend: Next.js middleware for CSP, X-Frame-Options, Permissions-Policy; token refresh uses shared Promise (no race condition); AbortController cleanup on unmount
 - Audit logger: truncates detail values >1000 chars
 

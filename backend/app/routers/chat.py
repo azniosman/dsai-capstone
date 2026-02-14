@@ -15,7 +15,7 @@ from app.routers.market import DEFAULT_INSIGHTS
 
 router = APIRouter(tags=["chat"])
 
-OPENAI_TIMEOUT_SECONDS = 30
+
 
 
 class ChatMessage(BaseModel):
@@ -134,7 +134,7 @@ def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap
 @router.post("/chat", response_model=ChatResponse)
 def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depends(get_current_user_optional)):
     tenant_id = user.tenant_id if user else 1  # fallback to global tenant
-    if not settings.openai_api_key:
+    if not settings.gemini_api_key:
         # Fallback: rule-based response when no API key configured
         return ChatResponse(reply=_fallback_response(
             payload.messages[-1].content if payload.messages else "",
@@ -143,8 +143,8 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
             tenant_id=tenant_id
         ))
 
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
+    import google.generativeai as genai
+    genai.configure(api_key=settings.gemini_api_key)
 
     profile = None
     recommendations = None
@@ -190,22 +190,31 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
                     payload.profile_id,
                     e,
                 )
-                # recommendations, skill_gaps, roadmap_courses remain None; chat continues without context
+                # recommendations, skill_gaps, roadmap_courses remain None
 
     system_prompt = _build_system_prompt(profile, recommendations, skill_gaps, roadmap_courses, market_insights, pathways)
 
-    messages = [{"role": "system", "content": system_prompt}]
-    for msg in payload.messages:
-        messages.append({"role": msg.role, "content": msg.content})
+    # Convert messages to Gemini format
+    history = []
+    for msg in payload.messages[:-1]:  # All except last (which is the new prompt)
+        role = "user" if msg.role == "user" else "model"
+        history.append({"role": role, "parts": [msg.content]})
 
-    response = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=messages,
-        max_tokens=1024,
-        temperature=0.7,
-        timeout=OPENAI_TIMEOUT_SECONDS,
+    # Initialize model with system instruction
+    model = genai.GenerativeModel(
+        model_name=settings.gemini_model,
+        system_instruction=system_prompt
     )
-    return ChatResponse(reply=response.choices[0].message.content)
+
+    # Start chat with history
+    chat = model.start_chat(history=history)
+    
+    try:
+        response = chat.send_message(payload.messages[-1].content)
+        return ChatResponse(reply=response.text)
+    except Exception as e:
+        logging.error(f"Gemini API error: {e}")
+        return ChatResponse(reply="I'm having trouble connecting to my brain right now. Please try again later.")
 
 
 def _fallback_response(user_msg: str, profile_id: int | None = None, db: Session | None = None, tenant_id: int | None = None) -> str:
