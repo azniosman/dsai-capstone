@@ -48,7 +48,7 @@ def reset_db():
     yield
 
 
-def _register(email="test@example.com", password="securepass123", name="Test User", tenant_name=TENANT_NAME):
+def _register(email="test@example.com", password="Secure@pass1", name="Test User", tenant_name=TENANT_NAME):
     return client.post("/api/auth/register", json={
         "email": email,
         "password": password,
@@ -58,7 +58,7 @@ def _register(email="test@example.com", password="securepass123", name="Test Use
     })
 
 
-def _login(email="test@example.com", password="securepass123"):
+def _login(email="test@example.com", password="Secure@pass1"):
     return client.post("/api/auth/login", data={
         "username": email,
         "password": password,
@@ -87,10 +87,32 @@ def test_register_password_too_short():
     assert res.status_code == 422
 
 
+def test_register_password_missing_complexity():
+    # No uppercase
+    res = client.post("/api/auth/register", json={
+        "email": "test@example.com",
+        "password": "lowercase@1",
+        "password_confirm": "lowercase@1",
+        "name": "Test",
+        "tenant_name": TENANT_NAME,
+    })
+    assert res.status_code == 422
+
+    # No special char
+    res = client.post("/api/auth/register", json={
+        "email": "test@example.com",
+        "password": "NoSpecial1",
+        "password_confirm": "NoSpecial1",
+        "name": "Test",
+        "tenant_name": TENANT_NAME,
+    })
+    assert res.status_code == 422
+
+
 def test_register_password_mismatch():
     res = client.post("/api/auth/register", json={
         "email": "test@example.com",
-        "password": "securepass123",
+        "password": "Secure@pass1",
         "password_confirm": "differentpass",
         "name": "Test",
         "tenant_name": TENANT_NAME,
@@ -101,8 +123,8 @@ def test_register_password_mismatch():
 def test_register_invalid_email():
     res = client.post("/api/auth/register", json={
         "email": "not-an-email",
-        "password": "securepass123",
-        "password_confirm": "securepass123",
+        "password": "Secure@pass1",
+        "password_confirm": "Secure@pass1",
         "name": "Test",
         "tenant_name": TENANT_NAME,
     })
@@ -236,17 +258,17 @@ def test_change_password():
 
     # Change password
     res = client.post("/api/auth/change-password", json={
-        "current_password": "securepass123",
-        "new_password": "newsecurepass456",
+        "current_password": "Secure@pass1",
+        "new_password": "NewSecure@456",
     }, headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
 
     # Login with new password
-    res = _login(password="newsecurepass456")
+    res = _login(password="NewSecure@456")
     assert res.status_code == 200
 
     # Old password should fail
-    res = _login(password="securepass123")
+    res = _login(password="Secure@pass1")
     assert res.status_code == 401
 
 
