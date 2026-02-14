@@ -112,6 +112,53 @@ python data/scripts/seed_db.py
 
 ---
 
+## ☁️ AWS Deployment (Terraform)
+
+Deploy the entire stack to AWS (ECS Fargate, RDS, ALB) using Infrastructure as Code.
+
+### Prerequisites
+1. **AWS CLI**: Installed and configured with `aws configure`.
+2. **Terraform**: [Install Terraform](https://developer.hashicorp.com/terraform/downloads).
+
+### Deployment Steps
+
+1. **Initialize Terraform**
+   ```bash
+   cd terraform
+   terraform init
+   ```
+
+2. **Build & Push Docker Images**
+   This script builds images and pushes them to Amazon ECR.
+   ```bash
+   # Make script executable
+   chmod +x ../scripts/build_and_push.sh
+   # Run build script
+   ../scripts/build_and_push.sh
+   ```
+
+3. **Plan Infrastructure**
+   Review changes before applying.
+   ```bash
+   terraform plan -out=tfplan
+   ```
+
+4. **Apply Deployment**
+   Provision VPC, RDS, ECS, and Load Balancers.
+   ```bash
+   terraform apply tfplan
+   ```
+
+5. **Access the App**
+   After deployment, Terraform will output the **Load Balancer DNS**.
+   ```bash
+   # Example Output
+   alb_dns_name = "skillbridge-dev-alb-123456789.ap-southeast-1.elb.amazonaws.com"
+   ```
+   Access the app at `http://<alb_dns_name>`.
+
+---
+
 ## 📂 Project Structure
 
 ```text
