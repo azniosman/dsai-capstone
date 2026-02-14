@@ -19,7 +19,7 @@ from app.routers import (
     auth, profile, recommend, skill_gap, upskilling,
     upload, jd_match, progress, chat, interview,
     market, compare, peer, projects, export, courses, sso, api_keys, audit_logs,
-    resume_rewriter,
+    resume_rewriter, dashboard,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -314,6 +314,7 @@ app.include_router(sso.router, prefix="/api")
 app.include_router(api_keys.router, prefix="/api")
 app.include_router(audit_logs.router, prefix="/api")
 app.include_router(resume_rewriter.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 
 
 @app.get("/health")

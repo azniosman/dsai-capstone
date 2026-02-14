@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowDown, FileText, Briefcase, GraduationCap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,16 @@ const HERO_FEATURES = [
 
 export default function ProfilePage() {
   const formRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  // Redirect logged-in users with a profile to the dashboard
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const profileId = localStorage.getItem("profileId");
+    if (token && profileId) {
+      router.replace("/dashboard");
+    }
+  }, [router]);
 
   const scrollToForm = () => {
     formRef.current?.scrollIntoView({ behavior: "smooth" });
