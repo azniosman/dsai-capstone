@@ -73,11 +73,15 @@ def _skill_match_quality(content_score: float) -> str:
 def get_recommendations(
     profile: UserProfile, db: Session, tenant_id: int, top_n: int = 5
 ) -> list[RoleRecommendation]:
-    # Check cache
+    # Check cache (clean expired entries first)
     key = _cache_key(profile, top_n, tenant_id)
+    now = time.time()
+    expired_keys = [k for k, (t, _) in _rec_cache.items() if now - t >= _CACHE_TTL]
+    for k in expired_keys:
+        del _rec_cache[k]
     if key in _rec_cache:
         cached_time, cached_result = _rec_cache[key]
-        if time.time() - cached_time < _CACHE_TTL:
+        if now - cached_time < _CACHE_TTL:
             return cached_result
 
     roles = db.query(JobRole).filter(JobRole.tenant_id == tenant_id).all()

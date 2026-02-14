@@ -57,7 +57,8 @@ def generate_roadmap(profile: UserProfile, db: Session, tenant_id: int) -> list[
 
         if best_course:
             used_courses.add(best_course.id)
-            week_end = current_week + best_course.duration_weeks - 1
+            duration = best_course.duration_weeks or 4
+            week_end = current_week + duration - 1
 
             # Calculate real subsidies
             subsidies = calculate_subsidies(best_course, is_career_switcher)
@@ -66,14 +67,14 @@ def generate_roadmap(profile: UserProfile, db: Session, tenant_id: int) -> list[
                 skill=skill,
                 course_title=best_course.title,
                 provider=best_course.provider,
-                duration_weeks=best_course.duration_weeks,
+                duration_weeks=duration,
                 level=best_course.level,
                 url=best_course.url,
                 certification=best_course.certification,
                 priority=priority,
                 week_start=current_week,
                 week_end=week_end,
-                skillsfuture_eligible=best_course.skillsfuture_eligible or True,
+                skillsfuture_eligible=best_course.skillsfuture_eligible if best_course.skillsfuture_eligible is not None else True,
                 skillsfuture_credit_amount=subsidies["sfc_applicable"],
                 course_fee=subsidies["course_fee"],
                 nett_fee_after_subsidy=subsidies["nett_payable"],

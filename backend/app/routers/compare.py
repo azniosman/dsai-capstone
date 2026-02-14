@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_tenant
+from app.auth import get_current_tenant, get_current_user
 from app.database import get_db
 from app.models.job_role import JobRole
 from app.models.user_profile import UserProfile
 from app.models.tenant import Tenant
+from app.models.user import User
 from app.services.skill_matcher import match_skills, compute_content_similarity
 
 router = APIRouter(tags=["compare"])
@@ -42,11 +43,11 @@ class CompareResponse(BaseModel):
 
 
 @router.post("/compare-roles", response_model=CompareResponse)
-def compare_roles(payload: CompareRequest, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
+def compare_roles(payload: CompareRequest, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant), user: User = Depends(get_current_user)):
     if len(payload.role_ids) < 2 or len(payload.role_ids) > 4:
         raise HTTPException(status_code=400, detail="Select 2-4 roles to compare")
 
-    profile = db.query(UserProfile).filter(UserProfile.id == payload.profile_id, UserProfile.tenant_id == tenant.id).first()
+    profile = db.query(UserProfile).filter(UserProfile.id == payload.profile_id, UserProfile.tenant_id == tenant.id, UserProfile.user_id == user.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 

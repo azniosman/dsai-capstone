@@ -57,4 +57,3 @@ def delete_api_key(
     current_user: User = Depends(has_role([Role.ADMIN])),
 ):
     revoke_api_key(api_key_id, current_user.tenant_id, db)
-    return {"message": "API Key revoked successfully"}

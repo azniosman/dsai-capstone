@@ -94,17 +94,14 @@ def update_profile(
 ):
     from app.models.user_profile import UserProfile
 
-    # If authenticated, filter by tenant; otherwise allow update by profile ID only
+    # If authenticated, filter by tenant + ownership; otherwise allow update only for unclaimed profiles
     if user:
-        profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == user.tenant_id).first()
+        profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == user.tenant_id, UserProfile.user_id == user.id).first()
     else:
         profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.user_id == None).first()
 
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
-
-    if profile.user_id and (not user or user.id != profile.user_id):
-        raise HTTPException(status_code=403, detail="Not authorized to edit this profile")
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(profile, field, value)

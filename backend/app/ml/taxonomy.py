@@ -88,4 +88,4 @@ def normalize_skills(skill_texts: list[str], threshold: float = 0.75) -> list[st
             result.append(skills[indices[i][0]])
         else:
             result.append(text)  # Keep original if no match
-    return list(set(result))
+    return list(dict.fromkeys(result))

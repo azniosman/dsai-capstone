@@ -6,15 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_tenant
+from app.auth import get_current_tenant, get_current_user
 from app.database import get_db
 from app.models.tenant import Tenant
+from app.models.user import User
 
 router = APIRouter(tags=["export"])
 
 
 @router.get("/export/roadmap/{profile_id}")
-def export_roadmap_pdf(profile_id: int, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant)):
+def export_roadmap_pdf(profile_id: int, db: Session = Depends(get_db), tenant: Tenant = Depends(get_current_tenant), user: User = Depends(get_current_user)):
     from app.models.user_profile import UserProfile
     from app.services.roadmap_generator import generate_roadmap
     from reportlab.lib.pagesizes import A4
@@ -23,11 +24,11 @@ def export_roadmap_pdf(profile_id: int, db: Session = Depends(get_db), tenant: T
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
 
-    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant.id).first()
+    profile = db.query(UserProfile).filter(UserProfile.id == profile_id, UserProfile.tenant_id == tenant.id, UserProfile.user_id == user.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    roadmap = generate_roadmap(profile, db)
+    roadmap = generate_roadmap(profile, db, tenant_id=tenant.id)
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=20*mm, bottomMargin=20*mm)
