@@ -163,6 +163,8 @@ Deploy the entire stack to AWS (ECS Fargate, RDS, ALB) using Infrastructure as C
 
 ## 📂 Project Structure
 
+View the [Technical Roadmap](Technical_Roadmap.md) for SkillBridge AI's production evolution.
+
 ```text
 dsai-capstone/
 ├── backend/                # FastAPI Application
