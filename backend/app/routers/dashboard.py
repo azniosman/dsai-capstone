@@ -45,24 +45,31 @@ def get_dashboard_summary(
 
     user_skills = set(s.lower() for s in (profile.skills or []))
 
-    # Lightweight skill matching — simple set intersection, no embeddings
-    roles = db.query(JobRole).filter(JobRole.tenant_id == user.tenant_id).all()
-    recs_count = 0
-    total_gaps = 0
-    best_match = 0.0
+    # Use the optimized recommender service
+    from app.services.recommender import get_recommendations
+    recommendations = get_recommendations(profile, db, user.tenant_id, top_n=3)
+    
+    # Calculate best match score (career readiness)
+    best_match = recommendations[0].match_score if recommendations else 0.0
+    career_readiness = round(best_match * 100, 1)
 
-    for role in roles:
-        req_skills = set(s.lower() for s in (role.required_skills or []))
-        if not req_skills:
-            continue
-        matched = user_skills & req_skills
-        match_ratio = len(matched) / len(req_skills)
-        missing = len(req_skills) - len(matched)
-        if match_ratio > 0.3:
-            recs_count += 1
-        total_gaps += missing
-        if match_ratio > best_match:
-            best_match = match_ratio
+    # Use gap analyzer for accurate gap counts on the top role
+    total_gaps = 0
+    if recommendations:
+        from app.services.gap_analyzer import analyze_gaps
+        # Analyze gaps for the top recommended role
+        top_role_id = recommendations[0].role_id
+        # We need to fetch the role object or use the service efficiently
+        # gap_analyzer.analyze_gaps analyzes *all* relevant roles or specific ones?
+        # Let's check gap_analyzer signature. It usually returns a list of gaps for reviewed roles.
+        # For dashboard summary, we might just want a simple count or use the pre-computed 'missing_skills' from recommendations.
+        
+        # Optimization: use the 'missing_skills' already returned by get_recommendations for the top 3
+        # This avoids re-running the gap analyzer service which might be heavy.
+        
+        # Sum gaps from top 3 recommendations to give a sense of "work to do"
+        # Or just show gaps for the #1 role. Let's do #1 role.
+        total_gaps = len(recommendations[0].missing_skills)
 
     # Count progress entries
     from app.models.skill_progress import SkillProgress
@@ -72,9 +79,6 @@ def get_dashboard_summary(
         .count()
     )
 
-    # Career readiness = best match score as percentage
-    career_readiness = round(best_match * 100, 1)
-
     return DashboardSummary(
         profile_id=profile.id,
         name=profile.name,
@@ -83,8 +87,9 @@ def get_dashboard_summary(
         skills=profile.skills or [],
         is_career_switcher=profile.is_career_switcher,
         skills_count=len(profile.skills or []),
-        recommendations_count=recs_count,
+        recommendations_count=len(recommendations),
         gaps_identified=total_gaps,
         progress_entries=progress_count,
-        career_readiness=career_readiness,
+        # Ensure readiness is nicely bounded
+        career_readiness=min(100.0, max(0.0, career_readiness)),
     )

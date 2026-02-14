@@ -234,6 +234,31 @@ async def lifespan(app):
         logger.info("Taxonomy index built successfully")
     except Exception as e:
         logger.warning("Taxonomy index warmup failed (will retry on first request): %s", e)
+        
+    # Pre-compute embeddings for all job roles to avoid timeout on first recommendation request
+    try:
+        logger.info("Warming up skill cache for job roles...")
+        from app.services.skill_matcher import warmup_skill_cache
+        db = SessionLocal()
+        try:
+            roles = db.query(JobRole).all()
+            skill_sets = []
+            for r in roles:
+                if r.required_skills:
+                    skill_sets.append(r.required_skills)
+                if r.preferred_skills:
+                    skill_sets.append(r.preferred_skills)
+                # Also warm up the combined skills used in compute_content_similarity
+                if r.required_skills and r.preferred_skills:
+                    skill_sets.append(r.required_skills + r.preferred_skills)
+            
+            count = warmup_skill_cache(skill_sets)
+            logger.info("Skill cache warmed up with %d unique skill sets from %d roles", count, len(roles))
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning("Skill cache warmup failed: %s", e)
+
     logger.info("Application startup complete")
     yield
 

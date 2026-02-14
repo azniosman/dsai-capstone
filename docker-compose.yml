@@ -24,6 +24,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-capstone}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-capstone}
       SENTENCE_TRANSFORMER_MODEL: ${SENTENCE_TRANSFORMERS_MODEL:-all-MiniLM-L6-v2}
+      OMP_NUM_THREADS: "1"
     depends_on:
       db:
         condition: service_healthy
