@@ -43,7 +43,7 @@ export default function MarketInsights() {
 
   if (loading) return <SkeletonCard count={4} />;
   if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>;
-  if (!data) return null;
+  if (!data) return <Alert variant="destructive"><AlertDescription>No market data available.</AlertDescription></Alert>;
 
   const salaryData = data.insights.map((i) => ({
     category: i.role_category,

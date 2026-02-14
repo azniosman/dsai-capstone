@@ -13,10 +13,12 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
+import { extractApiError } from "@/lib/utils";
 
 export default function AccountSettings() {
   const router = useRouter();
 
+  const [ready, setReady] = useState(false);
   const [account, setAccount] = useState({ name: "", email: "" });
   const [passwords, setPasswords] = useState({ current_password: "", new_password: "", confirm: "" });
   const [loading, setLoading] = useState({ account: false, password: false, delete: false });
@@ -27,7 +29,10 @@ export default function AccountSettings() {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
     api.get("/api/auth/me")
-      .then((res) => setAccount({ name: res.data.name, email: res.data.email }))
+      .then((res) => {
+        setAccount({ name: res.data.name, email: res.data.email });
+        setReady(true);
+      })
       .catch(() => router.push("/login"));
   }, [router]);
 
@@ -41,7 +46,7 @@ export default function AccountSettings() {
       localStorage.setItem("userEmail", res.data.email);
       toast.success("Account updated successfully.");
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to update account";
+      const msg = extractApiError(err, "Failed to update account");
       setError((e) => ({ ...e, account: msg }));
       toast.error(msg);
     } finally {
@@ -65,7 +70,7 @@ export default function AccountSettings() {
       setPasswords({ current_password: "", new_password: "", confirm: "" });
       toast.success("Password changed successfully.");
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to change password";
+      const msg = extractApiError(err, "Failed to change password");
       setError((e) => ({ ...e, password: msg }));
       toast.error(msg);
     } finally {
@@ -85,12 +90,14 @@ export default function AccountSettings() {
       toast.success("Account deleted.");
       router.push("/");
     } catch (err: unknown) {
-      toast.error((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to delete account");
+      toast.error(extractApiError(err, "Failed to delete account"));
     } finally {
       setLoading((l) => ({ ...l, delete: false }));
       setDeleteOpen(false);
     }
   };
+
+  if (!ready) return <div className="flex justify-center mt-8"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 
   return (
     <div className="max-w-xl mx-auto">

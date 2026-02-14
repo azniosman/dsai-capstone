@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 import api from "@/lib/api-client";
 
 const FALLBACK_ROLES = [
@@ -103,7 +104,8 @@ export default function MockInterview() {
       if (res.data.is_complete) setComplete(true);
     } catch (err) {
       console.error(err);
-      setMessages([...newMsgs, { role: "assistant", content: "Could you elaborate on that?" }]);
+      toast.error("Interview request failed. Please try again.");
+      setMessages([...newMsgs, { role: "assistant", content: "Sorry, there was a connection issue. Please try answering again." }]);
     } finally {
       setLoading(false);
     }

@@ -75,6 +75,7 @@ export default function ProgressDashboard() {
   }, [profileId, router]);
 
   const loadData = async () => {
+    if (!profileId) return;
     setLoading(true);
     try {
       const [progRes, timeRes] = await Promise.all([
@@ -92,10 +93,10 @@ export default function ProgressDashboard() {
   };
 
   const recordProgress = async () => {
-    if (!newSkill.trim()) return;
+    if (!newSkill.trim() || !profileId) return;
     try {
       await api.post("/api/progress", {
-        profile_id: parseInt(profileId!),
+        profile_id: parseInt(profileId),
         skill: newSkill.trim(),
         level: parseFloat(newLevel),
       });

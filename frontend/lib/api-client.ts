@@ -27,6 +27,7 @@ function clearAuth() {
 }
 
 async function doRefresh(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
   try {
     const res = await axios.post(
       `${api.defaults.baseURL}/api/auth/refresh`,
