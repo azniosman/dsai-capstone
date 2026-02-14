@@ -6,6 +6,8 @@ SkillBridge AI is a comprehensive career acceleration platform designed to bridg
 
 ![Overview](misc/images/aioverview.png)
 
+View the [Technical Roadmap](Technical_Roadmap.md) for SkillBridge AI's production evolution.
+
 ---
 
 ## ✨ Key Features
