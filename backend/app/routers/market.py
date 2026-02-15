@@ -15,11 +15,11 @@ router = APIRouter(tags=["market"])
 
 class MarketInsightResponse(BaseModel):
     role_category: str
-    trending_skills: list[str]
-    avg_salary_sgd: float
-    demand_level: str
-    hiring_volume: int
-    yoy_growth_pct: float
+    trending_skills: list[str] = []
+    avg_salary_sgd: float | None = None
+    demand_level: str | None = "Medium"
+    hiring_volume: int | None = 0
+    yoy_growth_pct: float | None = 0.0
     forecast_2026: str | None = None
     outlook: str | None = None
     model_config = {"from_attributes": True}
