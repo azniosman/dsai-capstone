@@ -1,4 +1,4 @@
-# SkillBridge AI — Technical Roadmap (Production Evolution)
+# SkillBridge AI — Technical Roadmap
 
 ## 1. Strategic Vision and Roadmap Overview
 
