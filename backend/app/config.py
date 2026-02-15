@@ -16,8 +16,32 @@ if not _env_file.exists():
         _env_file = _parent_env
 
 
+from urllib.parse import quote_plus
+
 class Settings(BaseSettings):
-    database_url: str = "postgresql://capstone:changeme@localhost:5432/capstone"
+    postgres_user: str = "capstone"
+    postgres_password: str = "changeme"
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_db: str = "capstone"
+    
+    # Optional override for the entire URL
+    database_url_override: str | None = None
+
+    @property
+    def database_url(self) -> str:
+        if self.database_url_override:
+            return self.database_url_override
+        
+        # Safely encode parts
+        user = quote_plus(self.postgres_user)
+        password = quote_plus(self.postgres_password)
+        host = self.postgres_host
+        port = self.postgres_port
+        db = quote_plus(self.postgres_db)
+        
+        return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+
     sentence_transformer_model: str = "all-MiniLM-L6-v2"
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
@@ -38,7 +62,14 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
 
-    model_config = {"env_file": str(_env_file), "extra": "ignore"}
+    model_config = {
+        "env_file": str(_env_file), 
+        "extra": "ignore",
+        "env_prefix": "", # Ensure it matches .env / env vars exactly
+        "fields": {
+            "database_url_override": {"env": "DATABASE_URL"}
+        }
+    }
 
     @model_validator(mode="after")
     def validate_secret_key(self):

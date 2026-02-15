@@ -22,7 +22,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-capstone}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-capstone}
+      POSTGRES_USER: ${POSTGRES_USER:-capstone}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-capstone}
       SENTENCE_TRANSFORMER_MODEL: ${SENTENCE_TRANSFORMERS_MODEL:-all-MiniLM-L6-v2}
       OMP_NUM_THREADS: "1"
     depends_on:
