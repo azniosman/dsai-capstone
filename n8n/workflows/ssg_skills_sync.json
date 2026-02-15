@@ -1,0 +1,164 @@
+{
+    "name": "SSG Skills Framework Sync",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours",
+                            "hoursInterval": 24
+                        }
+                    ]
+                }
+            },
+            "name": "Daily Schedule",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                260,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://public-api.ssg-wsg.gov.sg/dp-api/skills-framework/v1/skills",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "name": "Fetch SSG Skills",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                480,
+                300
+            ],
+            "notes": "Replace with actual SSG API endpoint and credentials when available. Currently falls back to local seed data."
+        },
+        {
+            "parameters": {
+                "functionCode": "// Transform SSG API response into ingestion schema\n// The SSG Skills Framework returns skills grouped by sector/category\nconst rawItems = items[0].json;\n\n// If SSG API returns data, transform it\nconst skills = [];\n\nif (rawItems && rawItems.categories) {\n  // Seed data format\n  for (const cat of rawItems.categories) {\n    for (const skillName of cat.skills) {\n      skills.push({ name: skillName, category: cat.name });\n    }\n  }\n} else if (rawItems && Array.isArray(rawItems)) {\n  // SSG API format (adapt when live)\n  for (const item of rawItems) {\n    skills.push({\n      name: item.skillName || item.name,\n      category: item.sector || item.category || 'General'\n    });\n  }\n}\n\nreturn [{ json: { skills } }];"
+            },
+            "name": "Transform Skills Data",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://backend:8000/api/ingest/skills",
+                "method": "POST",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": []
+                },
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json) }}",
+                "options": {
+                    "timeout": 60000
+                },
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "X-API-Key",
+                            "value": "={{ $env.BACKEND_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                }
+            },
+            "name": "Push to Backend",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                920,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "message": "✅ SSG Skills sync completed: {{ $json.created }} created, {{ $json.updated }} updated, {{ $json.skipped }} skipped.",
+                "channel": "admin-alerts"
+            },
+            "name": "Notify Success",
+            "type": "n8n-nodes-base.slack",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                250
+            ]
+        },
+        {
+            "parameters": {
+                "message": "❌ SSG Skills sync FAILED: {{ $json.message || 'Unknown error' }}",
+                "channel": "admin-alerts"
+            },
+            "name": "Notify Failure",
+            "type": "n8n-nodes-base.slack",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                450
+            ]
+        }
+    ],
+    "connections": {
+        "Daily Schedule": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch SSG Skills",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch SSG Skills": {
+            "main": [
+                [
+                    {
+                        "node": "Transform Skills Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Transform Skills Data": {
+            "main": [
+                [
+                    {
+                        "node": "Push to Backend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Push to Backend": {
+            "main": [
+                [
+                    {
+                        "node": "Notify Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "timezone": "Asia/Singapore"
+    }
+}

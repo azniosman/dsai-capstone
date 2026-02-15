@@ -1,4 +1,14 @@
-"""Load seed data from JSON files into PostgreSQL."""
+"""Load seed data from JSON files into PostgreSQL.
+
+DEPRECATED: This script is superseded by automated n8n data pipelines.
+    - SSG Skills sync:  n8n/workflows/ssg_skills_sync.json
+    - SSG Courses sync: n8n/workflows/ssg_courses_sync.json
+    - Job Board sync:   n8n/workflows/job_board_sync.json
+    - Market simulation: n8n/workflows/market_simulation.json
+
+The backend also seeds data automatically on startup (see backend/app/main.py).
+This script is kept for backward compatibility only.
+"""
 
 import json
 import os

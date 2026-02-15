@@ -1,0 +1,214 @@
+{
+    "name": "Job Board Data Sync",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours",
+                            "hoursInterval": 6
+                        }
+                    ]
+                }
+            },
+            "name": "6-Hourly Schedule",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                260,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://api.adzuna.com/v1/api/jobs/sg/search/1",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpQueryAuth",
+                "options": {
+                    "timeout": 30000
+                },
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "results_per_page",
+                            "value": "50"
+                        },
+                        {
+                            "name": "what",
+                            "value": "software engineer data scientist cloud"
+                        },
+                        {
+                            "name": "content-type",
+                            "value": "application/json"
+                        }
+                    ]
+                }
+            },
+            "name": "Fetch Job Listings",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                480,
+                300
+            ],
+            "notes": "Replace with actual Adzuna/LinkedIn API credentials. Query params are configurable for Singapore tech job market."
+        },
+        {
+            "parameters": {
+                "functionCode": "// Transform job board API response into job roles + market insights\nconst rawItems = items[0].json;\n\nconst roles = [];\nconst insightMap = {};\n\n// Handle Adzuna response format\nconst results = rawItems.results || rawItems.roles || [];\n\nfor (const job of results) {\n  const title = job.title || '';\n  const category = job.category ? (job.category.label || job.category) : 'General';\n  const salary = job.salary_max || job.salary_min || 0;\n\n  // Build job role\n  roles.push({\n    title: title,\n    category: category,\n    description: job.description || '',\n    required_skills: job.required_skills || [],\n    preferred_skills: job.preferred_skills || [],\n    min_experience_years: job.min_experience_years || 0,\n    education_level: job.education_level || 'bachelor',\n    career_switcher_friendly: job.career_switcher_friendly || false,\n    salary_range: salary > 0 ? `SGD ${Math.round(salary * 0.8).toLocaleString()} - ${Math.round(salary).toLocaleString()}` : null\n  });\n\n  // Aggregate market insights by category\n  if (!insightMap[category]) {\n    insightMap[category] = {\n      role_category: category,\n      trending_skills: [],\n      avg_salary_sgd: 0,\n      hiring_volume: 0,\n      demand_level: 'medium',\n      yoy_growth_pct: 0,\n      count: 0\n    };\n  }\n  insightMap[category].hiring_volume++;\n  insightMap[category].count++;\n  if (salary > 0) {\n    insightMap[category].avg_salary_sgd += salary;\n  }\n}\n\n// Normalise market insights\nconst insights = Object.values(insightMap).map(i => {\n  i.avg_salary_sgd = i.count > 0 ? Math.round(i.avg_salary_sgd / i.count) : 0;\n  i.demand_level = i.hiring_volume > 20 ? 'high' : i.hiring_volume > 10 ? 'medium' : 'low';\n  delete i.count;\n  return i;\n});\n\nreturn [{ json: { roles, insights } }];"
+            },
+            "name": "Transform Job Data",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://backend:8000/api/ingest/job-roles",
+                "method": "POST",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ roles: $json.roles }) }}",
+                "options": {
+                    "timeout": 60000
+                },
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "X-API-Key",
+                            "value": "={{ $env.BACKEND_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                }
+            },
+            "name": "Push Job Roles",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                920,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://backend:8000/api/ingest/market-insights",
+                "method": "POST",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ insights: $json.insights }) }}",
+                "options": {
+                    "timeout": 60000
+                },
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "X-API-Key",
+                            "value": "={{ $env.BACKEND_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                }
+            },
+            "name": "Push Market Insights",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                920,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "message": "✅ Job Board sync completed. Roles and market insights updated.",
+                "channel": "admin-alerts"
+            },
+            "name": "Notify Success",
+            "type": "n8n-nodes-base.slack",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "message": "❌ Job Board sync FAILED: {{ $json.message || 'Unknown error' }}",
+                "channel": "admin-alerts"
+            },
+            "name": "Notify Failure",
+            "type": "n8n-nodes-base.slack",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                500
+            ]
+        }
+    ],
+    "connections": {
+        "6-Hourly Schedule": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Job Listings",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Job Listings": {
+            "main": [
+                [
+                    {
+                        "node": "Transform Job Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Transform Job Data": {
+            "main": [
+                [
+                    {
+                        "node": "Push Job Roles",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Push Market Insights",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Push Job Roles": {
+            "main": [
+                [
+                    {
+                        "node": "Notify Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "timezone": "Asia/Singapore"
+    }
+}

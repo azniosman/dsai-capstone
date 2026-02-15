@@ -24,6 +24,15 @@
             "parameters": {
                 "url": "http://backend:8000/api/simulate",
                 "method": "POST",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "X-API-Key",
+                            "value": "={{ $env.BACKEND_API_KEY }}"
+                        }
+                    ]
+                },
                 "options": {}
             },
             "name": "Run Simulation",
@@ -36,14 +45,47 @@
         },
         {
             "parameters": {
-                "message": "Market data simulation completed. New trends updated.",
+                "url": "http://backend:8000/api/ingest/market-insights",
+                "method": "POST",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ insights: $json.insights || [] }) }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "X-API-Key",
+                            "value": "={{ $env.BACKEND_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "options": {
+                    "timeout": 60000
+                }
+            },
+            "name": "Push to Ingestion",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                900,
+                280
+            ],
+            "notes": "After simulation runs, push the updated market insights through the ingestion pipeline for tracking and audit."
+        },
+        {
+            "parameters": {
+                "message": "✅ Market data simulation completed. Trends updated via ingestion pipeline.",
                 "channel": "admin-alerts"
             },
             "name": "Notify Slack",
             "type": "n8n-nodes-base.slack",
             "typeVersion": 1,
             "position": [
-                900,
+                1120,
                 280
             ]
         }
@@ -64,6 +106,17 @@
             "main": [
                 [
                     {
+                        "node": "Push to Ingestion",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Push to Ingestion": {
+            "main": [
+                [
+                    {
                         "node": "Notify Slack",
                         "type": "main",
                         "index": 0
@@ -71,5 +124,8 @@
                 ]
             ]
         }
+    },
+    "settings": {
+        "timezone": "Asia/Singapore"
     }
 }

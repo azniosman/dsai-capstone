@@ -1,0 +1,161 @@
+{
+    "name": "SSG Courses Catalog Sync",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours",
+                            "hoursInterval": 24
+                        }
+                    ]
+                }
+            },
+            "name": "Daily Schedule",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                260,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://public-api.ssg-wsg.gov.sg/dp-api/courses/v1/courses",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "name": "Fetch SSG Courses",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                480,
+                300
+            ],
+            "notes": "Replace with actual SSG API endpoint and credentials when available. Currently falls back to local seed data."
+        },
+        {
+            "parameters": {
+                "functionCode": "// Transform SSG course catalog response into ingestion schema\nconst rawItems = items[0].json;\nconst courses = [];\n\nif (rawItems && rawItems.courses) {\n  // Seed data format: already matches our schema\n  for (const c of rawItems.courses) {\n    courses.push({\n      title: c.title,\n      provider: c.provider || 'Unknown',\n      skills_taught: c.skills_taught || c.skillsTaught || [],\n      duration_weeks: c.duration_weeks || c.durationWeeks,\n      level: c.level || 'intermediate',\n      url: c.url,\n      certification: c.certification,\n      course_fee: c.course_fee || c.courseFee || 0,\n      subsidy_percent: c.subsidy_percent || c.subsidyPercent || 70,\n      mces_eligible: c.mces_eligible || c.mcesEligible || false,\n      skillsfuture_eligible: c.skillsfuture_eligible !== undefined ? c.skillsfuture_eligible : true,\n      skillsfuture_credit_amount: c.skillsfuture_credit_amount || 500.0,\n      nett_fee_after_subsidy: c.nett_fee_after_subsidy || 500.0\n    });\n  }\n} else if (Array.isArray(rawItems)) {\n  // SSG API format (adapt when live)\n  for (const item of rawItems) {\n    courses.push({\n      title: item.courseTitle || item.title,\n      provider: item.trainingProvider || item.provider || 'Unknown',\n      skills_taught: item.skills || [],\n      duration_weeks: Math.ceil((item.totalDurationHours || 40) / 40),\n      level: item.courseLevel || 'intermediate',\n      url: item.courseUrl || null,\n      certification: item.certificationName || null,\n      course_fee: item.totalFee || 0,\n      subsidy_percent: item.subsidyRate || 70,\n      mces_eligible: item.mcesEligible || false,\n      skillsfuture_eligible: true,\n      skillsfuture_credit_amount: 500.0,\n      nett_fee_after_subsidy: item.nettFee || 500.0\n    });\n  }\n}\n\nreturn [{ json: { courses } }];"
+            },
+            "name": "Transform Courses Data",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://backend:8000/api/ingest/courses",
+                "method": "POST",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json) }}",
+                "options": {
+                    "timeout": 60000
+                },
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "X-API-Key",
+                            "value": "={{ $env.BACKEND_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                }
+            },
+            "name": "Push to Backend",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                920,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "message": "✅ SSG Courses sync completed: {{ $json.created }} created, {{ $json.updated }} updated, {{ $json.skipped }} skipped.",
+                "channel": "admin-alerts"
+            },
+            "name": "Notify Success",
+            "type": "n8n-nodes-base.slack",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                250
+            ]
+        },
+        {
+            "parameters": {
+                "message": "❌ SSG Courses sync FAILED: {{ $json.message || 'Unknown error' }}",
+                "channel": "admin-alerts"
+            },
+            "name": "Notify Failure",
+            "type": "n8n-nodes-base.slack",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                450
+            ]
+        }
+    ],
+    "connections": {
+        "Daily Schedule": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch SSG Courses",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch SSG Courses": {
+            "main": [
+                [
+                    {
+                        "node": "Transform Courses Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Transform Courses Data": {
+            "main": [
+                [
+                    {
+                        "node": "Push to Backend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Push to Backend": {
+            "main": [
+                [
+                    {
+                        "node": "Notify Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "timezone": "Asia/Singapore"
+    }
+}
