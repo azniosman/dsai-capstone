@@ -212,9 +212,9 @@ SENTENCE_TRANSFORMER_MODEL=all-MiniLM-L6-v2
 
 
 ### 📊 Dashboard & Insights
-| Profile Dashboard | Market Trends |
+| Profile Dashboard | Career Insights |
 |-------------------|---------------|
-| ![Dashboard](misc/images/dashboard.png) | ![Market Insights](misc/images/market_insights.png) |
+| ![Dashboard](misc/images/dashboard.png) | ![Career Insights](misc/images/career_insights.png) |
 
 ### 🚀 Career Growth
 | Job Recommendations | Skill Gap Analysis |
