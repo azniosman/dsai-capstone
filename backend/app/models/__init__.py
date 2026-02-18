@@ -7,9 +7,9 @@ from app.models.skill_progress import SkillProgress
 from app.models.market_insight import MarketInsight
 from app.models.tenant import Tenant
 from app.models.api_key import APIKey
-from app.models.audit_log import AuditLog # Added import
+from app.models.snapshot import ProfileSnapshot # Added import
 
 __all__ = [
     "JobRole", "Skill", "SCTPCourse", "UserProfile",
-    "User", "SkillProgress", "MarketInsight", "Tenant", "APIKey", "AuditLog",
+    "User", "SkillProgress", "MarketInsight", "Tenant", "APIKey", "AuditLog", "ProfileSnapshot",
 ]

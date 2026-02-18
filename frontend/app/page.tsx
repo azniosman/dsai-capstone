@@ -72,7 +72,7 @@ export default function LandingPage() {
       <section
         className="py-24 md:py-32 border-b border-border relative overflow-hidden"
         style={{
-          backgroundImage: `radial-gradient(hsl(36 10% 70% / 0.6) 1px, transparent 1px)`,
+          backgroundImage: `radial-gradient(hsl(0 0% 78% / 0.6) 1px, transparent 1px)`,
           backgroundSize: "28px 28px",
         }}
       >

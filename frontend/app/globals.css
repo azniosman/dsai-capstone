@@ -47,14 +47,14 @@
 
 /* ═══════════════════════════════════════════════════════
    LIGHT THEME — Countrast
-   Warm cream base, sky blue #00BFFF primary, orange accent.
+   Neutral light-gray base, sky blue #00BFFF primary, vivid orange accent.
    ═══════════════════════════════════════════════════════ */
 :root {
   --radius: 0.375rem;
 
-  /* Surfaces — warm off-white cream */
-  --background: 36 15% 91%;
-  /* ~#eeebe5 */
+  /* Surfaces — clean neutral light gray */
+  --background: 0 0% 95%;
+  /* ~#f2f2f2 */
   --foreground: 0 0% 10%;
   /* ~#1a1a1a near-black */
 
@@ -71,27 +71,27 @@
   /* near-black for max contrast */
 
   /* Secondary / Muted */
-  --secondary: 36 10% 87%;
+  --secondary: 0 0% 91%;
   --secondary-foreground: 0 0% 18%;
 
-  --muted: 36 10% 87%;
+  --muted: 0 0% 91%;
   --muted-foreground: 0 0% 42%;
 
-  --accent: 36 8% 84%;
+  --accent: 0 0% 88%;
   --accent-foreground: 0 0% 10%;
 
   --destructive: 5 78% 50%;
   /* #e03030 */
   --destructive-foreground: 0 0% 100%;
 
-  --border: 36 10% 83%;
-  /* warm light border */
-  --input: 36 10% 83%;
+  --border: 0 0% 88%;
+  /* neutral light border */
+  --input: 0 0% 88%;
   --ring: 195 100% 50%;
 
-  /* Charts — Countrast dual-accent: orange + sky blue */
-  --chart-1: 16 78% 54%;
-  /* #e8562a burnt orange */
+  /* Charts — Countrast dual-accent: vivid orange + sky blue */
+  --chart-1: 24 95% 53%;
+  /* #f57c14 vivid orange */
   --chart-2: 195 100% 50%;
   /* #00BFFF sky blue */
   --chart-3: 145 60% 36%;
@@ -101,59 +101,59 @@
   --chart-5: 265 68% 52%;
   /* purple */
 
-  /* Sidebar — slightly darker warm background */
-  --sidebar: 36 10% 87%;
+  /* Sidebar — slightly darker neutral gray */
+  --sidebar: 0 0% 91%;
   --sidebar-foreground: 0 0% 12%;
   --sidebar-primary: 195 100% 50%;
   --sidebar-primary-foreground: 0 0% 5%;
-  --sidebar-accent: 36 8% 83%;
+  --sidebar-accent: 0 0% 88%;
   --sidebar-accent-foreground: 0 0% 12%;
-  --sidebar-border: 36 10% 81%;
+  --sidebar-border: 0 0% 85%;
   --sidebar-ring: 195 100% 50%;
 }
 
 /* ═══════════════════════════════════════════════════════
-   DARK THEME — Warm Night
-   Warm dark base, sky blue primary, orange accent.
+   DARK THEME — Neutral Night
+   Neutral dark base, sky blue primary, vivid orange accent.
    ═══════════════════════════════════════════════════════ */
 .dark {
-  /* Surfaces — warm dark panels */
-  --background: 22 15% 8%;
-  /* warm near-black */
-  --foreground: 36 8% 90%;
-  /* warm off-white */
+  /* Surfaces — neutral dark panels */
+  --background: 0 0% 8%;
+  /* neutral near-black */
+  --foreground: 0 0% 90%;
+  /* neutral off-white */
 
-  --card: 22 12% 12%;
-  --card-foreground: 36 8% 90%;
+  --card: 0 0% 12%;
+  --card-foreground: 0 0% 90%;
 
-  --popover: 22 12% 14%;
-  --popover-foreground: 36 8% 90%;
+  --popover: 0 0% 14%;
+  --popover-foreground: 0 0% 90%;
 
   /* Primary — Sky Blue */
   --primary: 195 100% 50%;
   /* #00BFFF */
-  --primary-foreground: 22 15% 8%;
+  --primary-foreground: 0 0% 8%;
 
   /* Secondary / Muted */
-  --secondary: 22 10% 18%;
-  --secondary-foreground: 36 8% 72%;
+  --secondary: 0 0% 18%;
+  --secondary-foreground: 0 0% 72%;
 
-  --muted: 22 10% 18%;
-  --muted-foreground: 22 8% 50%;
+  --muted: 0 0% 18%;
+  --muted-foreground: 0 0% 50%;
 
-  --accent: 22 10% 20%;
-  --accent-foreground: 36 8% 90%;
+  --accent: 0 0% 20%;
+  --accent-foreground: 0 0% 90%;
 
   --destructive: 5 82% 56%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 22 10% 22%;
-  --input: 22 10% 22%;
+  --border: 0 0% 22%;
+  --input: 0 0% 22%;
   --ring: 195 100% 50%;
 
   /* Charts */
-  --chart-1: 16 78% 60%;
-  /* lighter orange for dark */
+  --chart-1: 24 95% 60%;
+  /* vivid orange for dark */
   --chart-2: 195 100% 50%;
   /* sky blue */
   --chart-3: 145 65% 46%;
@@ -164,13 +164,13 @@
   /* purple */
 
   /* Sidebar — darkest layer */
-  --sidebar: 22 15% 6%;
-  --sidebar-foreground: 36 8% 70%;
+  --sidebar: 0 0% 6%;
+  --sidebar-foreground: 0 0% 70%;
   --sidebar-primary: 195 100% 50%;
-  --sidebar-primary-foreground: 22 15% 8%;
-  --sidebar-accent: 22 12% 12%;
-  --sidebar-accent-foreground: 36 8% 90%;
-  --sidebar-border: 22 10% 16%;
+  --sidebar-primary-foreground: 0 0% 8%;
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-accent-foreground: 0 0% 90%;
+  --sidebar-border: 0 0% 16%;
   --sidebar-ring: 195 100% 50%;
 }
 

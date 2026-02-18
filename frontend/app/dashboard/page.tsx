@@ -16,15 +16,24 @@ import { AIResponse } from "@/components/ui/ai-response";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api-client";
 
+import { toast } from "sonner";
+
 /* ───────── Types ───────── */
 interface DashboardSummary {
     profile_id: number;
     name: string;
+    education: string | null;
+    years_experience: number;
+    is_career_switcher: boolean;
     skills: string[];
     skills_count: number;
     recommendations_count: number;
     gaps_identified: number;
+    progress_entries: number;
     career_readiness: number;
+    skills_delta: number;
+    recommendations_delta: number;
+    gaps_delta: number;
 }
 interface Recommendation {
     role_id: number;
@@ -101,15 +110,19 @@ export default function Dashboard() {
         if (!token) { router.push("/login"); return; }
 
         const fetchData = async () => {
+            const profileId = localStorage.getItem("profileId");
             try {
-                const [summaryRes, recsRes] = await Promise.allSettled([
-                    api.get("/api/dashboard/summary"),
-                    api.post("/api/recommend", { limit: 5 }),
-                ]);
-                if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
-                if (recsRes.status === "fulfilled") setRecs(recsRes.value.data.recommendations?.slice(0, 5) || []);
-            } catch (err) {
+                // Remove .catch to allow errors to propagate to the catch block
+                const summaryRes = await api.get("/api/dashboard/summary");
+                if (summaryRes) setSummary(summaryRes.data);
+
+                if (profileId) {
+                    const recsRes = await api.post("/api/recommend", { profile_id: Number(profileId) });
+                    if (recsRes) setRecs(recsRes.data.recommendations?.slice(0, 5) || []);
+                }
+            } catch (err: any) {
                 console.error(err);
+                toast.error(err.response?.data?.detail || "Failed to load dashboard data");
             } finally {
                 setLoading(false);
             }
@@ -117,14 +130,23 @@ export default function Dashboard() {
         fetchData();
     }, [router]);
 
-    const handlePromptSubmit = (value: string) => {
-        void value;
+    const handlePromptSubmit = async (value: string) => {
         setAiThinking(true);
         setPromptResponse(null);
-        setTimeout(() => {
+        try {
+            const profileId = localStorage.getItem("profileId");
+            const res = await api.post("/api/chat", {
+                profile_id: profileId ? parseInt(profileId) : null,
+                messages: [{ role: "user", content: value }],
+            });
+            setPromptResponse(res.data.reply);
+        } catch (err) {
+            console.error(err);
+            setPromptResponse("Sorry, I encountered an error. Please try again.");
+            toast.error("Failed to get AI response");
+        } finally {
             setAiThinking(false);
-            setPromptResponse(`Based on your profile, focusing on **System Design** would increase your match score for *Senior Engineer* roles by 15%.\n\nI recommend starting with the "Advanced Distributed Systems" module on the SCTP platform.`);
-        }, 1500);
+        }
     };
 
     const readiness = summary ? Math.round(summary.career_readiness) : 0;
@@ -136,6 +158,13 @@ export default function Dashboard() {
     const readinessFill = readiness >= 70 ? "bg-emerald-500" : readiness >= 40 ? "bg-amber-500" : "bg-destructive";
 
     const firstName = summary?.name.split(" ")[0] ?? "";
+
+    const profileCompleteness = summary
+        ? (summary.name ? 25 : 0) +
+        (summary.education ? 25 : 0) +
+        (summary.years_experience > 0 ? 25 : 0) +
+        (summary.skills_count > 0 ? 25 : 0)
+        : 0;
 
     return (
         <div className="max-w-7xl mx-auto space-y-6">
@@ -171,7 +200,7 @@ export default function Dashboard() {
                             <div className="kpi-number">{summary.skills_count}</div>
                             <div className="flex items-center gap-2 mt-2">
                                 <p className="text-xs text-muted-foreground">Active in profile</p>
-                                <Delta value={3} />
+                                <Delta value={summary.skills_delta} />
                             </div>
                         </CardContent>
                     </Card>
@@ -183,7 +212,7 @@ export default function Dashboard() {
                             <div className="kpi-number-accent">{summary.recommendations_count}</div>
                             <div className="flex items-center gap-2 mt-2">
                                 <p className="text-xs text-muted-foreground">Roles available</p>
-                                <Delta value={12} />
+                                <Delta value={summary.recommendations_delta} />
                             </div>
                         </CardContent>
                     </Card>
@@ -197,7 +226,7 @@ export default function Dashboard() {
                             </div>
                             <div className="flex items-center gap-2 mt-2">
                                 <p className="text-xs text-muted-foreground">To bridge</p>
-                                <Delta value={-2} />
+                                <Delta value={summary.gaps_delta} />
                             </div>
                         </CardContent>
                     </Card>
@@ -399,7 +428,7 @@ export default function Dashboard() {
                             </div>
                             <div className="space-y-3">
                                 {[
-                                    { label: "Profile completeness", value: 75 },
+                                    { label: "Profile completeness", value: profileCompleteness },
                                     { label: "Skills assessed", value: summary ? Math.min(100, summary.skills_count * 5) : 40 },
                                     { label: "Readiness score", value: readiness },
                                 ].map((item) => (

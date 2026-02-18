@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, JSON, Text, DateTime, func, ForeignKey
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -16,3 +17,6 @@ class UserProfile(Base):
     resume_text = Column(Text)
     is_career_switcher = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    snapshots = relationship("ProfileSnapshot", back_populates="profile", cascade="all, delete-orphan")

@@ -22,7 +22,6 @@ from functools import lru_cache
 @lru_cache(maxsize=1024)
 def _cached_encode(texts: tuple[str]) -> np.ndarray:
     """Cache embedding generation for immutable tuple of texts."""
-    print(f"DEBUG: CACHE MISS - Encoding {len(texts)} texts: {texts[:2]}...")
     return encode_texts(list(texts)).astype(np.float32)
 
 
@@ -97,8 +96,6 @@ def compute_content_similarity(
         w = CATEGORY_WEIGHTS.get(get_skill_category(skill), 1.0)
         weighted_sum += score * w
         weight_total += w
-    if weight_total == 0:
-        return 0.0
     if weight_total == 0:
         return 0.0
     return weighted_sum / weight_total
