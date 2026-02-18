@@ -53,12 +53,18 @@ export default function SkillGap() {
   const [gaps, setGaps] = useState<RoleGap[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasProfile, setHasProfile] = useState(false);
   const [tab, setTab] = useState("0");
   const [chartType, setChartType] = useState("radar");
 
   useEffect(() => {
     const profileId = localStorage.getItem("profileId");
-    if (!profileId) { setLoading(false); return; }
+    if (!profileId) {
+      setHasProfile(false);
+      setLoading(false);
+      return;
+    }
+    setHasProfile(true);
     api
       .get(`/api/skill-gap/${profileId}`)
       .then((res) => setGaps(res.data.gaps))
@@ -69,7 +75,7 @@ export default function SkillGap() {
   if (loading) return <div><WorkflowStepper /><SkeletonCard count={2} /></div>;
   if (error) return <div><WorkflowStepper /><Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert></div>;
 
-  if (!localStorage.getItem("profileId") || gaps.length === 0) {
+  if (!hasProfile || gaps.length === 0) {
     return (
       <div>
         <WorkflowStepper />

@@ -15,12 +15,12 @@ class RoleGap(BaseModel):
     role_id: int
     role_title: str
     match_score: float
-    gaps: list[SkillGapItem]
+    gaps: List[SkillGapItem]
 
 
 class SkillGapResponse(BaseModel):
     profile_id: int
-    gaps: list[RoleGap]
+    gaps: List[RoleGap]
 
 
 class RoadmapItem(BaseModel):
@@ -43,7 +43,7 @@ class RoadmapItem(BaseModel):
 
 class RoadmapResponse(BaseModel):
     profile_id: int
-    roadmap: list[RoadmapItem]
+    roadmap: List[RoadmapItem]
     total_weeks: int = 0
     total_cost: float = 0.0
     total_after_subsidy: float = 0.0

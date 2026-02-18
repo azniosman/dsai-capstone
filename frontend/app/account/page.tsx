@@ -12,10 +12,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
 import { extractApiError } from "@/lib/utils";
 import SkeletonCard from "@/components/skeleton-card";
+import ProfileForm from "@/components/profile-form";
 
 const FIELD_LABEL = "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
 
@@ -110,78 +112,91 @@ export default function AccountSettings() {
         <h1 className="text-2xl font-extrabold tracking-tight">Account Settings</h1>
       </header>
 
-      {/* Personal Information */}
-      <Card variant="data">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Settings className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground" style={{ fontSize: "0.625rem", letterSpacing: "0.1em" }}>
-              Personal Information
-            </h2>
-          </div>
-          {error.account && <Alert variant="destructive" className="mb-4"><AlertDescription>{error.account}</AlertDescription></Alert>}
-          <form onSubmit={handleAccountUpdate} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="name" className={FIELD_LABEL}>Name</Label>
-              <Input id="name" required value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className={FIELD_LABEL}>Email</Label>
-              <Input id="email" type="email" required value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} />
-            </div>
-            <Button type="submit" disabled={loading.account}>
-              {loading.account ? "Saving..." : "Save Changes"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="general">Account & Security</TabsTrigger>
+          <TabsTrigger value="profile">Professional Profile</TabsTrigger>
+        </TabsList>
 
-      {/* Security */}
-      <Card variant="elevated">
-        <CardContent className="p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-5" style={{ fontSize: "0.625rem", letterSpacing: "0.1em" }}>
-            Security
-          </h2>
-          {error.password && <Alert variant="destructive" className="mb-4"><AlertDescription>{error.password}</AlertDescription></Alert>}
-          <form onSubmit={handlePasswordChange} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="current_password" className={FIELD_LABEL}>Current Password</Label>
-              <Input id="current_password" type="password" required value={passwords.current_password}
-                onChange={(e) => setPasswords({ ...passwords, current_password: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="new_password" className={FIELD_LABEL}>New Password</Label>
-              <Input id="new_password" type="password" required minLength={8} value={passwords.new_password}
-                onChange={(e) => setPasswords({ ...passwords, new_password: e.target.value })} />
-              <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="confirm_password" className={FIELD_LABEL}>Confirm New Password</Label>
-              <Input id="confirm_password" type="password" required value={passwords.confirm}
-                onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })} />
-            </div>
-            <Button type="submit" disabled={loading.password}>
-              {loading.password ? "Changing..." : "Change Password"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+        <TabsContent value="general" className="space-y-5 mt-5">
+          {/* Personal Information */}
+          <Card variant="data">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Settings className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground" style={{ fontSize: "0.625rem", letterSpacing: "0.1em" }}>
+                  Personal Information
+                </h2>
+              </div>
+              {error.account && <Alert variant="destructive" className="mb-4"><AlertDescription>{error.account}</AlertDescription></Alert>}
+              <form onSubmit={handleAccountUpdate} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name" className={FIELD_LABEL}>Name</Label>
+                  <Input id="name" required value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className={FIELD_LABEL}>Email</Label>
+                  <Input id="email" type="email" required value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} />
+                </div>
+                <Button type="submit" disabled={loading.account}>
+                  {loading.account ? "Saving..." : "Save Changes"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-      {/* Danger Zone */}
-      <Card variant="ghost" className="border-destructive/40">
-        <CardContent className="p-6">
-          <h2 className="text-sm font-bold text-destructive uppercase tracking-widest mb-1" style={{ fontSize: "0.625rem", letterSpacing: "0.1em" }}>
-            Danger Zone
-          </h2>
-          <Separator className="mb-4 bg-destructive/20" />
-          <p className="text-sm text-muted-foreground mb-4">
-            Permanently delete your account and all associated data. This action cannot be undone.
-          </p>
-          <Button variant="danger" onClick={() => setDeleteOpen(true)}>
-            Delete Account
-          </Button>
-        </CardContent>
-      </Card>
+          {/* Security */}
+          <Card variant="elevated">
+            <CardContent className="p-6">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-5" style={{ fontSize: "0.625rem", letterSpacing: "0.1em" }}>
+                Security
+              </h2>
+              {error.password && <Alert variant="destructive" className="mb-4"><AlertDescription>{error.password}</AlertDescription></Alert>}
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="current_password" className={FIELD_LABEL}>Current Password</Label>
+                  <Input id="current_password" type="password" required value={passwords.current_password}
+                    onChange={(e) => setPasswords({ ...passwords, current_password: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="new_password" className={FIELD_LABEL}>New Password</Label>
+                  <Input id="new_password" type="password" required minLength={8} value={passwords.new_password}
+                    onChange={(e) => setPasswords({ ...passwords, new_password: e.target.value })} />
+                  <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm_password" className={FIELD_LABEL}>Confirm New Password</Label>
+                  <Input id="confirm_password" type="password" required value={passwords.confirm}
+                    onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })} />
+                </div>
+                <Button type="submit" disabled={loading.password}>
+                  {loading.password ? "Changing..." : "Change Password"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Danger Zone */}
+          <Card variant="ghost" className="border-destructive/40">
+            <CardContent className="p-6">
+              <h2 className="text-sm font-bold text-destructive uppercase tracking-widest mb-1" style={{ fontSize: "0.625rem", letterSpacing: "0.1em" }}>
+                Danger Zone
+              </h2>
+              <Separator className="mb-4 bg-destructive/20" />
+              <p className="text-sm text-muted-foreground mb-4">
+                Permanently delete your account and all associated data. This action cannot be undone.
+              </p>
+              <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+                Delete Account
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="profile" className="mt-5">
+          <ProfileForm />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>

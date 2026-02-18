@@ -44,10 +44,15 @@ export default function Recommendations() {
   const [recs, setRecs] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasProfile, setHasProfile] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     const profileId = localStorage.getItem("profileId");
+    const token = localStorage.getItem("token");
+    setIsLoggedIn(!!token);
     if (!profileId) { setLoading(false); return; }
+    setHasProfile(true);
     api
       .post("/api/recommend", { profile_id: parseInt(profileId) })
       .then((res) => setRecs(res.data.recommendations))
@@ -67,7 +72,7 @@ export default function Recommendations() {
       {loading && <SkeletonCard count={3} />}
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
-      {!loading && !error && !localStorage.getItem("token") && localStorage.getItem("profileId") && (
+      {!loading && !error && !isLoggedIn && hasProfile && (
         <Card variant="highlight">
           <CardContent className="p-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -89,7 +94,7 @@ export default function Recommendations() {
         </Card>
       )}
 
-      {!loading && !error && !localStorage.getItem("profileId") && (
+      {!loading && !error && !hasProfile && (
         <EmptyState
           icon={<Briefcase />}
           title="No profile yet"

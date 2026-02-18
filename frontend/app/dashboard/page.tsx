@@ -114,10 +114,17 @@ export default function Dashboard() {
             try {
                 // Remove .catch to allow errors to propagate to the catch block
                 const summaryRes = await api.get("/api/dashboard/summary");
-                if (summaryRes) setSummary(summaryRes.data);
+                if (summaryRes) {
+                    setSummary(summaryRes.data);
+                    // Persist profileId so other pages (recommendations, skill-gap, roadmap) can find it
+                    if (summaryRes.data?.profile_id) {
+                        localStorage.setItem("profileId", String(summaryRes.data.profile_id));
+                    }
+                }
 
-                if (profileId) {
-                    const recsRes = await api.post("/api/recommend", { profile_id: Number(profileId) });
+                if (profileId || summaryRes?.data?.profile_id) {
+                    const pid = profileId || String(summaryRes.data.profile_id);
+                    const recsRes = await api.post("/api/recommend", { profile_id: Number(pid) });
                     if (recsRes) setRecs(recsRes.data.recommendations?.slice(0, 5) || []);
                 }
             } catch (err: any) {
