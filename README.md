@@ -13,24 +13,35 @@ View the [Technical Roadmap](Technical_Roadmap.md) for SkillBridge AI's.
 ## ✨ Key Features
 
 ### 🧠 Intelligent Analysis
-- **Smart Profile Parsing**: Upload your PDF/DOCX resume for instant skill extraction using NLP (Sentence Transformers + spaCy).
-- **Hybrid Job Matching**: Advanced ranking algorithm combining content similarity (60%) with rule-based heuristics (40%) to find your perfect fit.
-- **Skill Gap Visualization**: Visual radar charts and detailed breakdowns of missing skills for every target role.
+
+- **Smart Resume Parsing**: Upload your resume text for instant skill extraction using **Google Gemini AI**.
+- **Hybrid Job Matching**: Advanced ranking algorithm combining content similarity (Sentence Transformers) with rule-based heuristics to find your perfect fit.
+- **Skill Gap Visualization**: Interactive radar charts and detailed breakdowns of missing skills for every target role.
+
+### 👤 Comprehensive Profile Management
+
+- **Full Control**: Create and edit your professional profile including experience, education, and skills.
+- **AI-Assisted**: Auto-populate your skills from your resume text with a single click.
+- **Privacy-First**: Securely manage your data and visibility.
 
 ### 📈 Real-Time Market Insights
+
 - **Live Market Simulator**: Tracks daily fluctuations in salary, hiring volume, and demand for Singapore's tech sector.
 - **2026 Trends**: benchmarks against projected growth sectors (AI, Cybersecurity, Cloud) to guide your career decisions.
 
 ### 🎓 Personalized Learning
+
 - **SCTP Pathways**: Automatically generates structured learning paths (Beginner → Advanced) using validated SkillsFuture Career Transition Programme courses.
 - **Subsidy Calculator**: Real-time calculation of course fees, including MCES (90% subsidy for age 40+) and SkillsFuture Credit offsets.
 
 ### 🤖 AI Career Coach
+
 - **Context-Aware Chat**: Interactive LLM chatbot that "knows" your profile, skill gaps, and local market trends.
 - **Mock Interview Simulator**: Practice role-specific questions generated based on your actual weak points.
 - **Resume Optimizer**: AI-powered suggestions to rewrite bullet points for maximum impact.
 
 ### ⚡ Automation & Experience
+
 - **Seamless Onboarding**: "Guest Mode" allows instant value exploration before account creation.
 - **n8n Workflows**: Automated pipelines for resume ingestion, market data updates, and notification triggers.
 
@@ -38,39 +49,44 @@ View the [Technical Roadmap](Technical_Roadmap.md) for SkillBridge AI's.
 
 ## 🛠️ Technology Stack
 
-| Domain | Technologies |
-|--------|--------------|
-| **Frontend** | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui |
-| **Backend** | Python 3.11, FastAPI, SQLAlchemy 2.0, Pydantic |
-| **AI / ML** | PyTorch, Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, Google Gemini API |
-| **Database** | PostgreSQL 16 |
-| **Automation**| n8n, Docker Compose |
-| **DevOps** | Docker, Shell Scripts |
+| Domain         | Technologies                                                                  |
+| -------------- | ----------------------------------------------------------------------------- |
+| **Frontend**   | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui        |
+| **Backend**    | Python 3.9+, FastAPI, SQLAlchemy 2.0, Pydantic                                |
+| **AI / ML**    | PyTorch, Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, Google Gemini API |
+| **Database**   | PostgreSQL 16                                                                 |
+| **Automation** | n8n, Docker Compose                                                           |
+| **DevOps**     | Docker, Shell Scripts                                                         |
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - [Docker & Docker Compose](https://www.docker.com/products/docker-desktop/)
 - [Gemini API Key](https://aistudio.google.com/) (Optional, for full AI features)
 
 ### Quick Start (Docker)
+
 The easiest way to run the full stack (Frontend, Backend, DB, Automation) is via Docker.
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/azniosman/dsai-capstone.git
    cd dsai-capstone
    ```
 
 2. **Configure Environment**
+
    ```bash
    cp .env.example .env
    # Edit .env to add your GEMINI_API_KEY
    ```
 
 3. **Launch the Application**
+
    ```bash
    # Starts all services in detached mode
    bash scripts/deploy.sh
@@ -88,6 +104,7 @@ The easiest way to run the full stack (Frontend, Backend, DB, Automation) is via
 If you prefer to run services locally for development:
 
 ### Backend
+
 ```bash
 cd backend
 # Create environment
@@ -100,6 +117,7 @@ uvicorn app.main:app --reload
 ```
 
 ### Frontend
+
 ```bash
 cd frontend
 npm install
@@ -108,7 +126,9 @@ npm run dev
 ```
 
 ### Seeding Data
+
 Populate the database with Singapore market data, job roles, and SCTP courses:
+
 ```bash
 # From root directory
 python data/scripts/seed_db.py
@@ -121,12 +141,14 @@ python data/scripts/seed_db.py
 Deploy the entire stack to AWS (ECS Fargate, RDS, ALB) using Infrastructure as Code.
 
 ### Prerequisites
+
 1. **AWS CLI**: Installed and configured with `aws configure`.
 2. **Terraform**: [Install Terraform](https://developer.hashicorp.com/terraform/downloads).
 
 ### Deployment Steps
 
 1. **Initialize Terraform**
+
    ```bash
    cd terraform
    terraform init
@@ -134,6 +156,7 @@ Deploy the entire stack to AWS (ECS Fargate, RDS, ALB) using Infrastructure as C
 
 2. **Build & Push Docker Images**
    This script builds images and pushes them to Amazon ECR.
+
    ```bash
    # Make script executable
    chmod +x ../scripts/build_and_push.sh
@@ -143,12 +166,14 @@ Deploy the entire stack to AWS (ECS Fargate, RDS, ALB) using Infrastructure as C
 
 3. **Plan Infrastructure**
    Review changes before applying.
+
    ```bash
    terraform plan -out=tfplan
    ```
 
 4. **Apply Deployment**
    Provision VPC, RDS, ECS, and Load Balancers.
+
    ```bash
    terraform apply tfplan
    ```
@@ -209,21 +234,22 @@ SENTENCE_TRANSFORMER_MODEL=all-MiniLM-L6-v2
 
 ## 📸 Screenshots
 
-
-
 ### 📊 Dashboard & Insights
-| Profile Dashboard | Career Insights |
-|-------------------|---------------|
+
+| Profile Dashboard                       | Career Insights                                     |
+| --------------------------------------- | --------------------------------------------------- |
 | ![Dashboard](misc/images/dashboard.png) | ![Career Insights](misc/images/career_insights.png) |
 
 ### 🚀 Career Growth
-| Job Recommendations | Skill Gap Analysis |
-|---------------------|--------------------|
+
+| Job Recommendations           | Skill Gap Analysis                        |
+| ----------------------------- | ----------------------------------------- |
 | ![Jobs](misc/images/jobs.png) | ![Skill Gaps](misc/images/skill_gaps.png) |
 
 ### 🎓 Learning & Coaching
-| Personalized Roadmap | AI Career Coach |
-|----------------------|-----------------|
+
+| Personalized Roadmap                | AI Career Coach                 |
+| ----------------------------------- | ------------------------------- |
 | ![Roadmap](misc/images/roadmap.png) | ![Coach](misc/images/coach.png) |
 
 ---
