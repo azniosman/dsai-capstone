@@ -64,67 +64,83 @@ export default function Roadmap() {
         <EmptyState
           icon={<Route />}
           title="No roadmap available"
-          description="Create a profile and get recommendations first to see your personalized upskilling roadmap."
+          description="Create a profile and get recommendations first to see your personalised upskilling roadmap."
         />
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="space-y-5">
       <WorkflowStepper />
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Upskilling Roadmap</h1>
-        <Button variant="outline" onClick={downloadPdf}>
+
+      <div className="flex items-start justify-between gap-4">
+        <header>
+          <p className="section-label mb-1">Upskilling Plan</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">Roadmap</h1>
+        </header>
+        <Button variant="outline" onClick={downloadPdf} className="shrink-0">
           <Download className="h-4 w-4 mr-2" />
           Export PDF
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card className="p-4 text-center">
-          <CardContent className="p-0">
-            <p className="text-3xl font-bold text-primary">{data.total_weeks}</p>
-            <p className="text-sm text-muted-foreground">Weeks ({Math.ceil(data.total_weeks / 4)} months)</p>
+      {/* Summary KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card variant="metric">
+          <CardContent className="p-4 text-center">
+            <div className="kpi-number-accent" style={{ fontSize: "2rem" }}>{data.total_weeks}</div>
+            <p className="section-label mt-1">Weeks</p>
+            <p className="text-xs text-muted-foreground data-num">{Math.ceil(data.total_weeks / 4)} months</p>
           </CardContent>
         </Card>
-        <Card className="p-4 text-center">
-          <CardContent className="p-0">
-            <p className="text-3xl font-bold">{data.roadmap.length}</p>
-            <p className="text-sm text-muted-foreground">Courses</p>
+        <Card variant="metric">
+          <CardContent className="p-4 text-center">
+            <div className="kpi-number" style={{ fontSize: "2rem" }}>{data.roadmap.length}</div>
+            <p className="section-label mt-1">Courses</p>
           </CardContent>
         </Card>
-        <Card className="p-4 text-center">
-          <CardContent className="p-0">
-            <p className="text-3xl font-bold text-red-500">SGD {data.total_cost.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">Total Course Fees</p>
+        <Card variant="metric">
+          <CardContent className="p-4 text-center">
+            <div className="kpi-number text-destructive" style={{ fontSize: "2rem" }}>
+              ${data.total_cost.toLocaleString()}
+            </div>
+            <p className="section-label mt-1">Total Fees</p>
           </CardContent>
         </Card>
-        <Card className="p-4 text-center">
-          <CardContent className="p-0">
-            <p className="text-3xl font-bold text-green-600">SGD {data.total_after_subsidy.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">After Subsidy</p>
+        <Card variant="kpi">
+          <CardContent className="p-4 text-center">
+            <div className="kpi-number-accent text-emerald-500 dark:text-emerald-400" style={{ fontSize: "2rem" }}>
+              ${data.total_after_subsidy.toLocaleString()}
+            </div>
+            <p className="section-label mt-1">After Subsidy</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* SkillsFuture credit alert */}
       {data.total_skillsfuture_applicable > 0 && (
-        <Alert className="mb-6 border-green-200 bg-green-50">
-          <GraduationCap className="h-4 w-4 text-green-600" />
-          <AlertDescription>
-            <p className="font-semibold text-green-800">
-              SkillsFuture Credit Applicable: SGD {data.total_skillsfuture_applicable.toLocaleString()}
-            </p>
-            <p className="text-sm text-green-700">
-              You can use your SkillsFuture Credits to offset course fees. Most SCTP courses are eligible
-              for up to SGD 500 in SkillsFuture Credits. Visit{" "}
-              <a href="https://www.myskillsfuture.gov.sg" target="_blank" rel="noopener noreferrer" className="underline">
-                MySkillsFuture
-              </a>{" "}
-              to check your balance.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <Card variant="highlight">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <GraduationCap className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-primary mb-1">
+                  SkillsFuture Credit: SGD {data.total_skillsfuture_applicable.toLocaleString()} applicable
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Use your SkillsFuture Credits to offset course fees. Most SCTP courses are eligible
+                  for up to SGD 500. Visit{" "}
+                  <a href="https://www.myskillsfuture.gov.sg" target="_blank" rel="noopener noreferrer"
+                    className="text-primary underline underline-offset-2">
+                    MySkillsFuture
+                  </a>{" "}
+                  to check your balance.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <RoadmapTimeline items={data.roadmap} />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, Activity } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,18 @@ interface TimelinePoint {
   level: number;
 }
 
+const CHART_COLORS = ["#00BFFF", "#e8562a", "#28c76f", "#f9a825", "#9b6de0", "#e84848"];
+
+const CHART_STYLE = {
+  contentStyle: {
+    backgroundColor: "#ffffff",
+    border: "1px solid #d9d4cc",
+    borderRadius: "6px",
+    fontSize: "12px",
+    color: "#1a1a1a",
+  },
+};
+
 export default function ProgressDashboard() {
   const router = useRouter();
   const [progress, setProgress] = useState<ProgressData | null>(null);
@@ -63,7 +75,6 @@ export default function ProgressDashboard() {
         setTimeline(timeRes.data.timeline);
       } catch (err: unknown) {
         if (!controller.signal.aborted) {
-          console.error(err);
           setError(extractApiError(err, "Failed to load progress"));
         }
       } finally {
@@ -85,7 +96,6 @@ export default function ProgressDashboard() {
       setProgress(progRes.data);
       setTimeline(timeRes.data.timeline);
     } catch (err: unknown) {
-      console.error(err);
       setError(extractApiError(err, "Failed to load progress"));
     } finally {
       setLoading(false);
@@ -108,7 +118,7 @@ export default function ProgressDashboard() {
     }
   };
 
-  if (loading) return <div className="flex justify-center mt-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (loading) return <div className="flex justify-center mt-8"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
   if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>;
 
   const dateMap: Record<string, Record<string, number>> = {};
@@ -120,43 +130,57 @@ export default function ProgressDashboard() {
   const chartData = Object.values(dateMap);
   const allSkills = [...new Set(timeline.map((t) => t.skill))];
 
-  const COLORS = ["#1565c0", "#00897b", "#4caf50", "#ff9800", "#f44336", "#00bcd4"];
-
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Progress Tracking</h1>
+    <div className="space-y-5">
+      <header>
+        <p className="section-label mb-1">Tracking</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">Progress Dashboard</h1>
+      </header>
 
-      <div className="grid grid-cols-3 gap-6 mb-6">
-        <Card className="p-6 text-center">
-          <CardContent className="p-0">
-            <p className="text-4xl font-bold text-green-600">{progress?.skills_acquired || 0}</p>
-            <p className="text-sm text-muted-foreground">Skills Acquired</p>
+      {/* KPI row */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card variant="metric" className="text-center">
+          <CardContent className="p-5">
+            <div className="kpi-number text-emerald-500" style={{ fontSize: "2.25rem" }}>
+              {progress?.skills_acquired || 0}
+            </div>
+            <p className="section-label mt-2">Acquired</p>
           </CardContent>
         </Card>
-        <Card className="p-6 text-center">
-          <CardContent className="p-0">
-            <p className="text-4xl font-bold text-orange-500">{progress?.skills_in_progress || 0}</p>
-            <p className="text-sm text-muted-foreground">In Progress</p>
+        <Card variant="metric" className="text-center">
+          <CardContent className="p-5">
+            <div className="kpi-number text-amber-500" style={{ fontSize: "2.25rem" }}>
+              {progress?.skills_in_progress || 0}
+            </div>
+            <p className="section-label mt-2">In Progress</p>
           </CardContent>
         </Card>
-        <Card className="p-6 text-center">
-          <CardContent className="p-0">
-            <p className="text-4xl font-bold text-primary">{progress?.skills_total || 0}</p>
-            <p className="text-sm text-muted-foreground">Total Tracked</p>
+        <Card variant="metric" className="text-center">
+          <CardContent className="p-5">
+            <div className="kpi-number-accent" style={{ fontSize: "2.25rem" }}>
+              {progress?.skills_total || 0}
+            </div>
+            <p className="section-label mt-2">Total Tracked</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="p-6 mb-6">
-        <CardContent className="p-0">
-          <h2 className="text-lg font-bold mb-3">Record Skill Progress</h2>
+      {/* Record progress */}
+      <Card variant="data">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="h-4 w-4 text-primary" />
+            <p className="section-label">Record Skill Progress</p>
+          </div>
           <div className="flex gap-4 items-end flex-wrap">
-            <div className="flex-1 min-w-[150px]">
-              <Label htmlFor="skill-name">Skill Name</Label>
+            <div className="flex-1 min-w-[150px] space-y-1.5">
+              <Label htmlFor="skill-name" className="text-xs font-semibold uppercase" style={{ letterSpacing: "0.08em" }}>
+                Skill Name
+              </Label>
               <Input id="skill-name" value={newSkill} onChange={(e) => setNewSkill(e.target.value)} />
             </div>
-            <div className="min-w-[150px]">
-              <Label>Level</Label>
+            <div className="min-w-[150px] space-y-1.5">
+              <Label className="text-xs font-semibold uppercase" style={{ letterSpacing: "0.08em" }}>Level</Label>
               <Select value={newLevel} onValueChange={setNewLevel}>
                 <SelectTrigger>
                   <SelectValue />
@@ -173,24 +197,25 @@ export default function ProgressDashboard() {
         </CardContent>
       </Card>
 
+      {/* Progress chart */}
       {chartData.length > 0 && (
-        <Card className="p-6 mb-6">
-          <CardContent className="p-0">
-            <h2 className="text-lg font-bold mb-3">Skill Progress Over Time</h2>
+        <Card variant="elevated">
+          <CardContent className="p-5">
+            <p className="section-label mb-4">Skill Progress Over Time</p>
             <div className="h-[300px]" role="img" aria-label="Line chart showing skill progress over time">
               <ResponsiveContainer>
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[0, 1]} ticks={[0, 0.5, 1]} />
-                  <Tooltip />
-                  <Legend />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
+                  <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} />
+                  <YAxis domain={[0, 1]} ticks={[0, 0.5, 1]} tick={{ fill: "#6b7280", fontSize: 11 }} />
+                  <Tooltip contentStyle={CHART_STYLE.contentStyle} />
+                  <Legend wrapperStyle={{ color: "#374151", fontSize: "12px" }} />
                   {allSkills.map((skill, i) => (
                     <Line
                       key={skill}
                       type="monotone"
                       dataKey={skill}
-                      stroke={COLORS[i % COLORS.length]}
+                      stroke={CHART_COLORS[i % CHART_COLORS.length]}
                       strokeWidth={2}
                       dot
                     />
@@ -202,29 +227,27 @@ export default function ProgressDashboard() {
         </Card>
       )}
 
+      {/* Recent activity */}
       {progress?.entries && progress.entries.length > 0 && (
-        <Card className="p-6">
-          <CardContent className="p-0">
-            <h2 className="text-lg font-bold mb-3">Recent Activity</h2>
-            {progress.entries.slice(0, 20).map((e) => (
-              <div key={`${e.skill}-${e.recorded_at}`} className="flex items-center gap-2 mb-2">
-                <Badge
-                  className={
-                    e.level >= 1.0
-                      ? "bg-green-100 text-green-800 hover:bg-green-100"
-                      : e.level >= 0.5
-                        ? "bg-orange-100 text-orange-800 hover:bg-orange-100"
-                        : ""
-                  }
-                >
-                  {e.skill}
-                </Badge>
-                <span className="text-sm">
-                  {e.level >= 1.0 ? "Strong" : e.level >= 0.5 ? "Partial" : "Started"}
-                </span>
-                <span className="text-xs text-muted-foreground">{e.recorded_at}</span>
-              </div>
-            ))}
+        <Card variant="elevated">
+          <CardContent className="p-5">
+            <p className="section-label mb-4">Recent Activity</p>
+            <div className="space-y-2">
+              {progress.entries.slice(0, 20).map((e) => (
+                <div key={`${e.skill}-${e.recorded_at}`} className="flex items-center gap-3 py-1.5 border-b border-border last:border-0">
+                  <Badge
+                    variant={e.level >= 1.0 ? "success" : e.level >= 0.5 ? "warning" : "muted"}
+                    className="shrink-0"
+                  >
+                    {e.skill}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground flex-1">
+                    {e.level >= 1.0 ? "Strong" : e.level >= 0.5 ? "Partial" : "Started"}
+                  </span>
+                  <span className="text-xs text-muted-foreground data-num">{e.recorded_at}</span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

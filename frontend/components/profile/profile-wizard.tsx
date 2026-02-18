@@ -19,6 +19,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
+import { extractApiError } from "@/lib/utils";
 
 const STEPS = [
     { id: 1, label: "Resume", icon: FileText, desc: "Auto-fill with AI" },
@@ -174,9 +175,9 @@ export default function ProfileWizard() {
                 toast.success("Profile created!");
             }
             router.push("/recommendations");
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            const msg = err.response?.data?.detail || "Failed to save profile.";
+            const msg = extractApiError(err, "Failed to save profile.");
             toast.error(msg);
             setError(msg);
         } finally {
@@ -239,9 +240,13 @@ export default function ProfileWizard() {
                             <div className="flex flex-col items-center justify-center h-full py-10 space-y-6">
                                 <div
                                     onClick={() => fileInputRef.current?.click()}
+                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label="Upload resume file"
                                     className="
                     w-full max-w-md h-64 border-2 border-dashed rounded-xl flex flex-col items-center justify-center 
-                    cursor-pointer hover:border-primary hover:bg-primary/5 transition-all group
+                    cursor-pointer hover:border-primary hover:bg-primary/5 transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
                   "
                                 >
                                     <div className="p-4 bg-primary/10 rounded-full mb-4 group-hover:scale-110 transition-transform">
@@ -344,7 +349,12 @@ export default function ProfileWizard() {
                                                 key={skill}
                                                 variant={form.skills.includes(skill) ? "default" : "outline"}
                                                 className={`cursor-pointer h-9 px-4 text-sm transition-all ${form.skills.includes(skill) ? "scale-105" : "hover:border-primary"}`}
+                                                role="checkbox"
+                                                aria-checked={form.skills.includes(skill)}
+                                                aria-label={`${form.skills.includes(skill) ? "Remove" : "Add"} ${skill}`}
+                                                tabIndex={0}
                                                 onClick={() => toggleSkill(skill)}
+                                                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSkill(skill); } }}
                                             >
                                                 {skill}
                                                 {form.skills.includes(skill) && <X className="ml-1 h-3 w-3" />}

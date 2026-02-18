@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, HelpCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,15 +112,23 @@ export default function MockInterview() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Mock Interview</h1>
+    <div className="max-w-2xl mx-auto space-y-5">
+      <header>
+        <p className="section-label mb-1">Practice</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">Mock Interview</h1>
+      </header>
 
       {!started ? (
-        <Card className="p-6">
-          <CardContent className="p-0 space-y-4">
-            <p>Practice for your tech interview! Select a role and difficulty level.</p>
-            <div>
-              <Label>Target Role</Label>
+        <Card variant="data">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <HelpCircle className="h-4 w-4 text-primary" />
+              <p className="text-xs text-muted-foreground">Select a role and difficulty to begin a 5-question practice session.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-widest" style={{ letterSpacing: "0.08em" }}>
+                Target Role
+              </Label>
               <Select value={role} onValueChange={setRole}>
                 <SelectTrigger>
                   <SelectValue />
@@ -132,8 +140,10 @@ export default function MockInterview() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Difficulty</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-widest" style={{ letterSpacing: "0.08em" }}>
+                Difficulty
+              </Label>
               <Select value={difficulty} onValueChange={setDifficulty}>
                 <SelectTrigger>
                   <SelectValue />
@@ -152,39 +162,44 @@ export default function MockInterview() {
         </Card>
       ) : (
         <>
-          <div className="flex gap-2 mb-4">
-            <Badge className="bg-primary hover:bg-primary">{role}</Badge>
+          {/* Status bar */}
+          <div className="flex gap-2 items-center">
+            <Badge variant="accent">{role}</Badge>
             <Badge variant="outline">{difficulty}</Badge>
-            <Badge variant="outline">Q{questionNum}/5</Badge>
+            <Badge variant="data" className="data-num">Q{questionNum} / 5</Badge>
           </div>
 
-          <Card className="p-4 mb-4 max-h-[400px] overflow-auto">
-            <CardContent className="p-0">
+          {/* Transcript */}
+          <Card variant="elevated" className="max-h-[400px] overflow-auto">
+            <CardContent className="p-4">
               {messages.map((msg, i) => (
-                <div key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`} className="mb-4">
-                  <p className="text-xs text-muted-foreground">
+                <div key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`} className="mb-5 last:mb-0">
+                  <p className="section-label mb-1.5">
                     {msg.role === "assistant" ? "Interviewer" : "You"}
                   </p>
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                   {msg.gapTargeted && msg.targetSkill && (
-                    <Badge className="mt-1 bg-orange-100 text-orange-800 hover:bg-orange-100">
+                    <Badge variant="warning" className="mt-2">
                       Targets your gap: {msg.targetSkill}
                     </Badge>
                   )}
                 </div>
               ))}
-              {loading && <Loader2 className="h-5 w-5 animate-spin" />}
+              {loading && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
             </CardContent>
           </Card>
 
           {feedback && (
-            <Alert className="mb-4">
-              <AlertDescription>{feedback}</AlertDescription>
-            </Alert>
+            <Card variant="highlight">
+              <CardContent className="p-4">
+                <p className="section-label mb-2">Feedback</p>
+                <p className="text-sm leading-relaxed">{feedback}</p>
+              </CardContent>
+            </Card>
           )}
 
           {complete ? (
-            <Button onClick={() => { setStarted(false); setMessages([]); }}>
+            <Button onClick={() => { setStarted(false); setMessages([]); }} className="w-full">
               Start New Interview
             </Button>
           ) : (
@@ -197,8 +212,8 @@ export default function MockInterview() {
                 disabled={loading}
                 className="flex-1"
               />
-              <Button onClick={sendAnswer} disabled={loading} className="min-w-[80px]">
-                Answer
+              <Button onClick={sendAnswer} disabled={loading} className="min-w-[80px] self-end">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Answer"}
               </Button>
             </div>
           )}

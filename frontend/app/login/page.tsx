@@ -1,17 +1,50 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Command, Sparkles, TrendingUp, GraduationCap,
+  Shield, ArrowRight, BarChart3, Activity
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
 import { extractApiError } from "@/lib/utils";
+
+const FEATURES = [
+  { icon: <Sparkles className="h-4 w-4" />, label: "AI-Powered Matching", desc: "Smart job recommendations based on your skills" },
+  { icon: <TrendingUp className="h-4 w-4" />, label: "Skill Gap Analysis", desc: "Identify exactly what you need to learn next" },
+  { icon: <GraduationCap className="h-4 w-4" />, label: "SCTP Pathways", desc: "Subsidised SkillsFuture courses tailored for you" },
+  { icon: <Shield className="h-4 w-4" />, label: "Career Coaching", desc: "AI coach to guide your career transition" },
+];
+
+const MARKET_PULSE = [
+  { label: "SG Demand Index", bar: 78, delta: "+12.4%" },
+  { label: "Top Skill: Python", bar: 95, delta: "#1" },
+  { label: "Open Roles Today", bar: 54, delta: "542" },
+];
+
+const SKILLS = ["Python", "React", "Cloud", "AI/ML", "TypeScript", "SQL", "Docker"];
+
+function MarketBar({ value, delta }: { value: number; delta: string }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <div className="flex-1 h-[3px] rounded-full bg-sidebar-border overflow-hidden">
+        <div
+          className="h-full bg-primary rounded-full"
+          style={{ width: `${value}%` }}
+        />
+      </div>
+      <span className="text-primary font-bold data-num w-12 text-right">{delta}</span>
+    </div>
+  );
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -21,22 +54,8 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [showForgot, setShowForgot] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState("");
-  const [resetToken, setResetToken] = useState("");
-  const [resetForm, setResetForm] = useState({ token: "", new_password: "" });
-  const [forgotStep, setForgotStep] = useState(1);
-
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const userName = typeof window !== "undefined" ? localStorage.getItem("userName") : null;
-
-  // Clear query params after reading to clean up URL, but keep profileId contextually if needed
-  useEffect(() => {
-    if (searchParams.get("tab")) {
-      // Optional: clear param from URL without refresh
-      // window.history.replaceState(null, "", "/login");
-    }
-  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,15 +80,11 @@ function LoginForm() {
           headers: { Authorization: `Bearer ${res.data.access_token}` },
         });
         localStorage.setItem("profileId", profile.data.id);
-      } catch {
-        // No linked profile
-      }
+      } catch { /* No linked profile */ }
       toast.success(`Welcome back, ${me.data.name}!`);
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: unknown) {
-      const msg = extractApiError(err, "Login failed");
-      setError(msg);
-      toast.error(msg);
+      setError(extractApiError(err, "Login failed"));
     } finally {
       setLoading(false);
     }
@@ -79,25 +94,20 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     const profileId = searchParams.get("profileId");
-
     try {
       await api.post("/api/auth/register", {
         email: form.email,
         password: form.password,
         password_confirm: form.password_confirm,
         name: form.name,
-        tenant_name: "Global", // Default tenant
+        tenant_name: "Global",
         profile_id: profileId ? parseInt(profileId) : undefined,
       });
-      toast.success("Account created! Profile linked. Please log in.");
+      toast.success("Account created! Please log in.");
       setTab("login");
-      setError(null);
     } catch (err: unknown) {
-      const msg = extractApiError(err, "Registration failed");
-      setError(msg);
-      toast.error(msg);
+      setError(extractApiError(err, "Registration failed"));
     } finally {
       setLoading(false);
     }
@@ -108,185 +118,217 @@ function LoginForm() {
     if (refreshToken) {
       try { await api.post("/api/auth/logout", { refresh_token: refreshToken }); } catch { /* ignore */ }
     }
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("profileId");
-    toast.success("Logged out successfully.");
+    localStorage.clear();
+    toast.success("Logged out.");
     router.push("/");
   };
 
-  const handleForgotSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.post("/api/auth/forgot-password", { email: forgotEmail });
-      if (res.data.reset_token) {
-        setResetToken(res.data.reset_token);
-        setResetForm((prev) => ({ ...prev, token: res.data.reset_token }));
-      }
-      setForgotStep(2);
-      toast.success(res.data.reset_token
-        ? "Reset token generated. Use it below to set a new password."
-        : "If an account exists with that email, a reset link has been generated.");
-    } catch (err: unknown) {
-      setError(extractApiError(err, "Failed to request password reset"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      await api.post("/api/auth/reset-password", { ...resetForm, token: resetForm.token.trim() });
-      toast.success("Password reset successfully! Please log in.");
-      setShowForgot(false);
-      setForgotStep(1);
-      setResetToken("");
-      setResetForm({ token: "", new_password: "" });
-      setForgotEmail("");
-      setTab("login");
-    } catch (err: unknown) {
-      const msg = extractApiError(err, "Password reset failed");
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  /* Already-logged-in state */
   if (token) {
     return (
-      <Card className="max-w-sm mx-auto p-8 text-center">
-        <CardContent className="p-0">
-          <h1 className="text-xl font-bold mb-2">Welcome, {userName || "User"}</h1>
-          <p className="text-sm text-muted-foreground mb-4">You are logged in.</p>
-          <Button variant="outline" onClick={handleLogout}>Log Out</Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (showForgot) {
-    return (
-      <Card className="max-w-sm mx-auto p-8">
-        <CardContent className="p-0">
-          <h2 className="text-lg font-bold mb-4">Reset Password</h2>
-          {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
-
-          {forgotStep === 1 ? (
-            <form onSubmit={handleForgotSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="forgot-email">Email</Label>
-                <Input id="forgot-email" type="email" required value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Sending..." : "Get Reset Token"}
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card variant="metric" className="max-w-sm w-full">
+          <CardContent className="p-8 text-center">
+            <div className="h-14 w-14 rounded bg-primary/15 border border-primary/30 flex items-center justify-center mx-auto mb-5 text-primary">
+              <Command className="h-7 w-7" />
+            </div>
+            <p className="section-label mb-2">Session Active</p>
+            <h1 className="text-xl font-extrabold mb-1">Welcome back, {userName || "User"}</h1>
+            <p className="text-sm text-muted-foreground mb-6">You&apos;re already signed in.</p>
+            <div className="flex flex-col gap-2">
+              <Button onClick={() => router.push("/dashboard")} className="gap-2 w-full">
+                Go to Dashboard <ArrowRight className="h-4 w-4" />
               </Button>
-              <button type="button" className="text-sm text-primary hover:underline" onClick={() => { setShowForgot(false); setError(null); }}>
-                Back to Login
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleResetSubmit} className="space-y-4">
-              {resetToken && (
-                <Alert>
-                  <AlertDescription>
-                    <p className="text-xs mb-1">Your reset token (demo mode — in production this would be emailed):</p>
-                    <p className="font-mono text-xs break-all">{resetToken}</p>
-                  </AlertDescription>
-                </Alert>
-              )}
-              <div>
-                <Label htmlFor="reset-token">Reset Token</Label>
-                <Textarea id="reset-token" required rows={3} value={resetForm.token} onChange={(e) => setResetForm({ ...resetForm, token: e.target.value })} />
-              </div>
-              <div>
-                <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" required minLength={8} value={resetForm.new_password} onChange={(e) => setResetForm({ ...resetForm, new_password: e.target.value })} />
-                <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters</p>
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Resetting..." : "Reset Password"}
-              </Button>
-              <button type="button" className="text-sm text-primary hover:underline" onClick={() => { setShowForgot(false); setForgotStep(1); setError(null); }}>
-                Back to Login
-              </button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+              <Button variant="ghost" onClick={handleLogout} className="w-full">Sign Out</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="max-w-sm mx-auto p-8">
-      <CardContent className="p-0">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="register">Register</TabsTrigger>
-          </TabsList>
+    <div className="min-h-screen flex bg-background">
 
-          {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
+      {/* ── Left: Brand Panel ── */}
+      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-sidebar border-r border-sidebar-border p-10">
+        <div>
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-12">
+            <div className="h-8 w-8 rounded bg-primary flex items-center justify-center text-primary-foreground shrink-0">
+              <Command className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="font-extrabold text-base tracking-tight text-sidebar-foreground">SkillBridge AI</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="live-dot" />
+                <span className="section-label text-primary" style={{ fontSize: "0.55rem" }}>Live Data</span>
+              </div>
+            </div>
+          </div>
 
-          <TabsContent value="login">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <Label htmlFor="login-email">Email</Label>
-                <Input id="login-email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              </div>
-              <div>
-                <Label htmlFor="login-password">Password</Label>
-                <Input id="login-password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Logging in..." : "Login"}
-              </Button>
-              <button type="button" className="text-sm text-primary hover:underline" onClick={() => { setShowForgot(true); setError(null); }}>
-                Forgot Password?
-              </button>
-            </form>
-          </TabsContent>
+          {/* Headline */}
+          <h2 className="text-2xl font-extrabold tracking-tight mb-3 text-sidebar-foreground leading-tight">
+            Accelerate your career<br />
+            <span className="text-primary">with intelligence.</span>
+          </h2>
+          <p className="text-sidebar-foreground/50 text-sm leading-relaxed mb-10">
+            AI-powered job matching, skill gap analysis, and curated upskilling roadmaps for Singapore&apos;s tech professionals.
+          </p>
 
-          <TabsContent value="register">
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <Label htmlFor="reg-name">Name</Label>
-                <Input id="reg-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          {/* Features */}
+          <div className="space-y-4 mb-10">
+            {FEATURES.map((f) => (
+              <div key={f.label} className="flex items-start gap-3">
+                <div className="h-7 w-7 rounded bg-primary/15 border border-primary/25 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                  {f.icon}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-sidebar-foreground">{f.label}</p>
+                  <p className="text-xs text-sidebar-foreground/50 mt-0.5">{f.desc}</p>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="reg-email">Email</Label>
-                <Input id="reg-email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              </div>
-              <div>
-                <Label htmlFor="reg-password">Password</Label>
-                <Input id="reg-password" type="password" required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-                <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters</p>
-              </div>
-              <div>
-                <Label htmlFor="reg-confirm">Confirm Password</Label>
-                <Input id="reg-confirm" type="password" required value={form.password_confirm} onChange={(e) => setForm({ ...form, password_confirm: e.target.value })} />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Registering..." : "Register"}
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+            ))}
+          </div>
+
+          {/* Market Pulse */}
+          <div className="border border-sidebar-border rounded p-4 bg-background/30">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="h-3.5 w-3.5 text-primary" />
+              <p className="section-label text-primary" style={{ fontSize: "0.55rem" }}>Market Pulse</p>
+            </div>
+            <div className="space-y-3">
+              {MARKET_PULSE.map((m) => (
+                <div key={m.label}>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-xs text-sidebar-foreground/60">{m.label}</span>
+                  </div>
+                  <MarketBar value={m.bar} delta={m.delta} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Skill tags */}
+        <div className="flex flex-wrap gap-1.5 mt-6">
+          {SKILLS.map((s) => (
+            <Badge key={s} variant="accent" className="text-[0.65rem] font-semibold">{s}</Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Right: Form Panel ── */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-sm">
+
+          {/* Mobile logo */}
+          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+            <div className="h-7 w-7 rounded bg-primary flex items-center justify-center text-primary-foreground">
+              <Command className="h-4 w-4" />
+            </div>
+            <span className="font-extrabold text-base">SkillBridge AI</span>
+          </div>
+
+          <header className="mb-8">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="h-3.5 w-3.5 text-primary" />
+              <p className="section-label">Intelligence Platform</p>
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight">
+              {tab === "login" ? "Sign in" : "Create account"}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {tab === "login"
+                ? "Welcome back. Enter your credentials to continue."
+                : "Start your career acceleration journey."}
+            </p>
+          </header>
+
+          <Tabs value={tab} onValueChange={(v) => { setTab(v); setError(null); }}>
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="register">Register</TabsTrigger>
+            </TabsList>
+
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs font-semibold tracking-wide uppercase" style={{ letterSpacing: "0.06em" }}>
+                    Email
+                  </Label>
+                  <Input id="email" type="email" placeholder="name@example.com" required
+                    value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-xs font-semibold tracking-wide uppercase" style={{ letterSpacing: "0.06em" }}>
+                    Password
+                  </Label>
+                  <Input id="password" type="password" required
+                    value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                </div>
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Signing in..." : <span className="flex items-center gap-2">Sign In <ArrowRight className="h-4 w-4" /></span>}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="register">
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name" className="text-xs font-semibold uppercase" style={{ letterSpacing: "0.06em" }}>
+                    Full Name
+                  </Label>
+                  <Input id="name" placeholder="Jane Doe" required
+                    value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reg-email" className="text-xs font-semibold uppercase" style={{ letterSpacing: "0.06em" }}>
+                    Email
+                  </Label>
+                  <Input id="reg-email" type="email" placeholder="name@example.com" required
+                    value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reg-password" className="text-xs font-semibold uppercase" style={{ letterSpacing: "0.06em" }}>
+                    Password
+                  </Label>
+                  <Input id="reg-password" type="password" required minLength={8}
+                    value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                  <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reg-confirm" className="text-xs font-semibold uppercase" style={{ letterSpacing: "0.06em" }}>
+                    Confirm Password
+                  </Label>
+                  <Input id="reg-confirm" type="password" required
+                    value={form.password_confirm} onChange={(e) => setForm({ ...form, password_confirm: e.target.value })} />
+                </div>
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Creating account..." : <span className="flex items-center gap-2">Create Account <ArrowRight className="h-4 w-4" /></span>}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            By continuing, you agree to our Terms of Service and Privacy Policy.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function Login() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className="h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">Loading...</div>}>
       <LoginForm />
     </Suspense>
   );

@@ -10,12 +10,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
+import { extractApiError } from "@/lib/utils";
 
 interface RewriteResult {
     original: string;
     rewritten: string;
     improvement_notes: string;
 }
+
+const FIELD_LABEL = "text-xs font-semibold uppercase tracking-widest";
 
 export default function ResumeRewriter() {
     const [role, setRole] = useState("");
@@ -38,7 +41,7 @@ export default function ResumeRewriter() {
             setResult(res.data);
             toast.success("Rewrite generated!");
         } catch (err: unknown) {
-            const msg = (err as any).response?.data?.detail || "Failed to rewrite text";
+            const msg = extractApiError(err, "Failed to rewrite text");
             setError(msg);
             toast.error(msg);
         } finally {
@@ -54,18 +57,21 @@ export default function ResumeRewriter() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto">
-            <h1 className="text-2xl font-bold mb-2">AI Resume Rewriter</h1>
-            <p className="text-sm text-muted-foreground mb-6">
-                Turn your basic bullet points into impactful, role-specific achievements.
-            </p>
+        <div className="max-w-3xl mx-auto space-y-5">
+            <header>
+                <p className="section-label mb-1">AI Tool</p>
+                <h1 className="text-2xl font-extrabold tracking-tight">Resume Rewriter</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                    Turn basic bullet points into impactful, role-specific achievements.
+                </p>
+            </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Input Section */}
-                <Card className="p-6">
-                    <CardContent className="p-0 space-y-4">
-                        <div>
-                            <Label htmlFor="role">Target Role</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Input */}
+                <Card variant="data">
+                    <CardContent className="p-6 space-y-4">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="role" className={FIELD_LABEL}>Target Role</Label>
                             <Input
                                 id="role"
                                 placeholder="e.g. Data Scientist, Product Manager"
@@ -73,8 +79,8 @@ export default function ResumeRewriter() {
                                 onChange={(e) => setRole(e.target.value)}
                             />
                         </div>
-                        <div>
-                            <Label htmlFor="bullet">Your Bullet Point</Label>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="bullet" className={FIELD_LABEL}>Your Bullet Point</Label>
                             <Textarea
                                 id="bullet"
                                 rows={6}
@@ -84,50 +90,50 @@ export default function ResumeRewriter() {
                             />
                         </div>
                         <Button onClick={handleRewrite} disabled={loading} className="w-full">
-                            {loading ? "Optimizing..." : "Rewrite with AI"}
+                            {loading ? "Optimising..." : "Rewrite with AI"}
                         </Button>
                         {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
                     </CardContent>
                 </Card>
 
-                {/* Output Section */}
+                {/* Output */}
                 <div className="space-y-4">
                     {!result && !loading && (
-                        <div className="h-full flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg bg-muted/50 text-muted-foreground">
-                            <PenTool className="h-10 w-10 mb-2 opacity-50" />
-                            <p>Result will appear here</p>
+                        <div className="h-full min-h-[200px] flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded bg-muted/20 text-muted-foreground">
+                            <PenTool className="h-10 w-10 mb-2 opacity-30" />
+                            <p className="text-sm">Result will appear here</p>
                         </div>
                     )}
 
                     {loading && (
-                        <div className="h-full flex flex-col items-center justify-center p-8 border rounded-lg bg-background">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
-                            <p className="text-sm animate-pulse">Analyzing impact...</p>
+                        <div className="h-full min-h-[200px] flex flex-col items-center justify-center p-8 border border-border rounded bg-card">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-3" />
+                            <p className="text-sm text-muted-foreground animate-pulse">Analysing impact...</p>
                         </div>
                     )}
 
                     {result && (
-                        <Card className="p-6 bg-[#f0f9ff] dark:bg-slate-900 border-[#bae6fd] dark:border-slate-800">
-                            <CardContent className="p-0">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-bold flex items-center gap-2 text-[#0284c7] dark:text-sky-400">
-                                        <CheckCircle2 className="h-5 w-5" />
-                                        Optimized Version
-                                    </h3>
-                                    <Button variant="ghost" size="icon" onClick={copyToClipboard} className="h-8 w-8">
-                                        <Copy className="h-4 w-4" />
+                        <Card variant="highlight">
+                            <CardContent className="p-5">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                                        <p className="section-label text-primary">Optimised Version</p>
+                                    </div>
+                                    <Button variant="ghost" size="icon-sm" onClick={copyToClipboard}>
+                                        <Copy className="h-3.5 w-3.5" />
                                     </Button>
                                 </div>
-                                <p className="text-lg font-medium mb-4">{result.rewritten}</p>
+                                <p className="text-base font-semibold mb-4 leading-relaxed">{result.rewritten}</p>
 
-                                <div className="bg-white dark:bg-slate-950 p-4 rounded-md text-sm border">
-                                    <p className="font-semibold mb-1">Why this is better:</p>
-                                    <p className="text-muted-foreground">{result.improvement_notes}</p>
+                                <div className="bg-card p-4 rounded border border-border mb-4">
+                                    <p className="section-label mb-1.5">Why this is better</p>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">{result.improvement_notes}</p>
                                 </div>
 
-                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-                                    <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Original</p>
-                                    <p className="text-sm opacity-70 strike-through">{result.original}</p>
+                                <div className="border-t border-border pt-3">
+                                    <p className="section-label mb-1.5">Original</p>
+                                    <p className="text-sm text-muted-foreground opacity-60 line-through">{result.original}</p>
                                 </div>
                             </CardContent>
                         </Card>

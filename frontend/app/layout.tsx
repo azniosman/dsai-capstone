@@ -1,25 +1,21 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { TenantProvider } from "@/contexts/tenant-context";
+import { ThemeProvider } from "@/components/theme-provider";
 import ErrorBoundary from "@/components/error-boundary";
-import Navbar from "@/components/layout/navbar";
-import AppBreadcrumbs from "@/components/layout/breadcrumbs";
+import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
+  subsets: ["latin"],
   variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const outfit = Outfit({
-  variable: "--font-outfit",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "SkillBridge AI — Career Intelligence Platform",
-  description: "SkillBridge AI: AI-powered job matching, skill gap analysis, and personalized upskilling roadmaps for Singapore tech careers",
+  title: "SkillBridge AI",
+  description: "AI-Powered Career Intelligence Platform",
 };
 
 export default function RootLayout({
@@ -28,18 +24,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${outfit.variable} font-sans antialiased bg-background`}>
-        <TenantProvider>
-          <ErrorBoundary>
-            <Navbar />
-            <main className="container mx-auto py-6 px-4">
-              <AppBreadcrumbs />
-              {children}
-            </main>
-            <Toaster />
-          </ErrorBoundary>
-        </TenantProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${inter.variable} font-sans antialiased bg-background text-foreground`}
+      >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <TenantProvider>
+            <ErrorBoundary>
+              <AppShell>
+                {children}
+              </AppShell>
+              <Toaster />
+            </ErrorBoundary>
+          </TenantProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

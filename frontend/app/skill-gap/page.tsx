@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,7 +17,22 @@ import EmptyState from "@/components/empty-state";
 import SkeletonCard from "@/components/skeleton-card";
 import api from "@/lib/api-client";
 
-const GAP_COLORS: Record<string, string> = { none: "#4caf50", low: "#2196f3", medium: "#ff9800", high: "#f44336" };
+const GAP_COLORS: Record<string, string> = {
+  none: "#28c76f",
+  low: "#00BFFF",
+  medium: "#f9a825",
+  high: "#e84848",
+};
+
+const CHART_STYLE = {
+  contentStyle: {
+    backgroundColor: "#ffffff",
+    border: "1px solid #d9d4cc",
+    borderRadius: "6px",
+    fontSize: "12px",
+    color: "#1a1a1a",
+  },
+};
 
 interface GapItem {
   skill: string;
@@ -68,6 +84,7 @@ export default function SkillGap() {
 
   const tabIdx = parseInt(tab);
   const currentGap = gaps[tabIdx] || gaps[0];
+  const score = Math.round(currentGap.match_score * 100);
   const chartData = currentGap.gaps.map((g) => ({
     skill: g.skill,
     level: g.user_level,
@@ -76,17 +93,22 @@ export default function SkillGap() {
   }));
 
   const radarData = currentGap.gaps.slice(0, 10).map((g) => ({
-    skill: g.skill.length > 12 ? g.skill.slice(0, 12) + "..." : g.skill,
+    skill: g.skill.length > 12 ? g.skill.slice(0, 12) + "…" : g.skill,
     "Your Level": Math.round(g.user_level * 100),
     Required: g.required_level === "required" ? 100 : 70,
   }));
 
   return (
-    <div>
+    <div className="space-y-5">
       <WorkflowStepper />
-      <h1 className="text-2xl font-bold mb-4">Skill Gap Analysis</h1>
 
-      <Tabs value={tab} onValueChange={setTab} className="mb-4">
+      <header>
+        <p className="section-label mb-1">Analysis</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">Skill Gap Analysis</h1>
+      </header>
+
+      {/* Role selector */}
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           {gaps.map((g, i) => (
             <TabsTrigger key={g.role_title} value={String(i)}>{g.role_title}</TabsTrigger>
@@ -94,36 +116,45 @@ export default function SkillGap() {
         </TabsList>
       </Tabs>
 
-      <div className="flex justify-between items-center mb-4">
-        <p className="text-sm font-medium">
-          {currentGap.role_title} — Match: {Math.round(currentGap.match_score * 100)}%
-        </p>
+      {/* Score + chart toggle */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" />
+          <span className="text-sm font-semibold">{currentGap.role_title}</span>
+          <Badge variant={score >= 70 ? "success" : score >= 40 ? "warning" : "destructive"} className="data-num">
+            {score}% Match
+          </Badge>
+        </div>
         <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v)} size="sm">
           <ToggleGroupItem value="radar">Radar</ToggleGroupItem>
           <ToggleGroupItem value="bar">Bar</ToggleGroupItem>
         </ToggleGroup>
       </div>
 
-      <Card className="p-4 mb-6">
-        <CardContent className="p-0">
+      {/* Chart */}
+      <Card variant="data">
+        <CardContent className="p-4">
           <div className="h-[350px]" role="img" aria-label="Chart comparing your skill levels to required levels">
             <ResponsiveContainer>
               {chartType === "radar" ? (
                 <RadarChart data={radarData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="skill" tick={{ fontSize: 11 }} />
-                  <PolarRadiusAxis domain={[0, 100]} />
-                  <Radar name="Your Level" dataKey="Your Level" stroke="#1565c0" fill="#1565c0" fillOpacity={0.4} />
-                  <Radar name="Required" dataKey="Required" stroke="#f44336" fill="#f44336" fillOpacity={0.1} />
-                  <Legend />
+                  <PolarGrid stroke="#d9d4cc" />
+                  <PolarAngleAxis dataKey="skill" tick={{ fill: "#374151", fontSize: 11 }} />
+                  <PolarRadiusAxis domain={[0, 100]} tick={{ fill: "#6b7280", fontSize: 10 }} />
+                  <Radar name="Your Level" dataKey="Your Level" stroke="#00BFFF" fill="#00BFFF" fillOpacity={0.3} />
+                  <Radar name="Required" dataKey="Required" stroke="#e8562a" fill="#e8562a" fillOpacity={0.1} />
+                  <Legend wrapperStyle={{ color: "#374151", fontSize: "12px" }} />
                 </RadarChart>
               ) : (
                 <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" domain={[0, 1]} />
-                  <YAxis type="category" dataKey="skill" width={100} tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v) => `${Math.round(Number(v) * 100)}%`} />
-                  <Bar dataKey="level" name="Your Level">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
+                  <XAxis type="number" domain={[0, 1]} tick={{ fill: "#6b7280", fontSize: 11 }} />
+                  <YAxis type="category" dataKey="skill" width={100} tick={{ fill: "#374151", fontSize: 11 }} />
+                  <Tooltip
+                    formatter={(v) => `${Math.round(Number(v) * 100)}%`}
+                    contentStyle={CHART_STYLE.contentStyle}
+                  />
+                  <Bar dataKey="level" name="Your Level" radius={[0, 3, 3, 0]}>
                     {chartData.map((entry) => (
                       <Cell key={entry.skill} fill={GAP_COLORS[entry.severity]} />
                     ))}
@@ -136,6 +167,11 @@ export default function SkillGap() {
       </Card>
 
       <GapTable gaps={currentGap.gaps} />
+
+      {/* Unused TabsContent to satisfy Tabs children requirement */}
+      {gaps.map((_, i) => (
+        <TabsContent key={i} value={String(i)} />
+      ))}
     </div>
   );
 }

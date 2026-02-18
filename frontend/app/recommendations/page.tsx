@@ -13,11 +13,17 @@ import EmptyState from "@/components/empty-state";
 import SkeletonCard from "@/components/skeleton-card";
 import api from "@/lib/api-client";
 
-const QUALITY_BADGE: Record<string, { className: string; label: string }> = {
-  strong: { className: "bg-green-100 text-green-800 hover:bg-green-100", label: "Strong Match" },
-  moderate: { className: "bg-orange-100 text-orange-800 hover:bg-orange-100", label: "Moderate Match" },
-  developing: { className: "bg-gray-100 text-gray-800 hover:bg-gray-100", label: "Developing" },
-};
+function qualityVariant(q: string): "success" | "warning" | "muted" {
+  if (q === "strong") return "success";
+  if (q === "moderate") return "warning";
+  return "muted";
+}
+
+function qualityLabel(q: string): string {
+  if (q === "strong") return "Strong Match";
+  if (q === "moderate") return "Moderate Match";
+  return "Developing";
+}
 
 interface Recommendation {
   role_id: number;
@@ -50,95 +56,105 @@ export default function Recommendations() {
   }, []);
 
   return (
-    <div>
+    <div className="space-y-5">
       <WorkflowStepper />
-      <h1 className="text-2xl font-bold mb-4">Recommended Job Roles</h1>
+
+      <header>
+        <p className="section-label mb-1">Intelligence</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">Recommended Roles</h1>
+      </header>
 
       {loading && <SkeletonCard count={3} />}
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
       {!loading && !error && !localStorage.getItem("token") && localStorage.getItem("profileId") && (
-        <Alert className="mb-6 bg-primary/10 border-primary/20">
-          <AlertDescription className="flex items-center justify-between">
-            <div>
-              <span className="font-semibold block mb-1">Save your results!</span>
-              Create an account to save your profile and get updated recommendations later.
+        <Card variant="highlight">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <p className="text-sm font-bold mb-0.5">Save your results</p>
+                <p className="text-xs text-muted-foreground">Create an account to save your profile and get updated recommendations.</p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  const pid = localStorage.getItem("profileId");
+                  window.location.href = `/login?tab=register&profileId=${pid}`;
+                }}
+              >
+                Sign Up to Save
+              </Button>
             </div>
-            <Button
-              size="sm"
-              onClick={() => {
-                const pid = localStorage.getItem("profileId");
-                window.location.href = `/login?tab=register&profileId=${pid}`;
-              }}
-            >
-              Sign Up to Save
-            </Button>
-          </AlertDescription>
-        </Alert>
+          </CardContent>
+        </Card>
       )}
 
       {!loading && !error && !localStorage.getItem("profileId") && (
         <EmptyState
           icon={<Briefcase />}
           title="No profile yet"
-          description="Create a profile to get personalized job recommendations based on your skills and experience."
+          description="Create a profile to get personalised job recommendations based on your skills and experience."
         />
       )}
 
       {!loading && !error && recs.length > 0 && (
         <div className="flex flex-col gap-4">
-          {recs.map((rec) => {
-            const quality = QUALITY_BADGE[rec.skill_match_quality] || QUALITY_BADGE.developing;
-            return (
-              <Card key={rec.role_id} className="p-6">
-                <CardContent className="p-0">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h2 className="text-lg font-bold">{rec.title}</h2>
-                        <Badge className={quality.className}>{quality.label}</Badge>
-                      </div>
-                      <div className="flex gap-1.5 flex-wrap">
-                        <Badge variant="secondary">{rec.category}</Badge>
-                        {rec.salary_range && <Badge variant="outline">{rec.salary_range}</Badge>}
-                        {rec.career_switcher_bonus > 0 && (
-                          <Badge className="bg-[#00897b] hover:bg-[#00897b] text-white">Career Switcher +</Badge>
-                        )}
-                      </div>
+          {recs.map((rec, idx) => (
+            <Card key={rec.role_id} variant="elevated" className="hover-lift">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className="text-xs font-mono text-muted-foreground/60 data-num">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <h2 className="text-base font-bold">{rec.title}</h2>
+                      <Badge variant={qualityVariant(rec.skill_match_quality)}>
+                        {qualityLabel(rec.skill_match_quality)}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <Badge variant="secondary">{rec.category}</Badge>
+                      {rec.salary_range && <Badge variant="outline" className="data-num">{rec.salary_range}</Badge>}
+                      {rec.career_switcher_bonus > 0 && (
+                        <Badge variant="success">Career Switcher +</Badge>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                  <div className="mt-4 space-y-1.5">
-                    <MatchScoreBar score={rec.match_score} label="Overall" />
-                    <MatchScoreBar score={rec.content_score} label="Skills" />
-                    <MatchScoreBar score={rec.rule_score} label="Profile Fit" />
-                  </div>
+                <div className="space-y-1.5 mb-3">
+                  <MatchScoreBar score={rec.match_score} label="Overall" />
+                  <MatchScoreBar score={rec.content_score} label="Skills" />
+                  <MatchScoreBar score={rec.rule_score} label="Profile Fit" />
+                </div>
 
-                  <p className="text-sm text-muted-foreground mt-3">{rec.rationale}</p>
+                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rec.rationale}</p>
 
-                  <div className="mt-4">
-                    <p className="text-xs text-muted-foreground mb-1">Matched Skills:</p>
+                {rec.matched_skills.length > 0 && (
+                  <div className="mb-2">
+                    <p className="section-label mb-1.5">Matched Skills</p>
                     <div className="flex gap-1 flex-wrap">
                       {rec.matched_skills.map((s) => (
                         <SkillChip key={s} skill={s} severity="none" />
                       ))}
                     </div>
                   </div>
+                )}
 
-                  {rec.missing_skills.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-xs text-muted-foreground mb-1">Missing Skills:</p>
-                      <div className="flex gap-1 flex-wrap">
-                        {rec.missing_skills.map((s) => (
-                          <SkillChip key={s} skill={s} severity="high" />
-                        ))}
-                      </div>
+                {rec.missing_skills.length > 0 && (
+                  <div>
+                    <p className="section-label mb-1.5">Missing Skills</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {rec.missing_skills.map((s) => (
+                        <SkillChip key={s} skill={s} severity="high" />
+                      ))}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>

@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import {
   User, Briefcase, BarChart3, Route, FileText, MessageSquare, HelpCircle,
   TrendingUp, GitCompare, Users, Wrench, Activity, LogIn, GraduationCap,
-  Home, Menu, Settings,
+  Menu, Settings, Sun, Moon, Sparkles, Command, Cpu
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -20,13 +21,30 @@ import {
 import { useTenant } from "@/contexts/tenant-context";
 import api from "@/lib/api-client";
 
+const ThemeToggle = () => {
+  const { theme, setTheme } = useTheme();
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      className="text-muted-foreground hover:text-foreground"
+    >
+      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <span className="sr-only">Toggle theme</span>
+    </Button>
+  );
+};
+
 const NAV_SECTIONS = [
   {
-    header: "Core",
+    header: "Intelligence",
     items: [
-      { label: "Dashboard", path: "/dashboard", icon: User },
-      { label: "Jobs", path: "/recommendations", icon: Briefcase },
-      { label: "Skill Gap", path: "/skill-gap", icon: BarChart3 },
+      { label: "Dashboard", path: "/dashboard", icon: Cpu },
+      { label: "Matches", path: "/recommendations", icon: Briefcase },
+      { label: "Gaps", path: "/skill-gap", icon: BarChart3 },
       { label: "Roadmap", path: "/roadmap", icon: Route },
     ],
   },
@@ -34,105 +52,22 @@ const NAV_SECTIONS = [
     header: "Tools",
     items: [
       { label: "JD Match", path: "/jd-match", icon: FileText },
-      { label: "Compare Roles", path: "/compare", icon: GitCompare },
-      { label: "Career Coach", path: "/chat", icon: MessageSquare },
-      { label: "Mock Interview", path: "/interview", icon: HelpCircle },
+      { label: "Coach", path: "/chat", icon: MessageSquare },
+      { label: "Interview", path: "/interview", icon: HelpCircle },
       { label: "Courses", path: "/courses", icon: GraduationCap },
-    ],
-  },
-  {
-    header: "Insights",
-    items: [
-      { label: "Market Insights", path: "/market", icon: TrendingUp },
-      { label: "Peer Comparison", path: "/peers", icon: Users },
-      { label: "Projects", path: "/projects", icon: Wrench },
-      { label: "Progress", path: "/progress", icon: Activity },
-    ],
-  },
-  {
-    header: "Account",
-    items: [
-      { label: "Settings", path: "/account", icon: Settings },
     ],
   },
 ];
 
-function NavDrawerContent({ onClose }: { onClose: () => void }) {
-  const pathname = usePathname();
-  const { tenantConfig } = useTenant();
-
-  return (
-    <div className="pt-2">
-      {tenantConfig.logoUrl ? (
-        <div className="px-4 mb-2">
-          <img src={tenantConfig.logoUrl} alt={tenantConfig.name} className="max-w-full h-auto" />
-        </div>
-      ) : (
-        <h2 className="px-4 mb-1 text-lg font-bold">{tenantConfig.name}</h2>
-      )}
-      <p className="px-4 text-xs text-muted-foreground">Career Intelligence Platform</p>
-
-      <nav className="mt-4 space-y-4">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.header}>
-            <p className="px-4 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {section.header}
-            </p>
-            <ul className="space-y-0.5">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const active = pathname === item.path;
-                return (
-                  <li key={item.path}>
-                    <Link
-                      href={item.path}
-                      onClick={onClose}
-                      className={`flex items-center gap-3 px-4 py-2 mx-2 rounded-lg text-sm transition-colors ${active
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "hover:bg-muted text-foreground"
-                        }`}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-
-        <div className="border-t pt-2">
-          <p className="px-4 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Help
-          </p>
-          <button
-            onClick={() => { onClose(); alert("Simulating guided tour!"); }}
-            className="flex items-center gap-3 px-4 py-2 mx-2 rounded-lg text-sm hover:bg-muted text-foreground w-full text-left"
-          >
-            <Home className="h-4 w-4 shrink-0" />
-            Show Tour
-          </button>
-        </div>
-      </nav>
-    </div>
-  );
-}
-
 function UserMenu() {
   const router = useRouter();
-  const { tenantConfig } = useTenant();
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const userName = typeof window !== "undefined" ? localStorage.getItem("userName") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   if (!token) {
     return (
-      <Button variant="ghost" size="sm" asChild className="text-white hover:bg-white/20">
-        <Link href="/login">
-          <LogIn className="h-4 w-4 mr-1" />
-          Login
-        </Link>
+      <Button variant="default" size="sm" asChild>
+        <Link href="/login">Login</Link>
       </Button>
     );
   }
@@ -142,45 +77,36 @@ function UserMenu() {
     : "U";
 
   const handleLogout = async () => {
-    const refreshToken = localStorage.getItem("refreshToken");
-    if (refreshToken) {
-      try {
-        await api.post("/api/auth/logout", { refresh_token: refreshToken });
-      } catch {
-        // Ignore
-      }
-    }
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("profileId");
-    localStorage.removeItem("tenantName");
+    localStorage.clear();
     router.push("/");
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="ml-2 hover:bg-white/20">
+        <Button variant="ghost" size="icon" className="ml-2 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarFallback
-              className="text-xs font-medium"
-              style={{ backgroundColor: tenantConfig.primaryColor, color: "white" }}
-            >
+            <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
               {initials}
             </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem disabled className="text-sm">
-          {userName || "User"}
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+          {userName}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/dashboard")}>Dashboard</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/account")}>Account Settings</DropdownMenuItem>
-        <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/dashboard")}>
+          Dashboard
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/account")}>
+          Settings
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+          Logout
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -188,60 +114,91 @@ function UserMenu() {
 
 export default function Navbar() {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const pathname = usePathname();
   const { tenantConfig } = useTenant();
 
+  const NAV_LINKS = [
+    { label: "Dashboard", path: "/dashboard" },
+    { label: "Jobs", path: "/recommendations" },
+    { label: "Gaps", path: "/skill-gap" },
+    { label: "Roadmap", path: "/roadmap" },
+    { label: "Coach", path: "/chat" },
+  ];
+
   return (
-    <header
-      className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-    >
-      <div className="container mx-auto flex items-center h-16 px-4">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto flex h-16 items-center px-4">
+        {/* Mobile Menu */}
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="mr-2 md:hidden">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[260px] p-0 overflow-y-auto">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Navigation</SheetTitle>
+          <SheetContent side="left" className="w-[280px] sm:w-[300px]">
+            <SheetHeader>
+              <SheetTitle className="text-left text-lg font-bold">Menu</SheetTitle>
             </SheetHeader>
-            <NavDrawerContent onClose={() => setSheetOpen(false)} />
+            <div className="flex flex-col gap-4 py-4">
+              {NAV_SECTIONS.map((section) => (
+                <div key={section.header} className="space-y-1">
+                  <h4 className="px-2 text-xs font-semibold text-muted-foreground mb-2">
+                    {section.header}
+                  </h4>
+                  {section.items.map((item) => (
+                    <Link
+                      key={item.path}
+                      href={item.path}
+                      onClick={() => setSheetOpen(false)}
+                      className={`flex items-center gap-3 px-2 py-2 text-sm font-medium rounded-md transition-colors ${pathname === item.path
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                        }`}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              ))}
+            </div>
           </SheetContent>
         </Sheet>
 
-        <Link href="/" className="mr-6 flex items-center space-x-2">
+        {/* Logo */}
+        <Link href="/" className="mr-8 flex items-center gap-2">
           {tenantConfig.logoUrl ? (
             <img src={tenantConfig.logoUrl} alt={tenantConfig.name} className="h-8 w-auto" />
           ) : (
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold">
-                {tenantConfig.name.substring(0, 1)}
+              <div className="h-6 w-6 rounded bg-primary flex items-center justify-center text-primary-foreground">
+                <Command className="h-4 w-4" />
               </div>
-              <span className="hidden font-bold sm:inline-block">
-                {tenantConfig.name}
-              </span>
+              <span className="font-semibold text-sm tracking-tight">{tenantConfig.name}</span>
             </div>
           )}
         </Link>
-        <nav className="flex items-center space-x-6 text-sm font-medium">
-          {[
-            { label: "Dashboard", path: "/dashboard" },
-            { label: "Jobs", path: "/recommendations" },
-            { label: "Gaps", path: "/skill-gap" },
-            { label: "Roadmap", path: "/roadmap" },
-            { label: "Coach", path: "/chat" },
-          ].map((link) => (
-            <Link
-              key={link.path}
-              href={link.path}
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
-            >
-              {link.label}
-            </Link>
-          ))}
+
+        {/* Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+          {NAV_LINKS.map((link) => {
+            const isActive = pathname === link.path;
+
+            return (
+              <Link
+                key={link.path}
+                href={link.path}
+                className={`transition-colors hover:text-foreground/80 ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"
+                  }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="ml-auto flex items-center space-x-4">
+        <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
           <UserMenu />
         </div>
       </div>
