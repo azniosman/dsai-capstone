@@ -20,6 +20,13 @@ interface Gap {
   priority: string | number;
 }
 
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0 },
+};
+
+import { motion } from "framer-motion";
+
 export default function GapTable({ gaps }: { gaps: Gap[] }) {
   return (
     <div className="border rounded-lg overflow-x-auto">
@@ -34,8 +41,14 @@ export default function GapTable({ gaps }: { gaps: Gap[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {gaps.map((gap) => (
-            <TableRow key={gap.skill}>
+          {gaps.map((gap, index) => (
+            <motion.tr
+              key={gap.skill}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+            >
               <TableCell className="font-medium">{gap.skill}</TableCell>
               <TableCell>
                 <Badge variant="outline">{gap.required_level}</Badge>
@@ -47,7 +60,7 @@ export default function GapTable({ gaps }: { gaps: Gap[] }) {
                 </Badge>
               </TableCell>
               <TableCell>{gap.priority}</TableCell>
-            </TableRow>
+            </motion.tr>
           ))}
         </TableBody>
       </Table>

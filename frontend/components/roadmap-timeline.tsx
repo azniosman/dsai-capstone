@@ -20,11 +20,19 @@ interface RoadmapItem {
   url?: string;
 }
 
+import { motion } from "framer-motion";
+
 export default function RoadmapTimeline({ items }: { items: RoadmapItem[] }) {
   return (
     <div className="flex flex-col gap-4">
       {items.map((item, idx) => (
-        <Card key={idx}>
+        <motion.div
+          key={idx}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: idx * 0.1 }}
+        >
+        <Card>
           <CardContent className="flex gap-4 items-start p-4">
             <div className="min-w-[80px] text-center bg-primary text-primary-foreground rounded-md p-2">
               <span className="text-xs">Week</span>
@@ -74,7 +82,8 @@ export default function RoadmapTimeline({ items }: { items: RoadmapItem[] }) {
             </div>
           </CardContent>
         </Card>
-      ))}
+      </motion.div>
+    ))}
     </div>
   );
 }

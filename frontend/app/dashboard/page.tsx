@@ -8,6 +8,7 @@ import {
     TrendingUp, Zap, Target, ArrowUpRight, Brain,
     ChevronRight, ArrowUp, ArrowDown, Minus
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -201,7 +202,12 @@ export default function Dashboard() {
             {loading ? <KpiSkeleton /> : summary && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {/* Skills */}
-                    <Card variant="metric" className="hover-lift">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                    >
+                    <Card variant="metric" className="hover-lift h-full">
                         <CardContent className="p-5">
                             <p className="section-label mb-3">Skills Tracked</p>
                             <div className="kpi-number">{summary.skills_count}</div>
@@ -211,9 +217,15 @@ export default function Dashboard() {
                             </div>
                         </CardContent>
                     </Card>
+                    </motion.div>
 
                     {/* Job Matches */}
-                    <Card variant="metric" className="hover-lift">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                    >
+                    <Card variant="metric" className="hover-lift h-full">
                         <CardContent className="p-5">
                             <p className="section-label mb-3">Job Matches</p>
                             <div className="kpi-number-accent">{summary.recommendations_count}</div>
@@ -223,9 +235,15 @@ export default function Dashboard() {
                             </div>
                         </CardContent>
                     </Card>
+                    </motion.div>
 
                     {/* Gaps */}
-                    <Card variant="metric" className="hover-lift">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                    >
+                    <Card variant="metric" className="hover-lift h-full">
                         <CardContent className="p-5">
                             <p className="section-label mb-3">Gaps Identified</p>
                             <div className={`kpi-number text-amber-500 dark:text-amber-400`}>
@@ -237,9 +255,15 @@ export default function Dashboard() {
                             </div>
                         </CardContent>
                     </Card>
+                    </motion.div>
 
                     {/* Career Readiness */}
-                    <Card variant="kpi" className="hover-lift">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                    >
+                    <Card variant="kpi" className="hover-lift h-full">
                         <CardContent className="p-5">
                             <p className="section-label mb-3">Career Readiness</p>
                             <div className={`kpi-number-accent ${readinessColor}`}>
@@ -255,6 +279,7 @@ export default function Dashboard() {
                             <p className="text-xs text-muted-foreground mt-1.5">Overall score</p>
                         </CardContent>
                     </Card>
+                    </motion.div>
                 </div>
             )}
 
