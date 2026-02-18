@@ -12,6 +12,7 @@ import WorkflowStepper from "@/components/workflow-stepper";
 import EmptyState from "@/components/empty-state";
 import SkeletonCard from "@/components/skeleton-card";
 import api from "@/lib/api-client";
+import { extractApiError } from "@/lib/utils";
 
 function qualityVariant(q: string): "success" | "warning" | "muted" {
   if (q === "strong") return "success";
@@ -56,7 +57,7 @@ export default function Recommendations() {
     api
       .post("/api/recommend", { profile_id: parseInt(profileId) })
       .then((res) => setRecs(res.data.recommendations))
-      .catch((err) => setError(err.response?.data?.detail || "Failed to get recommendations"))
+      .catch((err: unknown) => setError(extractApiError(err, "Failed to get recommendations")))
       .finally(() => setLoading(false));
   }, []);
 

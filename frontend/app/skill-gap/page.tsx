@@ -16,6 +16,7 @@ import WorkflowStepper from "@/components/workflow-stepper";
 import EmptyState from "@/components/empty-state";
 import SkeletonCard from "@/components/skeleton-card";
 import api from "@/lib/api-client";
+import { extractApiError } from "@/lib/utils";
 
 const GAP_COLORS: Record<string, string> = {
   none: "#28c76f",
@@ -68,7 +69,7 @@ export default function SkillGap() {
     api
       .get(`/api/skill-gap/${profileId}`)
       .then((res) => setGaps(res.data.gaps))
-      .catch((err) => setError(err.response?.data?.detail || "Failed to load skill gaps"))
+      .catch((err: unknown) => setError(extractApiError(err, "Failed to load skill gaps")))
       .finally(() => setLoading(false));
   }, []);
 

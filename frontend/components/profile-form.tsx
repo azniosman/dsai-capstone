@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Briefcase, GraduationCap, Code, FileText, Loader2 } from "lucide-react";
+import { Briefcase, GraduationCap, Code, FileText, Loader2, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ export default function ProfileForm() {
     is_career_switcher: false,
   });
   const [skillInput, setSkillInput] = useState("");
+  const [extracting, setExtracting] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -106,6 +107,30 @@ export default function ProfileForm() {
       ...data, 
       skills: data.skills.filter((s) => s !== skillToRemove) 
     });
+  };
+
+  const handleExtractSkills = async () => {
+    if (!data.resume_text.trim()) {
+      toast.error("Please enter resume text first.");
+      return;
+    }
+    setExtracting(true);
+    try {
+      const res = await api.post("/api/profile/parse-resume", { resume_text: data.resume_text });
+      const newSkills = res.data.skills || [];
+      if (newSkills.length === 0) {
+        toast.info("No new skills found in text.");
+      } else {
+        // Merge unique
+        const merged = Array.from(new Set([...data.skills, ...newSkills]));
+        setData({ ...data, skills: merged });
+        toast.success(`Extracted ${newSkills.length} skills!`);
+      }
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to extract skills"));
+    } finally {
+      setExtracting(false);
+    }
   };
 
   if (fetching) {
@@ -207,18 +232,34 @@ export default function ProfileForm() {
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <FileText className="h-3 w-3 text-muted-foreground" />
-              <Label htmlFor="resume" className={FIELD_LABEL}>Resume Text (Optional)</Label>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-3 w-3 text-muted-foreground" />
+                <Label htmlFor="resume" className={FIELD_LABEL}>Resume Text (Optional)</Label>
+              </div>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExtractSkills}
+                disabled={extracting}
+                className="h-7 text-xs gap-1.5"
+              >
+                {extracting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 text-primary" />}
+                {extracting ? "Analyzing..." : "Auto-Extract Skills"}
+              </Button>
             </div>
             <Textarea
               id="resume"
-              rows={5}
+              rows={8}
               value={data.resume_text}
               onChange={(e) => setData({ ...data, resume_text: e.target.value })}
-              placeholder="Paste your resume content here for better AI analysis..."
-              className="font-mono text-xs"
+              placeholder="Paste your resume content here..."
+              className="font-mono text-xs leading-relaxed"
             />
+            <p className="text-[10px] text-muted-foreground">
+              Paste your full resume here. Our AI can analyze it to auto-populate your skills and improve recommendation accuracy.
+            </p>
           </div>
 
           <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/10">
