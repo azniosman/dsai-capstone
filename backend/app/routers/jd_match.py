@@ -1,5 +1,6 @@
 """JD paste & instant gap analysis — compare user skills against a job description."""
 
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -16,7 +17,7 @@ router = APIRouter(tags=["jd-match"])
 class JDMatchRequest(BaseModel):
     profile_id: int
     job_description: str
-    job_title: str | None = None
+    job_title: Optional[str] = None
 
 
 class JDMatchResponse(BaseModel):

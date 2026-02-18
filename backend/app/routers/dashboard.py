@@ -1,6 +1,7 @@
 """Dashboard summary endpoint — aggregates key profile metrics in a single call."""
 
 import logging
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -16,7 +17,7 @@ router = APIRouter(tags=["dashboard"])
 class DashboardSummary(BaseModel):
     profile_id: int
     name: str
-    education: str | None
+    education: Optional[str]
     years_experience: int
     skills: list[str]
     is_career_switcher: bool

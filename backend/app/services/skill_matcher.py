@@ -1,6 +1,8 @@
 """Skill matching using Sentence Transformers + FAISS for similarity search."""
 
+from typing import Optional, Union, Tuple
 import faiss
+from typing import List, Dict # Added redundant but safe imports if needed, or stick to what's there
 import numpy as np
 
 from app.ml.embeddings import encode_texts
@@ -40,7 +42,7 @@ def match_skills(
     required_skills: list[str],
     partial_threshold: float = 0.6,
     strong_threshold: float = 0.85,
-    cached_index: tuple[faiss.Index, list[str]] | None = None,
+    cached_index: Optional[Tuple[faiss.Index, List[str]]] = None,
 ) -> dict[str, float]:
     """Score each required skill against user skills.
 
@@ -80,7 +82,7 @@ def match_skills(
 def compute_content_similarity(
     user_skills: list[str], 
     role_skills: list[str], 
-    cached_index: tuple[faiss.Index, list[str]] | None = None
+    cached_index: Optional[Tuple[faiss.Index, List[str]]] = None
 ) -> float:
     """Compute weighted content similarity between user skills and role requirements.
 

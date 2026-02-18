@@ -1,5 +1,6 @@
 """Mock interview simulator endpoint with skill-gap-aware question selection."""
 
+from typing import Optional, List, Union, Tuple, Dict
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -16,19 +17,19 @@ class InterviewMessage(BaseModel):
 
 
 class InterviewRequest(BaseModel):
-    profile_id: int | None = None
+    profile_id: Optional[int] = None
     role_title: str
-    messages: list[InterviewMessage] = []
+    messages: List[InterviewMessage] = []
     difficulty: str = "intermediate"  # "beginner", "intermediate", "advanced"
 
 
 class InterviewResponse(BaseModel):
     reply: str
-    feedback: str | None = None
+    feedback: Optional[str] = None
     is_complete: bool = False
     question_number: int = 0
     gap_targeted: bool = False
-    target_skill: str | None = None
+    target_skill: Optional[str] = None
 
 
 # Role-specific interview questions
@@ -232,7 +233,7 @@ def mock_interview(payload: InterviewRequest, db: Session = Depends(get_db), use
     )
 
 
-def _quick_feedback(answer: str) -> str | None:
+def _quick_feedback(answer: str) -> Optional[str]:
     if len(answer.split()) < 20:
         return "Tip: Try to elaborate more. Use the STAR format (Situation, Task, Action, Result) for behavioral answers."
     if len(answer.split()) > 200:

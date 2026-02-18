@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from typing import Optional, List, Union, Any, Dict
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -33,7 +34,7 @@ _SEED_CANDIDATES = [
 ]
 
 
-def _resolve_seed_path(filename: str) -> str | None:
+def _resolve_seed_path(filename: str) -> Optional[str]:
     """Return the first path where filename exists under a seed candidate directory."""
     for base in _SEED_CANDIDATES:
         path = os.path.join(base, filename)

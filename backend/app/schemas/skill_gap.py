@@ -1,3 +1,4 @@
+from typing import Optional, List, Union
 from pydantic import BaseModel
 
 
@@ -28,8 +29,8 @@ class RoadmapItem(BaseModel):
     provider: str
     duration_weeks: int
     level: str
-    url: str | None
-    certification: str | None
+    url: Optional[str]
+    certification: Optional[str]
     priority: int
     week_start: int
     week_end: int

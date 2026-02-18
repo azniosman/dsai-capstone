@@ -2,6 +2,7 @@
 
 import secrets
 from collections import OrderedDict
+from typing import Optional, Union
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -34,7 +35,7 @@ def _cleanup_expired_tokens() -> None:
             break
 
 
-def revoke_token(jti: str, expires_at: float | None = None) -> None:
+def revoke_token(jti: str, expires_at: Optional[float] = None) -> None:
     if expires_at is None:
         expires_at = (datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)).timestamp()
     _cleanup_expired_tokens()
@@ -122,7 +123,7 @@ def verify_reset_token(token: str) -> int:
 
 
 def get_current_user_optional(
-    token: str | None = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ):
     """Return user if authenticated, None otherwise."""
@@ -152,7 +153,7 @@ def get_current_user_optional(
 
 
 def get_current_user(
-    token: str | None = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ):
     """Require authentication."""

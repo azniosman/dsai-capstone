@@ -1,6 +1,7 @@
 """Authentication endpoints — register, login, me, password management, account settings."""
 
 import re
+from typing import Optional, List, Union
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -43,8 +44,8 @@ class RegisterRequest(BaseModel):
     password_confirm: str
     name: str = Field(min_length=1)
     tenant_name: str = Field(min_length=1)
-    role: str | None = None
-    profile_id: int | None = None  # Added profile_id
+    role: Optional[str] = None
+    profile_id: Optional[int] = None  # Added profile_id
 
     @field_validator("email")
     @classmethod
@@ -106,8 +107,8 @@ class ResetPasswordRequest(BaseModel):
 
 
 class UpdateAccountRequest(BaseModel):
-    name: str | None = None
-    email: str | None = None
+    name: Optional[str] = None
+    email: Optional[str] = None
 
 
 class RefreshRequest(BaseModel):
@@ -155,7 +156,7 @@ def _reset_failed_attempts(user: User, db: Session) -> None:
 
 @router.post("/register", response_model=UserResponse)
 @limiter.limit("5/minute")
-def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db), current_user: User | None = Depends(get_current_user_optional)):
+def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user_optional)):
     existing = db.query(User).filter_by(email=payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Registration failed. Please try again.")

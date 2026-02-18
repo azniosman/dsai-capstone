@@ -1,8 +1,8 @@
 """Audit logging utility for tracking user and system events."""
 
 import logging
+from typing import Any, Optional, Dict
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 def log_audit_event(
     db: Session,
     tenant_id: int,
-    user_id: int | None,
+    user_id: Optional[int],
     action: str,
-    details: dict[str, Any] | None = None,
+    details: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Record an audit event. Logs on failure but does not re-raise, so auth and other callers continue."""
     try:

@@ -1,5 +1,6 @@
 """Multi-role comparison endpoint."""
 
+from typing import Optional, List, Dict, Set
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -19,7 +20,7 @@ class RoleComparisonItem(BaseModel):
     role_id: int
     title: str
     category: str
-    salary_range: str | None
+    salary_range: Optional[str]
     match_score: float
     required_skills: list[str]
     preferred_skills: list[str]

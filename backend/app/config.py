@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from typing import Optional
 from pydantic_settings import BaseSettings
 from pydantic import model_validator
 
@@ -26,7 +27,7 @@ class Settings(BaseSettings):
     postgres_db: str = "capstone"
     
     # Optional override for the entire URL
-    database_url_override: str | None = None
+    database_url_override: Optional[str] = None
 
     @property
     def database_url(self) -> str:
