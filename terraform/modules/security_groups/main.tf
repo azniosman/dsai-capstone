@@ -5,7 +5,7 @@
 
 resource "aws_security_group" "lambda" {
   name        = "${var.project_name}-${var.environment}-lambda-sg"
-  description = "Lambda functions — egress-only to RDS, AWS APIs, internet via NAT"
+  description = "Lambda functions - egress-only to RDS, AWS APIs, internet via NAT"
   vpc_id      = var.vpc_id
 
   egress {
@@ -75,7 +75,7 @@ resource "aws_security_group" "opensearch" {
 
 resource "aws_security_group" "alb" {
   name        = "${var.project_name}-${var.environment}-alb-sg"
-  description = "ALB — HTTP/HTTPS from internet (enterprise ECS path)"
+  description = "ALB - HTTP/HTTPS from internet (enterprise ECS path)"
   vpc_id      = var.vpc_id
 
   ingress {

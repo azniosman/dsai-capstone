@@ -11,3 +11,8 @@ output "bucket_regional_domain_name" {
   description = "Regional domain name used as CloudFront S3 origin"
   value       = aws_s3_bucket.web.bucket_regional_domain_name
 }
+
+output "website_endpoint" {
+  description = "S3 static website endpoint (HTTP; only populated when enable_public_access=true)"
+  value       = var.enable_public_access ? aws_s3_bucket_website_configuration.web[0].website_endpoint : ""
+}

@@ -18,6 +18,11 @@ on:
         required: false
         default: false
         type: boolean
+      enable_cloudfront:
+        description: "Enable CloudFront (requires AWS account verification)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write # needed if you later switch to OIDC
@@ -78,10 +83,11 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region:   ${{ env.AWS_REGION }}
-          TF_VAR_environment:  ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:  ${{ secrets.DB_PASSWORD }}
-          TF_VAR_secret_key:   ${{ secrets.SECRET_KEY }}
+          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
+          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         # If the ECR repo already exists in AWS but not in Terraform state,
         # import it so the subsequent apply becomes a no-op instead of failing
         # with RepositoryAlreadyExistsException. The `|| true` makes this step
@@ -103,10 +109,11 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region:   ${{ env.AWS_REGION }}
-          TF_VAR_environment:  ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:  ${{ secrets.DB_PASSWORD }}
-          TF_VAR_secret_key:   ${{ secrets.SECRET_KEY }}
+          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
+          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: terraform apply -target=module.ecr -auto-approve -input=false
 
       # ── Step 2: Build and push Lambda container image ──────────────────────
@@ -141,24 +148,26 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region:       ${{ env.AWS_REGION }}
-          TF_VAR_environment:      ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}
-          TF_VAR_secret_key:       ${{ secrets.SECRET_KEY }}
-          TF_VAR_gemini_api_key:   ${{ secrets.GEMINI_API_KEY }}
-          TF_VAR_lambda_image_uri: ${{ env.IMAGE_URI }}
+          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
+          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
+          TF_VAR_gemini_api_key:    ${{ secrets.GEMINI_API_KEY }}
+          TF_VAR_lambda_image_uri:  ${{ env.IMAGE_URI }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: terraform plan -out=tfplan -input=false
 
       - name: Terraform Apply
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region:       ${{ env.AWS_REGION }}
-          TF_VAR_environment:      ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}
-          TF_VAR_secret_key:       ${{ secrets.SECRET_KEY }}
-          TF_VAR_gemini_api_key:   ${{ secrets.GEMINI_API_KEY }}
-          TF_VAR_lambda_image_uri: ${{ env.IMAGE_URI }}
+          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
+          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
+          TF_VAR_gemini_api_key:    ${{ secrets.GEMINI_API_KEY }}
+          TF_VAR_lambda_image_uri:  ${{ env.IMAGE_URI }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: terraform apply -auto-approve tfplan
 
       # ── Capture Terraform outputs ─────────────────────────────────────────
@@ -166,10 +175,11 @@ jobs:
         id: tf
         working-directory: ./terraform
         run: |
-          echo "api_url=$(terraform output -raw api_endpoint)"     >> $GITHUB_OUTPUT
-          echo "s3_bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
+          echo "api_url=$(terraform output -raw api_endpoint)"        >> $GITHUB_OUTPUT
+          echo "s3_bucket=$(terraform output -raw s3_bucket_name)"    >> $GITHUB_OUTPUT
           echo "cf_domain=$(terraform output -raw cloudfront_domain)" >> $GITHUB_OUTPUT
-          echo "cf_id=$(terraform output -raw cloudfront_id)"      >> $GITHUB_OUTPUT
+          echo "cf_id=$(terraform output -raw cloudfront_id)"         >> $GITHUB_OUTPUT
+          echo "frontend_url=$(terraform output -raw frontend_url)"   >> $GITHUB_OUTPUT
 
       # ── Step 4: Build and deploy frontend ─────────────────────────────────
       - name: Setup Node.js
@@ -186,8 +196,8 @@ jobs:
       - name: Build frontend (Next.js static export)
         working-directory: ./frontend
         env:
-          NEXT_PUBLIC_API_URL:  ${{ steps.tf.outputs.api_url }}
-          NEXT_PUBLIC_APP_URL:  https://${{ steps.tf.outputs.cf_domain }}
+          NEXT_PUBLIC_API_URL: ${{ steps.tf.outputs.api_url }}
+          NEXT_PUBLIC_APP_URL: ${{ steps.tf.outputs.frontend_url }}
         run: npm run build
 
       - name: Sync frontend to S3
@@ -206,8 +216,9 @@ jobs:
             --include "*.html" \
             --region "${{ env.AWS_REGION }}"
 
-      # ── Step 5: Invalidate CloudFront cache ───────────────────────────────
+      # ── Step 5: Invalidate CloudFront cache (skipped when CF is disabled) ─
       - name: Invalidate CloudFront
+        if: ${{ steps.tf.outputs.cf_id != '' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id "${{ steps.tf.outputs.cf_id }}" \
@@ -220,7 +231,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend | https://${{ steps.tf.outputs.cf_domain }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ steps.tf.outputs.frontend_url }} |" >> $GITHUB_STEP_SUMMARY
           echo "| API      | ${{ steps.tf.outputs.api_url }} |" >> $GITHUB_STEP_SUMMARY
           echo "| S3 Bucket| ${{ steps.tf.outputs.s3_bucket }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Image    | ${{ env.IMAGE_URI }} |" >> $GITHUB_STEP_SUMMARY

@@ -63,6 +63,12 @@ variable "enable_opensearch" {
   default     = false
 }
 
+variable "enable_cloudfront" {
+  description = "Enable CloudFront CDN. Requires AWS account verification for new accounts. When false, S3 static website hosting is used instead (HTTP only)."
+  type        = bool
+  default     = false
+}
+
 variable "lambda_memory_mb" {
   description = "Lambda memory in MB (higher = faster cold start for ML models)"
   type        = number

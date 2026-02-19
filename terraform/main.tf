@@ -107,16 +107,18 @@ module "api_gateway" {
   lambda_function_name = module.lambda_backend.lambda_function_name
 }
 
-# 8. S3 Frontend — private bucket (CloudFront OAC serves files, not public S3)
+# 8. S3 Frontend — private if CloudFront is enabled; public website if not
 module "s3_frontend" {
   source = "./modules/s3_frontend"
 
-  project_name = var.project_name
-  environment  = var.environment
+  project_name         = var.project_name
+  environment          = var.environment
+  enable_public_access = !var.enable_cloudfront
 }
 
-# 9. CloudFront — HTTPS distribution with OAC for S3 and API Gateway passthrough
+# 9. CloudFront — optional (requires AWS account verification for new accounts)
 module "cloudfront" {
+  count  = var.enable_cloudfront ? 1 : 0
   source = "./modules/cloudfront"
 
   project_name          = var.project_name

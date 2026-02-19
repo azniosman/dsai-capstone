@@ -9,14 +9,14 @@ resource "aws_s3_bucket" "web" {
   tags = { Name = "${var.project_name}-${var.environment}-web" }
 }
 
-# Block all public access — CloudFront OAC serves files via signed requests
 resource "aws_s3_bucket_public_access_block" "web" {
   bucket = aws_s3_bucket.web.id
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  # Lock down when CloudFront is serving the bucket; open when using S3 website
+  block_public_acls       = !var.enable_public_access
+  block_public_policy     = !var.enable_public_access
+  ignore_public_acls      = !var.enable_public_access
+  restrict_public_buckets = !var.enable_public_access
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "web" {
@@ -29,5 +29,33 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "web" {
   }
 }
 
-# Note: The bucket policy granting CloudFront OAC access is created
-# in the cloudfront module (which has the OAC ARN needed for the condition).
+# S3 static website hosting — used when CloudFront is disabled
+resource "aws_s3_bucket_website_configuration" "web" {
+  count  = var.enable_public_access ? 1 : 0
+  bucket = aws_s3_bucket.web.id
+
+  index_document { suffix = "index.html" }
+  error_document { key    = "index.html" } # SPA 404 fallback
+}
+
+# Public-read bucket policy — only created when CloudFront is disabled
+resource "aws_s3_bucket_policy" "public_read" {
+  count  = var.enable_public_access ? 1 : 0
+  bucket = aws_s3_bucket.web.id
+
+  depends_on = [aws_s3_bucket_public_access_block.web]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "PublicReadGetObject"
+      Effect    = "Allow"
+      Principal = "*"
+      Action    = "s3:GetObject"
+      Resource  = "${aws_s3_bucket.web.arn}/*"
+    }]
+  })
+}
+
+# Note: When CloudFront IS enabled, the bucket policy granting CloudFront OAC
+# access is created in the cloudfront module (needs the OAC ARN).

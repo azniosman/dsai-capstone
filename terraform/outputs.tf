@@ -39,18 +39,18 @@ output "s3_bucket_name" {
 }
 
 output "cloudfront_domain" {
-  description = "CloudFront domain name"
-  value       = module.cloudfront.cloudfront_domain_name
+  description = "CloudFront domain (or S3 website endpoint when CloudFront is disabled)"
+  value       = var.enable_cloudfront ? module.cloudfront[0].cloudfront_domain_name : module.s3_frontend.website_endpoint
 }
 
 output "cloudfront_id" {
-  description = "CloudFront distribution ID (needed for cache invalidation)"
-  value       = module.cloudfront.cloudfront_id
+  description = "CloudFront distribution ID (empty when CloudFront is disabled)"
+  value       = var.enable_cloudfront ? module.cloudfront[0].cloudfront_id : ""
 }
 
 output "frontend_url" {
-  description = "Frontend application URL (HTTPS via CloudFront)"
-  value       = "https://${module.cloudfront.cloudfront_domain_name}"
+  description = "Frontend application URL"
+  value       = var.enable_cloudfront ? "https://${module.cloudfront[0].cloudfront_domain_name}" : "http://${module.s3_frontend.website_endpoint}"
 }
 
 output "opensearch_endpoint" {
@@ -61,7 +61,7 @@ output "opensearch_endpoint" {
 output "deploy_summary" {
   description = "Quick deployment summary"
   value = {
-    frontend = "https://${module.cloudfront.cloudfront_domain_name}"
+    frontend = var.enable_cloudfront ? "https://${module.cloudfront[0].cloudfront_domain_name}" : "http://${module.s3_frontend.website_endpoint}"
     api      = module.api_gateway.api_endpoint
     ecr      = module.ecr.backend_repo_url
     s3       = module.s3_frontend.bucket_id
