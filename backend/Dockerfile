@@ -10,6 +10,17 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 
+# Install spaCy
+RUN pip install --no-cache-dir spacy==3.7.0
+
+# Install English model explicitly
+RUN pip install --no-cache-dir https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
+
+# Verify spaCy can load the model
+RUN python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
+
+
+
 # Pre-download the Sentence Transformer model so it's cached in the image
 # (ECS tasks in private subnets cannot download at runtime)
 ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers

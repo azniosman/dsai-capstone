@@ -24,8 +24,13 @@ COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
 RUN yum install -y gcc gcc-c++ python3-devel && \
     pip install --upgrade pip && \
     pip install --no-cache-dir --prefer-binary -r ${LAMBDA_TASK_ROOT}/requirements.txt && \
-    yum remove -y gcc gcc-c++ python3-devel && \
     yum clean all
+
+# Install spaCy and model explicitly (after cleanup to keep image small, though requirements.txt installs deps first)
+RUN pip install --no-cache-dir spacy==3.7.0 && \
+    pip install --no-cache-dir https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl && \
+    python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
+
 
 # ── Pre-download NLP models (Lambda runs in private subnet — no internet) ────
 
