@@ -14,8 +14,9 @@ ENV HF_HUB_OFFLINE=1
 RUN mkdir -p /opt/models/sentence-transformers /opt/models/huggingface
 
 # ===== Install system dependencies =====
+# cmake: needed for sentencepiece source build fallback
 # git/curl: needed for some pip installs or healthchecks
-RUN yum install -y git curl && \
+RUN yum install -y git curl cmake && \
     yum clean all
 
 # ===== Install Python dependencies =====
@@ -35,7 +36,8 @@ RUN pip install --no-cache-dir "spacy==3.7.0" && \
     python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
 
 # 3. AI Stack: Install Sentence Transformers & fix HuggingFace compatibility
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --prefer-binary \
+    "sentencepiece" \
     "sentence-transformers==2.2.2" \
     "huggingface-hub<0.25.0"
 
