@@ -186,7 +186,7 @@ export default function AccountSettings() {
               <p className="text-sm text-muted-foreground mb-4">
                 Permanently delete your account and all associated data. This action cannot be undone.
               </p>
-              <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+              <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
                 Delete Account
               </Button>
             </CardContent>

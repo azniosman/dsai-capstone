@@ -68,35 +68,35 @@ const QUICK_ACTIONS = [
     desc: "Gap analysis",
     icon: BarChart3,
     href: "/skill-gap",
-    color: "text-amber-500",
+    color: "text-primary/70",
   },
   {
     label: "Career Coach",
     desc: "AI guidance",
     icon: MessageSquare,
     href: "/chat",
-    color: "text-emerald-500",
+    color: "text-primary",
   },
   {
     label: "Interview Prep",
     desc: "Mock questions",
     icon: HelpCircle,
     href: "/interview",
-    color: "text-purple-400",
+    color: "text-primary/80",
   },
   {
     label: "Courses",
     desc: "SCTP pathways",
     icon: GraduationCap,
     href: "/courses",
-    color: "text-pink-400",
+    color: "text-accent-foreground",
   },
   {
     label: "Market Trends",
     desc: "Live market data",
     icon: TrendingUp,
     href: "/market",
-    color: "text-cyan-400",
+    color: "text-primary/60",
   },
 ];
 
@@ -106,7 +106,7 @@ function ScoreBar({ score }: { score: number }) {
     score >= 70
       ? "bg-primary"
       : score >= 40
-        ? "bg-amber-500"
+        ? "bg-amber-500 dark:bg-amber-400"
         : "bg-destructive";
   return (
     <div className="score-bar-track w-20">
@@ -232,17 +232,18 @@ export default function Dashboard() {
   };
 
   const readiness = summary ? Math.round(summary.career_readiness) : 0;
+  // Readiness uses semantic status utilities (defined in globals.css)
   const readinessColor =
     readiness >= 70
-      ? "text-emerald-500 dark:text-emerald-400"
+      ? "status-success"
       : readiness >= 40
-        ? "text-amber-500 dark:text-amber-400"
-        : "text-destructive";
+        ? "status-warning"
+        : "status-error";
   const readinessFill =
     readiness >= 70
-      ? "bg-emerald-500"
+      ? "bg-emerald-500 dark:bg-emerald-400"
       : readiness >= 40
-        ? "bg-amber-500"
+        ? "bg-amber-500 dark:bg-amber-400"
         : "bg-destructive";
 
   const firstName = summary?.name.split(" ")[0] ?? "";
@@ -334,9 +335,7 @@ export default function Dashboard() {
               <Card variant="metric" className="hover-lift h-full">
                 <CardContent className="p-5">
                   <p className="section-label mb-3">Gaps Identified</p>
-                  <div
-                    className={`kpi-number text-amber-500 dark:text-amber-400`}
-                  >
+                  <div className="kpi-number status-warning">
                     {summary.gaps_identified}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
@@ -384,7 +383,7 @@ export default function Dashboard() {
           <p className="section-label">AI Assistant</p>
           {engine && (
             <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1.5 opacity-70">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="live-dot !w-1.5 !h-1.5" />
               {engine}
             </div>
           )}

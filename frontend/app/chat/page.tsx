@@ -98,7 +98,7 @@ export default function CareerChat() {
         </div>
         {engine && (
           <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1.5 opacity-70">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="live-dot !w-1.5 !h-1.5" />
             {engine}
           </div>
         )}
@@ -130,7 +130,7 @@ export default function CareerChat() {
               </div>
               {msg.role === "user" && (
                 <Avatar className="h-7 w-7 shrink-0">
-                  <AvatarFallback className="bg-emerald-600 text-white rounded">
+                  <AvatarFallback className="bg-secondary text-secondary-foreground rounded">
                     <User className="h-3.5 w-3.5" />
                   </AvatarFallback>
                 </Avatar>

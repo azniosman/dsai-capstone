@@ -17,20 +17,23 @@ import SkeletonCard from "@/components/skeleton-card";
 import api from "@/lib/api-client";
 import { extractApiError } from "@/lib/utils";
 
+// Gap severity colors — semantic palette, consistent with status utilities
 const GAP_COLORS: Record<string, string> = {
-  none: "#28c76f",
-  low: "#00BFFF",
-  medium: "#f9a825",
-  high: "#e84848",
+  none:   "hsl(145 60% 36%)",  // green — no gap
+  low:    "hsl(220 80% 55%)",  // blue  — small gap
+  medium: "hsl(40 90% 45%)",   // amber — medium gap
+  high:   "hsl(5 78% 50%)",    // red   — critical gap
 };
 
+// Recharts tooltip style — matches card bg/border in light mode
 const CHART_STYLE = {
   contentStyle: {
-    backgroundColor: "#ffffff",
-    border: "1px solid #d9d4cc",
-    borderRadius: "6px",
+    backgroundColor: "oklch(0.9699 0.0013 106.4238)",
+    border: "1px solid oklch(0.8687 0.0043 56.366)",
+    borderRadius: "12px",
     fontSize: "12px",
-    color: "#1a1a1a",
+    color: "oklch(0.2795 0.0368 260.031)",
+    boxShadow: "2px 2px 10px 4px hsl(240 4% 60% / 0.18)",
   },
 };
 
