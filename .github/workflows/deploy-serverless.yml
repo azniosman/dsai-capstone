@@ -1,16 +1,10 @@
 name: Deploy Serverless Stack
 
-# Trigger on push to main or manual dispatch with environment selection.
-# Uses OIDC (no static AWS credentials stored in GitHub Secrets).
+# Manual dispatch only — prevents CI failures on every push when AWS
+# credentials haven't been provisioned yet.
+# Run from: GitHub → Actions → Deploy Serverless Stack → Run workflow
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "terraform/**"
-      - "data/seed/**"
   workflow_dispatch:
     inputs:
       environment:
@@ -26,7 +20,7 @@ on:
         type: boolean
 
 permissions:
-  id-token: write # Required for OIDC JWT
+  id-token: write # needed if you later switch to OIDC
   contents: read
 
 env:
@@ -37,24 +31,37 @@ env:
 
 jobs:
   deploy:
-    name: Build & Deploy (${{ github.event.inputs.environment || 'dev' }})
+    name: Build & Deploy (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
+    environment: ${{ github.event.inputs.environment }}
 
     env:
-      ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+      ENVIRONMENT: ${{ github.event.inputs.environment }}
 
     steps:
       # ── Checkout ────────────────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── AWS Auth (OIDC — no static credentials) ────────────────────────────
+      # ── AWS Auth ────────────────────────────────────────────────────────────
+      # Option A (current): static IAM credentials.
+      #   Set these in GitHub → Settings → Environments → dev → Secrets:
+      #     AWS_ACCESS_KEY_ID
+      #     AWS_SECRET_ACCESS_KEY
+      #
+      # Option B (recommended for production): OIDC federation.
+      #   Replace the step below with:
+      #     uses: aws-actions/configure-aws-credentials@v4
+      #     with:
+      #       role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+      #       aws-region: ${{ env.AWS_REGION }}
+      #   Then create an IAM OIDC provider + role with a GitHub trust policy.
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
 
       # ── Terraform — Init ───────────────────────────────────────────────────
       - name: Setup Terraform
@@ -71,10 +78,10 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region: ${{ env.AWS_REGION }}
-          TF_VAR_environment: ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_aws_region:   ${{ env.AWS_REGION }}
+          TF_VAR_environment:  ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:  ${{ secrets.DB_PASSWORD }}
+          TF_VAR_secret_key:   ${{ secrets.SECRET_KEY }}
         run: terraform apply -target=module.ecr -auto-approve -input=false
 
       # ── Step 2: Build and push Lambda container image ──────────────────────
@@ -87,7 +94,6 @@ jobs:
 
       - name: Build and push Lambda image
         env:
-          ACCOUNT_ID: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
@@ -110,11 +116,11 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region: ${{ env.AWS_REGION }}
-          TF_VAR_environment: ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-          TF_VAR_gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          TF_VAR_aws_region:       ${{ env.AWS_REGION }}
+          TF_VAR_environment:      ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}
+          TF_VAR_secret_key:       ${{ secrets.SECRET_KEY }}
+          TF_VAR_gemini_api_key:   ${{ secrets.GEMINI_API_KEY }}
           TF_VAR_lambda_image_uri: ${{ env.IMAGE_URI }}
         run: terraform plan -out=tfplan -input=false
 
@@ -122,11 +128,11 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region: ${{ env.AWS_REGION }}
-          TF_VAR_environment: ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-          TF_VAR_gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          TF_VAR_aws_region:       ${{ env.AWS_REGION }}
+          TF_VAR_environment:      ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}
+          TF_VAR_secret_key:       ${{ secrets.SECRET_KEY }}
+          TF_VAR_gemini_api_key:   ${{ secrets.GEMINI_API_KEY }}
           TF_VAR_lambda_image_uri: ${{ env.IMAGE_URI }}
         run: terraform apply -auto-approve tfplan
 
@@ -135,10 +141,10 @@ jobs:
         id: tf
         working-directory: ./terraform
         run: |
-          echo "api_url=$(terraform output -raw api_endpoint)" >> $GITHUB_OUTPUT
+          echo "api_url=$(terraform output -raw api_endpoint)"     >> $GITHUB_OUTPUT
           echo "s3_bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
           echo "cf_domain=$(terraform output -raw cloudfront_domain)" >> $GITHUB_OUTPUT
-          echo "cf_id=$(terraform output -raw cloudfront_id)" >> $GITHUB_OUTPUT
+          echo "cf_id=$(terraform output -raw cloudfront_id)"      >> $GITHUB_OUTPUT
 
       # ── Step 4: Build and deploy frontend ─────────────────────────────────
       - name: Setup Node.js
@@ -155,20 +161,20 @@ jobs:
       - name: Build frontend (Next.js static export)
         working-directory: ./frontend
         env:
-          NEXT_PUBLIC_API_URL: ${{ steps.tf.outputs.api_url }}
-          NEXT_PUBLIC_APP_URL: https://${{ steps.tf.outputs.cf_domain }}
+          NEXT_PUBLIC_API_URL:  ${{ steps.tf.outputs.api_url }}
+          NEXT_PUBLIC_APP_URL:  https://${{ steps.tf.outputs.cf_domain }}
         run: npm run build
 
       - name: Sync frontend to S3
         run: |
-          # Upload immutable assets with long cache TTL
+          # Immutable assets — long-lived cache
           aws s3 sync frontend/out/ "s3://${{ steps.tf.outputs.s3_bucket }}/" \
             --delete \
             --cache-control "public, max-age=31536000, immutable" \
             --exclude "*.html" \
             --region "${{ env.AWS_REGION }}"
 
-          # Upload HTML with no-cache so stale SPA shells are never served
+          # HTML files — always revalidate
           aws s3 sync frontend/out/ "s3://${{ steps.tf.outputs.s3_bucket }}/" \
             --delete \
             --cache-control "no-cache, no-store, must-revalidate" \
@@ -185,11 +191,11 @@ jobs:
       # ── Summary ───────────────────────────────────────────────────────────
       - name: Deployment summary
         run: |
-          echo "## ✓ Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Frontend | https://${{ steps.tf.outputs.cf_domain }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| API | ${{ steps.tf.outputs.api_url }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| S3 Bucket | ${{ steps.tf.outputs.s3_bucket }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | ${{ env.IMAGE_URI }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API      | ${{ steps.tf.outputs.api_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| S3 Bucket| ${{ steps.tf.outputs.s3_bucket }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image    | ${{ env.IMAGE_URI }} |" >> $GITHUB_STEP_SUMMARY
