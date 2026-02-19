@@ -10,7 +10,7 @@ resource "aws_cloudwatch_log_group" "api_gw" {
 resource "aws_apigatewayv2_api" "http" {
   name          = "${var.project_name}-${var.environment}-api"
   protocol_type = "HTTP"
-  description   = "SkillBridge API Gateway — HTTP API v2"
+  description   = "SkillBridge API Gateway - HTTP API v2"
 
   cors_configuration {
     allow_credentials = false

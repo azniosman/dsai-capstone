@@ -24,7 +24,7 @@ resource "aws_security_group" "lambda" {
 
 resource "aws_security_group" "rds" {
   name        = "${var.project_name}-${var.environment}-rds-sg"
-  description = "RDS PostgreSQL — inbound only from Lambda SG"
+  description = "RDS PostgreSQL - inbound only from Lambda SG"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -50,7 +50,7 @@ resource "aws_security_group" "rds" {
 
 resource "aws_security_group" "opensearch" {
   name        = "${var.project_name}-${var.environment}-opensearch-sg"
-  description = "OpenSearch — HTTPS inbound from Lambda SG only"
+  description = "OpenSearch - HTTPS inbound from Lambda SG only"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -108,7 +108,7 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "ecs_tasks" {
   name        = "${var.project_name}-${var.environment}-ecs-tasks-sg"
-  description = "ECS Fargate tasks — inbound from ALB (enterprise path)"
+  description = "ECS Fargate tasks - inbound from ALB (enterprise path)"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -133,7 +133,7 @@ resource "aws_security_group" "ecs_tasks" {
 
 resource "aws_security_group" "efs" {
   name        = "${var.project_name}-${var.environment}-efs-sg"
-  description = "EFS — NFS from ECS tasks (enterprise path)"
+  description = "EFS - NFS from ECS tasks (enterprise path)"
   vpc_id      = var.vpc_id
 
   ingress {

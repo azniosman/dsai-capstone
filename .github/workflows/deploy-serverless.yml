@@ -49,24 +49,37 @@ jobs:
         uses: actions/checkout@v4
 
       # ── AWS Auth ────────────────────────────────────────────────────────────
-      # Option A (current): static IAM credentials.
-      #   Set these in GitHub → Settings → Environments → dev → Secrets:
-      #     AWS_ACCESS_KEY_ID
-      #     AWS_SECRET_ACCESS_KEY
-      #
-      # Option B (recommended for production): OIDC federation.
-      #   Replace the step below with:
-      #     uses: aws-actions/configure-aws-credentials@v4
-      #     with:
-      #       role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-      #       aws-region: ${{ env.AWS_REGION }}
-      #   Then create an IAM OIDC provider + role with a GitHub trust policy.
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ env.AWS_REGION }}
+
+      # ── Terraform state backend (S3) ───────────────────────────────────────
+      # Creates the state bucket once; subsequent runs are no-ops.
+      - name: Bootstrap Terraform state bucket
+        run: |
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET="${PROJECT_NAME}-tfstate-${ACCOUNT}"
+          echo "TF_BACKEND_BUCKET=${BUCKET}" >> $GITHUB_ENV
+
+          # Create bucket (idempotent — BucketAlreadyOwnedByYou is not an error)
+          aws s3api create-bucket \
+            --bucket "${BUCKET}" \
+            --region "${AWS_REGION}" 2>&1 | grep -v "BucketAlreadyOwnedByYou" || true
+
+          # Enable versioning so we can recover from bad state
+          aws s3api put-bucket-versioning \
+            --bucket "${BUCKET}" \
+            --versioning-configuration Status=Enabled 2>/dev/null || true
+
+          # Block all public access on the state bucket
+          aws s3api put-public-access-block \
+            --bucket "${BUCKET}" \
+            --public-access-block-configuration \
+              "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" \
+            2>/dev/null || true
 
       # ── Terraform — Init ───────────────────────────────────────────────────
       - name: Setup Terraform
@@ -76,10 +89,15 @@ jobs:
 
       - name: Terraform Init
         working-directory: ./terraform
-        run: terraform init -upgrade -input=false
+        run: |
+          terraform init -upgrade -input=false \
+            -backend-config="bucket=${TF_BACKEND_BUCKET}" \
+            -backend-config="key=${ENVIRONMENT}/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true"
 
       # ── Step 1: Create ECR (targeted apply, idempotent) ────────────────────
-      - name: Import existing ECR into Terraform state
+      - name: Import existing resources into Terraform state
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
@@ -88,22 +106,55 @@ jobs:
           TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
           TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
           TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        # If the ECR repo already exists in AWS but not in Terraform state,
-        # import it so the subsequent apply becomes a no-op instead of failing
-        # with RepositoryAlreadyExistsException. The `|| true` makes this step
-        # succeed whether or not the resource exists / is already imported.
+        # Import any resources that already exist in AWS but not in state.
+        # Each import uses `|| true` so the step succeeds even if the resource
+        # doesn't exist in AWS or is already in state.
         run: |
-          terraform import \
-            -input=false \
+          # ECR repository & lifecycle policy
+          terraform import -input=false \
             module.ecr.aws_ecr_repository.backend \
-            "${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-backend" \
-          2>&1 | grep -v "^$" || true
+            "${PROJECT_NAME}-${ENVIRONMENT}-backend" \
+            2>&1 | grep -v "^$" || true
 
-          terraform import \
-            -input=false \
+          terraform import -input=false \
             module.ecr.aws_ecr_lifecycle_policy.backend \
-            "${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-backend" \
-          2>&1 | grep -v "^$" || true
+            "${PROJECT_NAME}-${ENVIRONMENT}-backend" \
+            2>&1 | grep -v "^$" || true
+
+          # IAM role
+          terraform import -input=false \
+            module.iam.aws_iam_role.lambda_exec \
+            "${PROJECT_NAME}-${ENVIRONMENT}-lambda-exec" \
+            2>&1 | grep -v "^$" || true
+
+          # CloudWatch Log Group for API Gateway
+          terraform import -input=false \
+            module.api_gateway.aws_cloudwatch_log_group.api_gw \
+            "/aws/apigateway/${PROJECT_NAME}-${ENVIRONMENT}" \
+            2>&1 | grep -v "^$" || true
+
+          # RDS DB Subnet Group
+          terraform import -input=false \
+            module.rds.aws_db_subnet_group.main \
+            "${PROJECT_NAME}-${ENVIRONMENT}-db-subnet" \
+            2>&1 | grep -v "^$" || true
+
+          # RDS DB Parameter Group
+          terraform import -input=false \
+            module.rds.aws_db_parameter_group.postgres16 \
+            "${PROJECT_NAME}-${ENVIRONMENT}-pg16" \
+            2>&1 | grep -v "^$" || true
+
+          # Secrets Manager Secret (import by ARN)
+          SECRET_ARN=$(aws secretsmanager describe-secret \
+            --secret-id "${PROJECT_NAME}/${ENVIRONMENT}/db-credentials" \
+            --query ARN --output text 2>/dev/null || true)
+          if [ -n "${SECRET_ARN}" ] && [ "${SECRET_ARN}" != "None" ]; then
+            terraform import -input=false \
+              module.rds.aws_secretsmanager_secret.db_credentials \
+              "${SECRET_ARN}" \
+              2>&1 | grep -v "^$" || true
+          fi
 
       - name: Create ECR repository
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
