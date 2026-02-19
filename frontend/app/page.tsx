@@ -3,18 +3,45 @@
 import { useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight, FileText, Briefcase, GraduationCap,
-  TrendingUp, Command, ArrowDown, BarChart3, Zap
+  ArrowRight,
+  FileText,
+  Briefcase,
+  GraduationCap,
+  TrendingUp,
+  Command,
+  ArrowDown,
+  BarChart3,
+  Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import ProfileWizard from "@/components/profile/profile-wizard";
 
 const FEATURES = [
-  { icon: <FileText className="h-5 w-5" />, label: "Resume Parsing", desc: "Automated extraction of skills and experience", stat: "< 5s" },
-  { icon: <Briefcase className="h-5 w-5" />, label: "50+ Tech Roles", desc: "Deep coverage of Singapore's tech landscape", stat: "50+" },
-  { icon: <GraduationCap className="h-5 w-5" />, label: "SCTP Courses", desc: "SkillsFuture-eligible upskilling paths", stat: "100%" },
-  { icon: <TrendingUp className="h-5 w-5" />, label: "Market Intelligence", desc: "Real-time salary and demand data", stat: "Live" },
+  {
+    icon: <FileText className="h-5 w-5" />,
+    label: "Resume Parsing",
+    desc: "Automated extraction of skills and experience",
+    stat: "< 5s",
+  },
+  {
+    icon: <Briefcase className="h-5 w-5" />,
+    label: "50+ Tech Roles",
+    desc: "Deep coverage of Singapore's tech landscape",
+    stat: "50+",
+  },
+  {
+    icon: <GraduationCap className="h-5 w-5" />,
+    label: "SCTP Courses",
+    desc: "SkillsFuture-eligible upskilling paths",
+    stat: "100%",
+  },
+  {
+    icon: <TrendingUp className="h-5 w-5" />,
+    label: "Market Intelligence",
+    desc: "Real-time salary and demand data",
+    stat: "Live",
+  },
 ];
 
 const STATS = [
@@ -41,7 +68,6 @@ export default function LandingPage() {
 
   return (
     <div className="bg-background min-h-screen">
-
       {/* ── Navbar ── */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="container mx-auto px-6 h-14 flex items-center justify-between">
@@ -50,10 +76,17 @@ export default function LandingPage() {
               <Command className="h-4 w-4" />
             </div>
             <div>
-              <span className="font-extrabold text-sm tracking-tight">SkillBridge AI</span>
+              <span className="font-extrabold text-sm tracking-tight">
+                SkillBridge
+              </span>
               <div className="flex items-center gap-1.5">
                 <span className="live-dot" />
-                <span className="section-label text-primary" style={{ fontSize: "0.5rem" }}>Live</span>
+                <span
+                  className="section-label text-primary"
+                  style={{ fontSize: "0.5rem" }}
+                >
+                  Live
+                </span>
               </div>
             </div>
           </div>
@@ -62,7 +95,9 @@ export default function LandingPage() {
               Get Started
             </Button>
             <Button size="sm" asChild>
-              <a href="/login">Sign In <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></a>
+              <a href="/login">
+                Sign In <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </a>
             </Button>
           </div>
         </div>
@@ -80,7 +115,8 @@ export default function LandingPage() {
         <div
           className="absolute inset-x-0 top-0 h-64 pointer-events-none"
           style={{
-            background: "radial-gradient(ellipse 60% 40% at 50% 0%, hsl(190 100% 50% / 0.06), transparent)",
+            background:
+              "radial-gradient(ellipse 60% 40% at 50% 0%, hsl(190 100% 50% / 0.06), transparent)",
           }}
         />
 
@@ -96,11 +132,14 @@ export default function LandingPage() {
             </div>
 
             <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6 leading-[1.1]">
-              Discover Your Next<br />
+              Discover Your Next
+              <br />
               <span className="text-primary">Tech Career</span>
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed mb-10 max-w-2xl mx-auto">
-              AI-powered job matching, skill gap analysis, and personalised upskilling roadmaps — built for Singapore&apos;s tech professionals.
+              AI-powered job matching, skill gap analysis, and personalised
+              upskilling roadmaps — built for Singapore&apos;s tech
+              professionals.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-3">
               <Button size="xl" onClick={scrollToForm}>
@@ -115,10 +154,17 @@ export default function LandingPage() {
           {/* Stats Row — terminal-style data blocks */}
           <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto border-t border-border pt-12">
             {STATS.map((s) => (
-              <div key={s.label} className="text-center border border-border rounded bg-card p-4">
+              <div
+                key={s.label}
+                className="text-center border border-border rounded bg-card p-4"
+              >
                 <div className="kpi-number-accent text-3xl mb-1">{s.value}</div>
-                <div className="text-xs font-semibold text-foreground">{s.label}</div>
-                <div className="text-[0.65rem] text-muted-foreground mt-0.5">{s.sub}</div>
+                <div className="text-xs font-semibold text-foreground">
+                  {s.label}
+                </div>
+                <div className="text-[0.65rem] text-muted-foreground mt-0.5">
+                  {s.sub}
+                </div>
               </div>
             ))}
           </div>
@@ -130,7 +176,9 @@ export default function LandingPage() {
         <div className="container mx-auto px-6 max-w-5xl">
           <div className="text-center mb-12">
             <p className="section-label mb-3">Platform Capabilities</p>
-            <h2 className="text-3xl font-extrabold tracking-tight">Everything you need to level up</h2>
+            <h2 className="text-3xl font-extrabold tracking-tight">
+              Everything you need to level up
+            </h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {FEATURES.map((f) => (
@@ -145,10 +193,14 @@ export default function LandingPage() {
                   <div className="h-10 w-10 rounded bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary/20 transition-colors">
                     {f.icon}
                   </div>
-                  <Badge variant="data" className="text-[0.6rem]">{f.stat}</Badge>
+                  <Badge variant="data" className="text-[0.6rem]">
+                    {f.stat}
+                  </Badge>
                 </div>
                 <h3 className="font-bold text-sm mb-1.5">{f.label}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {f.desc}
+                </p>
               </div>
             ))}
           </div>
@@ -159,13 +211,13 @@ export default function LandingPage() {
       <section className="py-16 border-b border-border bg-card/30">
         <div className="container mx-auto px-6 max-w-5xl">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
             <div className="border border-border rounded p-6 bg-card">
               <BarChart3 className="h-6 w-6 text-primary mb-4" />
               <div className="text-2xl font-extrabold data-num mb-1">87%</div>
               <p className="text-sm font-semibold mb-1">Accuracy Rate</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Our hybrid AI scores skills with 87% alignment to actual recruiter shortlists.
+                Our hybrid AI scores skills with 87% alignment to actual
+                recruiter shortlists.
               </p>
             </div>
 
@@ -174,19 +226,22 @@ export default function LandingPage() {
               <div className="text-2xl font-extrabold data-num mb-1">3 min</div>
               <p className="text-sm font-semibold mb-1">Profile to Results</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Complete a short profile and get your personalised roadmap in under 3 minutes.
+                Complete a short profile and get your personalised roadmap in
+                under 3 minutes.
               </p>
             </div>
 
             <div className="border border-border rounded p-6 bg-card">
               <GraduationCap className="h-6 w-6 text-primary mb-4" />
               <div className="text-2xl font-extrabold data-num mb-1">$0</div>
-              <p className="text-sm font-semibold mb-1">SkillsFuture Eligible</p>
+              <p className="text-sm font-semibold mb-1">
+                SkillsFuture Eligible
+              </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                All recommended SCTP courses qualify for full SkillsFuture subsidies.
+                All recommended SCTP courses qualify for full SkillsFuture
+                subsidies.
               </p>
             </div>
-
           </div>
         </div>
       </section>
@@ -196,7 +251,9 @@ export default function LandingPage() {
         <div className="container mx-auto px-6 max-w-4xl">
           <div className="text-center mb-12">
             <p className="section-label mb-3">Get Started</p>
-            <h2 className="text-3xl font-extrabold tracking-tight">Build your career profile</h2>
+            <h2 className="text-3xl font-extrabold tracking-tight">
+              Build your career profile
+            </h2>
             <p className="text-muted-foreground mt-3 text-sm">
               Answer a few questions to unlock your personalised roadmap.
             </p>
@@ -212,18 +269,21 @@ export default function LandingPage() {
             <div className="h-6 w-6 rounded bg-primary flex items-center justify-center text-primary-foreground">
               <Command className="h-3.5 w-3.5" />
             </div>
-            <span className="text-sm font-bold tracking-tight">SkillBridge AI</span>
+            <span className="text-sm font-bold tracking-tight">
+              SkillBridge
+            </span>
           </div>
           <p className="text-xs text-muted-foreground text-center">
             Built for Singapore&apos;s SCTP learners and career-switchers.
           </p>
           <div className="flex items-center gap-1.5">
             <span className="live-dot" />
-            <span className="text-xs text-muted-foreground">Systems operational</span>
+            <span className="text-xs text-muted-foreground">
+              Systems operational
+            </span>
           </div>
         </div>
       </footer>
-
     </div>
   );
 }

@@ -29,6 +29,17 @@ def warmup_model():
 
 
 def encode_texts(texts: list[str]) -> np.ndarray:
+    # 1. Try SageMaker Serverless if configured
+    if hasattr(settings, 'sagemaker_embedding_endpoint') and settings.sagemaker_embedding_endpoint:
+        try:
+            from app.services.sagemaker_service import sagemaker_service
+            embeddings = sagemaker_service.get_embeddings(texts)
+            if embeddings:
+                return np.array(embeddings)
+        except Exception as e:
+            logger.warning(f"SageMaker embedding failed, falling back to local: {e}")
+
+    # 2. Fallback to local SentenceTransformer
     model = get_model()
     return model.encode(texts, normalize_embeddings=True)
 

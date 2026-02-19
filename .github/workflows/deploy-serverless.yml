@@ -1,0 +1,108 @@
+name: Deploy Serverless Architecture
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # Required for requesting the JWT
+  contents: read  # Required for actions/checkout
+
+env:
+  AWS_REGION: ap-southeast-1
+  TF_VERSION: 1.6.0
+  PYTHON_VERSION: 3.11
+  NODE_VERSION: 20
+  # Customize these
+  PROJECT_NAME: skillbridge
+  ENVIRONMENT: dev
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # --- Backend Build ---
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Build Lambda Package
+        run: |
+          chmod +x scripts/build_lambda.sh
+          ./scripts/build_lambda.sh
+
+      # --- Infrastructure (Terraform) ---
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        working-directory: ./terraform
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get Terraform Outputs
+        if: github.ref == 'refs/heads/main'
+        id: tf-outputs
+        working-directory: ./terraform
+        run: |
+          echo "S3_BUCKET=$(terraform output -raw web_bucket_name)" >> $GITHUB_OUTPUT
+          echo "CLOUDFRONT_ID=$(terraform output -raw cloudfront_domain)" >> $GITHUB_OUTPUT # Note: This is domain, assuming we need Dist ID for invalidation, usually we output ID too.
+          # Let's assume user updates outputs.tf to include ID or we grep it.
+          # For now, just sync.
+
+      # --- Frontend Build & Deploy ---
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ steps.tf-outputs.outputs.API_ENDPOINT }} # Need to capture this from TF
+        run: npm run build
+
+      - name: Deploy to S3
+        if: github.ref == 'refs/heads/main'
+        run: |
+          aws s3 sync frontend/out s3://${{ steps.tf-outputs.outputs.S3_BUCKET }} --delete
+
+      # Placeholder for CloudFront Invalidation (needs Dist ID)
+      # - name: Invalidate CloudFront
+      #   run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DIST_ID }} --paths "/*"

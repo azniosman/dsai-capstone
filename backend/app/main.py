@@ -265,7 +265,7 @@ async def lifespan(app):
 
 
 app = FastAPI(
-    title="SkillBridge AI",
+    title="SkillBridge",
     version="0.2.0",
     lifespan=lifespan,
 )
@@ -341,6 +341,10 @@ app.include_router(api_keys.router, prefix="/api")
 app.include_router(audit_logs.router, prefix="/api")
 app.include_router(resume_rewriter.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+
+# Voice & AI
+from app.routers import voice
+app.include_router(voice.router, prefix="/api")
 
 
 @app.get("/health")

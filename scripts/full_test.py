@@ -1,4 +1,4 @@
-"""Full integration test for all SkillBridge AI endpoints."""
+"""Full integration test for all SkillBridge endpoints."""
 import requests
 import json
 import sys
@@ -309,7 +309,7 @@ def test_roles():
 # ──────────────────────────────────────────────
 if __name__ == "__main__":
     print("=" * 60)
-    print("  SkillBridge AI — Full Integration Test")
+    print("  SkillBridge — Full Integration Test")
     print("=" * 60)
     start = time.time()
 

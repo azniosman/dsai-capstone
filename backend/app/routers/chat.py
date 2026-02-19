@@ -1,4 +1,4 @@
-"""LLM career coach chatbot endpoint — WorkD AI persona."""
+"""LLM career coach chatbot endpoint — SkillBridge AI persona."""
 
 import logging
 
@@ -61,7 +61,7 @@ def _build_market_insights_table(insights: Optional[List] = None) -> str:
 
 def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap_courses=None, market_insights=None, pathways=None):
     parts = [
-        "You are 'WorkD AI,' a Senior Career Advisor specialising in the Singapore Labor Market.",
+        "You are 'SkillBridge AI,' a Senior Career Advisor specialising in the Singapore Labor Market.",
         "You have deep knowledge of the SSG Skills Framework, MySkillsFuture portal, and SCTP initiatives.",
         "",
         "Your Voice: Professional, encouraging, yet data-driven. Use localised terms like",
@@ -192,38 +192,46 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
 
     system_prompt = _build_system_prompt(profile, recommendations, skill_gaps, roadmap_courses, market_insights, pathways)
 
+    # Try Bedrock - fall back to Gemini - fall back to Rules
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=settings.gemini_api_key)
-
-        # Convert messages to Gemini format
-        history = []
-        for msg in payload.messages[:-1]:  # All except last (which is the new prompt)
-            role = "user" if msg.role == "user" else "model"
-            history.append({"role": role, "parts": [msg.content]})
-
-        # Initialize model with system instruction
-        model = genai.GenerativeModel(
-            model_name=settings.gemini_model,
-            system_instruction=system_prompt
+        from app.services.bedrock_service import bedrock_service
+        
+        # Convert messages for Bedrock
+        # We already have the system prompt
+        
+        response_text = bedrock_service.invoke_model(
+            system_prompt=system_prompt,
+            messages=[m.dict() for m in payload.messages]
         )
+        return ChatResponse(reply=response_text)
 
-        # Start chat with history
-        chat = model.start_chat(history=history)
-        response = chat.send_message(payload.messages[-1].content)
-        return ChatResponse(reply=response.text)
+    except Exception as e_bedrock:
+        logging.error(f"Bedrock API error: {e_bedrock}")
+        
+        # Fallback to Gemini if configured
+        if settings.gemini_api_key:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=settings.gemini_api_key)
 
-    except Exception as e:
-        error_str = str(e)
-        logging.error(f"Gemini API error: {e}")
+                # Convert messages to Gemini format
+                history = []
+                for msg in payload.messages[:-1]:  # All except last
+                    role = "user" if msg.role == "user" else "model"
+                    history.append({"role": role, "parts": [msg.content]})
 
-        if "429" in error_str or "ResourceExhausted" in error_str or "quota" in error_str.lower():
-            return ChatResponse(reply=(
-                "I'm currently experiencing high demand. The AI service rate limit has been reached. "
-                "Please wait a minute and try again. In the meantime, I can still help with basic career guidance!"
-            ))
+                model = genai.GenerativeModel(
+                    model_name=settings.gemini_model,
+                    system_instruction=system_prompt
+                )
+                
+                chat = model.start_chat(history=history)
+                response = chat.send_message(payload.messages[-1].content)
+                return ChatResponse(reply=response.text)
+            except Exception as e_gemini:
+                logging.error(f"Gemini API error (fallback): {e_gemini}")
 
-        # Fallback to rule-based response on any other error
+        # Fallback to rule-based response
         return ChatResponse(reply=_fallback_response(
             payload.messages[-1].content if payload.messages else "",
             profile_id=payload.profile_id,
@@ -233,7 +241,7 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
 
 
 def _fallback_response(user_msg: str, profile_id: Optional[int] = None, db: Optional[Session] = None, tenant_id: Optional[int] = None) -> str:
-    """WorkD AI rule-based fallback when no LLM API key is configured."""
+    """SkillBridge AI rule-based fallback when no LLM API key is configured."""
     msg = user_msg.lower()
 
     # Try to load user context for personalised responses
@@ -318,7 +326,7 @@ def _fallback_response(user_msg: str, profile_id: Optional[int] = None, db: Opti
         lines.append(f"\nThese sectors have the strongest demand. I'd recommend focusing your upskilling on these areas.{course_hint}")
         return "\n".join(lines)
 
-    return ("Hi! I'm WorkD AI, your Senior Career Advisor specialising in Singapore's tech market. "
+    return ("Hi! I'm SkillBridge AI, your Senior Career Advisor specialising in Singapore's tech market. "
             "I can help you with:\n\n"
             "- Understanding your job recommendations and match scores\n"
             "- Identifying high-growth roles matching your skills\n"

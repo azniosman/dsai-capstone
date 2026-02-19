@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-SkillBridge AI — Job Recommendation & Skill Gap Analysis System for SCTP learners and career-switchers in Singapore.
+SkillBridge — Job Recommendation & Skill Gap Analysis System for SCTP learners and career-switchers in Singapore.
 
 ## Tech Stack
 
@@ -71,6 +71,7 @@ auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resu
 `recommender` (hybrid scoring), `skill_matcher` (embedding similarity), `gap_analyzer`, `roadmap_generator`, `course_pathways`, `resume_parser`, `market_simulator`, `subsidy_calculator` (SkillsFuture/MCES), `audit_logger`
 
 **ML layer** (`backend/app/ml/`):
+
 - `embeddings.py` — Sentence Transformer wrapper; global model instance loaded at startup; `encode_texts()` + cosine similarity
 - `taxonomy.py` — FAISS-based skill normalization; maps free-text skills to canonical taxonomy names (threshold 0.75)
 
@@ -95,6 +96,7 @@ auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resu
 ### n8n Workflows
 
 Automation workflows in `n8n/workflows/` (accessible at port 5678):
+
 - `market_simulation.json` — Periodic market data updates
 - `resume_ingestion.json` — Resume upload processing pipeline
 - `analysis_notification.json` — Result notification dispatch
@@ -132,33 +134,33 @@ Automation workflows in `n8n/workflows/` (accessible at port 5678):
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | /api/auth/register | User registration |
-| POST | /api/auth/login | User login (returns JWT) |
-| GET | /api/auth/me | Current user info |
-| POST | /api/profile | Create user profile |
-| POST | /api/upload-resume | Upload PDF/DOCX resume |
-| POST | /api/recommend | Get job recommendations |
-| GET | /api/skill-gap/{id} | Skill gap analysis |
-| GET | /api/upskilling/{id} | Upskilling roadmap |
-| POST | /api/jd-match | Match profile against job description |
-| POST | /api/chat | Career coach chatbot |
-| POST | /api/interview | Mock interview simulator |
-| GET | /api/market-insights | Singapore labor market data |
-| POST | /api/compare-roles | Multi-role comparison |
-| GET | /api/roles | List all roles |
-| GET | /api/peer-comparison/{id} | Anonymized peer comparison |
-| GET | /api/project-suggestions/{id} | Portfolio project ideas |
-| POST | /api/progress | Record skill progress |
-| GET | /api/progress/{id} | Get progress dashboard |
-| GET | /api/progress/{id}/timeline | Progress timeline data |
-| GET | /api/export/roadmap/{id} | Export roadmap as PDF |
-| GET | /api/courses | List SCTP courses |
-| POST | /api/calculate-subsidy | Calculate subsidy for a course |
-| GET | /api/sso/login | SSO login (dev only) |
-| GET | /api/sso/callback | SSO callback (dev only) |
-| POST | /api/api-keys/ | Create API key (admin) |
-| GET | /api/api-keys/ | List API keys (admin) |
-| DELETE | /api/api-keys/{id} | Revoke API key (admin) |
-| GET | /api/audit-logs/ | List audit logs (admin) |
+| Method | Path                          | Description                           |
+| ------ | ----------------------------- | ------------------------------------- |
+| POST   | /api/auth/register            | User registration                     |
+| POST   | /api/auth/login               | User login (returns JWT)              |
+| GET    | /api/auth/me                  | Current user info                     |
+| POST   | /api/profile                  | Create user profile                   |
+| POST   | /api/upload-resume            | Upload PDF/DOCX resume                |
+| POST   | /api/recommend                | Get job recommendations               |
+| GET    | /api/skill-gap/{id}           | Skill gap analysis                    |
+| GET    | /api/upskilling/{id}          | Upskilling roadmap                    |
+| POST   | /api/jd-match                 | Match profile against job description |
+| POST   | /api/chat                     | Career coach chatbot                  |
+| POST   | /api/interview                | Mock interview simulator              |
+| GET    | /api/market-insights          | Singapore labor market data           |
+| POST   | /api/compare-roles            | Multi-role comparison                 |
+| GET    | /api/roles                    | List all roles                        |
+| GET    | /api/peer-comparison/{id}     | Anonymized peer comparison            |
+| GET    | /api/project-suggestions/{id} | Portfolio project ideas               |
+| POST   | /api/progress                 | Record skill progress                 |
+| GET    | /api/progress/{id}            | Get progress dashboard                |
+| GET    | /api/progress/{id}/timeline   | Progress timeline data                |
+| GET    | /api/export/roadmap/{id}      | Export roadmap as PDF                 |
+| GET    | /api/courses                  | List SCTP courses                     |
+| POST   | /api/calculate-subsidy        | Calculate subsidy for a course        |
+| GET    | /api/sso/login                | SSO login (dev only)                  |
+| GET    | /api/sso/callback             | SSO callback (dev only)               |
+| POST   | /api/api-keys/                | Create API key (admin)                |
+| GET    | /api/api-keys/                | List API keys (admin)                 |
+| DELETE | /api/api-keys/{id}            | Revoke API key (admin)                |
+| GET    | /api/audit-logs/              | List audit logs (admin)               |

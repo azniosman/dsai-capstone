@@ -1,23 +1,24 @@
 variable "aws_region" {
-  description = "AWS Region to deploy resources"
-  type        = string
+  description = "AWS Region to deploy to"
   default     = "ap-southeast-1"
 }
 
-variable "environment" {
-  description = "Deployment environment (e.g. dev, prod)"
-  type        = string
-  default     = "dev"
-}
-
 variable "project_name" {
-  description = "Project name prefix"
-  type        = string
+  description = "Project name"
   default     = "skillbridge"
 }
 
+variable "environment" {
+  description = "Environment (dev, prod)"
+  default     = "dev"
+}
+
 variable "db_password" {
-  description = "Database password"
-  type        = string
+  description = "Master password for Aurora DB"
   sensitive   = true
+}
+
+variable "bedrock_model_id" {
+  description = "Bedrock Model ID"
+  default     = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 }

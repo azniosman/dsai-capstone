@@ -15,15 +15,15 @@ interface TenantContextValue {
 }
 
 const defaultConfig: TenantConfig = {
-  name: "SkillBridge AI",
+  name: "SkillBridge",
   logoUrl: "",
-  primaryColor: "#00BFFF",   // Countrast sky blue
+  primaryColor: "#00BFFF", // Countrast sky blue
   secondaryColor: "#E8562A", // Countrast burnt orange
 };
 
 export const TenantContext = createContext<TenantContextValue>({
   tenantConfig: defaultConfig,
-  setTenantConfig: () => { },
+  setTenantConfig: () => {},
 });
 
 export function useTenant() {
@@ -54,7 +54,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       root.style.setProperty("--tenant-secondary", tenantConfig.secondaryColor);
       root.style.setProperty(
         "--tenant-gradient",
-        `linear-gradient(135deg, ${tenantConfig.primaryColor} 0%, ${tenantConfig.secondaryColor} 100%)`
+        `linear-gradient(135deg, ${tenantConfig.primaryColor} 0%, ${tenantConfig.secondaryColor} 100%)`,
       );
     }
   }, [tenantConfig]);

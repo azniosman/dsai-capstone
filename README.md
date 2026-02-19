@@ -1,12 +1,12 @@
-# SkillBridge AI 🚀
+# SkillBridge 🚀
 
 **AI-Driven Career Intelligence for Singapore's SCTP Learners & Career Switchers**
 
-SkillBridge AI is a comprehensive career acceleration platform designed to bridge the gap between current skills and future-ready tech roles. Leveraging advanced AI, real-time market data, and the SkillsFuture Singapore (SSG) framework, it provides personalized upskilling pathways, job recommendations, and interactive career coaching.
+SkillBridge is a comprehensive career acceleration platform designed to bridge the gap between current skills and future-ready tech roles. Leveraging advanced AI, real-time market data, and the SkillsFuture Singapore (SSG) framework, it provides personalized upskilling pathways, job recommendations, and interactive career coaching.
 
 ![Overview](misc/images/aioverview.png)
 
-View the [Technical Roadmap](Technical_Roadmap.md) for SkillBridge AI's.
+View the [Technical Roadmap](Technical_Roadmap.md) for SkillBridge.
 
 ---
 
@@ -136,57 +136,54 @@ python data/scripts/seed_db.py
 
 ---
 
-## ☁️ AWS Deployment (Terraform)
+## 🏗️ Technical Architecture Strategy
 
-Deploy the entire stack to AWS (ECS Fargate, RDS, ALB) using Infrastructure as Code.
+SkillBridge adopts a dual-architecture strategy to demonstrate both rapid, cost-effective prototyping (Capstone) and scalable enterprise vision (Roadmap).
 
-### Prerequisites
+### 1. Current Implementation: Capstone Demo (Serverless)
 
-1. **AWS CLI**: Installed and configured with `aws configure`.
-2. **Terraform**: [Install Terraform](https://developer.hashicorp.com/terraform/downloads).
+**Goal**: Maximize "Wow" factor while minimizing idle costs ($~45/mo).
 
-### Deployment Steps
+- **Core**: AWS Lambda (Python/FastAPI) + API Gateway.
+- **Data**: Amazon Aurora Serverless v2 + `pgvector` (Vector Search).
+- **AI**: AWS Bedrock (Claude 3.5 Sonnet) & SageMaker Serverless Inference.
+- **Frontend**: S3 Static Hosting + CloudFront CDN.
 
-1. **Initialize Terraform**
+👉 **[View Capstone Demo Documentation](Capstone-Demo.md)** for full architecture, features, and walkthrough.
 
+### 2. Target End State: Enterprise Technical Roadmap
+
+**Goal**: High-throughput, compliance-ready microservices architecture for 100k+ users.
+
+- **Core**: Amazon ECS (Fargate) for long-running containerized services.
+- **Search**: OpenSearch Serverless for massive-scale vector retrieval.
+- **Event Bus**: EventBridge for asynchronous decoupling of resume parsing and notifications.
+- **Security**: WAF, Shield, and PrivateLink for banking-grade security.
+
+👉 **[View Enterprise Technical Roadmap](Enterprise-Technical_Roadmap.md)** to see the future vision.
+
+---
+
+## ☁️ Deployment Guide
+
+### Deploying the Current Serverless Stack
+
+The repository currently contains the Terraform code for the **Capstone Demo (Serverless)** architecture.
+
+1. **Build Lambda Package**:
+   ```bash
+   ./scripts/build_lambda.sh
+   ```
+2. **Provision Infrastructure**:
    ```bash
    cd terraform
    terraform init
+   terraform apply
    ```
+3. **CI/CD**:
+   Push to `main` to trigger the GitHub Actions workflow defined in `.github/workflows/deploy-serverless.yml`.
 
-2. **Build & Push Docker Images**
-   This script builds images and pushes them to Amazon ECR.
-
-   ```bash
-   # Make script executable
-   chmod +x ../scripts/build_and_push.sh
-   # Run build script
-   ../scripts/build_and_push.sh
-   ```
-
-3. **Plan Infrastructure**
-   Review changes before applying.
-
-   ```bash
-   terraform plan -out=tfplan
-   ```
-
-4. **Apply Deployment**
-   Provision VPC, RDS, ECS, and Load Balancers.
-
-   ```bash
-   terraform apply tfplan
-   ```
-
-5. **Access the App**
-   After deployment, Terraform will output the **Load Balancer DNS**.
-   ```bash
-   # Example Output
-   alb_dns_name = "skillbridge-dev-alb-123456789.ap-southeast-1.elb.amazonaws.com"
-   ```
-   Access the app at `http://<alb_dns_name>`.
-
----
+For detailed deployment steps, see **[walkthrough.md](walkthrough.md)**.
 
 ## 📂 Project Structure
 
@@ -260,4 +257,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-**SkillBridge AI** — Empowering Singapore's Workforce 🇸🇬
+**SkillBridge** — Empowering Singapore's Workforce 🇸🇬

@@ -14,7 +14,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SkillBridge AI",
+  title: "SkillBridge",
   description: "AI-Powered Career Intelligence Platform",
 };
 
@@ -36,9 +36,7 @@ export default function RootLayout({
         >
           <TenantProvider>
             <ErrorBoundary>
-              <AppShell>
-                {children}
-              </AppShell>
+              <AppShell>{children}</AppShell>
               <Toaster />
             </ErrorBoundary>
           </TenantProvider>
