@@ -21,6 +21,7 @@ env:
 jobs:
   deploy:
     name: Build and Deploy
+    if: false #azni has disable the workflow temporarily until terraform script is ok
     runs-on: ubuntu-latest
     defaults:
       run:
