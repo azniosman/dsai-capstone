@@ -176,10 +176,12 @@ jobs:
 
           echo "IMAGE_URI=${ECR}:${IMAGE_TAG}" >> $GITHUB_ENV
 
-      # ── Step 3: Pre-apply cleanup of partially-created resources ─────────────
-      # Resources created by previous failed Terraform runs that cannot be
-      # imported cleanly are deleted here so Terraform recreates them cleanly.
-      - name: Clean up partially-created AWS resources
+      # ── Step 3: Pre-apply cleanup (clean-slate strategy) ─────────────────────
+      # Strategy: remove all non-ECR modules from Terraform state, then delete
+      # their corresponding AWS resources so Terraform rebuilds everything fresh.
+      # This eliminates all "already exists" and cross-VPC conflicts from prior
+      # partial runs. ECR is preserved (already has the image we just pushed).
+      - name: Clean up AWS resources for clean-slate Terraform apply
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
@@ -193,109 +195,168 @@ jobs:
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
 
-          # ── IAM: delete execution role (with attached policies) + custom policy ──
+          echo "=== Step 1: Remove non-ECR modules from Terraform state ==="
+          # This prevents stale state from causing drift errors on the fresh apply.
+          for MOD in \
+            module.vpc \
+            module.security_groups \
+            module.rds \
+            module.iam \
+            module.lambda_backend \
+            module.api_gateway \
+            module.s3_frontend \
+            "module.cloudfront[0]" \
+            "module.opensearch[0]"; do
+            terraform state rm "$MOD" 2>&1 | head -3 || true
+          done
+
+          echo "=== Step 2: Kick off Aurora cluster deletion (async — runs during VPC cleanup) ==="
+          CLUSTER_ID="${P}-${E}-aurora"
+          # Delete cluster instances first (required before cluster deletion)
+          for INST in $(aws rds describe-db-clusters \
+            --db-cluster-identifier "$CLUSTER_ID" \
+            --query 'DBClusters[0].DBClusterMembers[].DBInstanceIdentifier' \
+            --output text 2>/dev/null | tr '\t' '\n'); do
+            echo "  Deleting Aurora instance: $INST"
+            aws rds delete-db-instance \
+              --db-instance-identifier "$INST" \
+              --skip-final-snapshot 2>/dev/null || true
+          done
+          # Delete cluster (will wait for instances internally if needed)
+          aws rds delete-db-cluster \
+            --db-cluster-identifier "$CLUSTER_ID" \
+            --skip-final-snapshot 2>/dev/null || true
+
+          echo "=== Step 3: Delete Lambda, API Gateway, CWL log groups ==="
+          aws lambda delete-function \
+            --function-name "${P}-${E}-api" 2>/dev/null || true
+          API_ID=$(aws apigatewayv2 get-apis \
+            --query "Items[?Name=='${P}-${E}-api'].ApiId" \
+            --output text 2>/dev/null || echo "")
+          for AID in $API_ID; do
+            [ -z "$AID" ] || [ "$AID" = "None" ] && continue
+            aws apigatewayv2 delete-api --api-id "$AID" 2>/dev/null || true
+          done
+          aws logs delete-log-group \
+            --log-group-name "/aws/lambda/${P}-${E}-api" 2>/dev/null || true
+          aws logs delete-log-group \
+            --log-group-name "/aws/apigateway/${P}-${E}" 2>/dev/null || true
+
+          echo "=== Step 4: Delete IAM role and custom policy ==="
           ROLE_NAME="${P}-${E}-lambda-exec"
           POLICY_ARNS=$(aws iam list-attached-role-policies \
             --role-name "$ROLE_NAME" \
             --query 'AttachedPolicies[].PolicyArn' \
             --output text 2>/dev/null || echo "")
           for ARN in $POLICY_ARNS; do
-            aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$ARN" 2>/dev/null || true
+            aws iam detach-role-policy \
+              --role-name "$ROLE_NAME" --policy-arn "$ARN" 2>/dev/null || true
           done
           aws iam delete-role --role-name "$ROLE_NAME" 2>/dev/null || true
-          # Also delete the custom policy so Terraform can recreate it
           aws iam delete-policy \
-            --policy-arn "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy" 2>/dev/null || true
+            --policy-arn "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy" \
+            2>/dev/null || true
 
-          # ── CloudWatch log group (API Gateway) ────────────────────────────────
-          aws logs delete-log-group \
-            --log-group-name "/aws/apigateway/${P}-${E}" 2>/dev/null || true
-
-          # ── RDS: remove old postgres16 parameter group (no longer in config) ──
-          aws rds delete-db-parameter-group \
-            --db-parameter-group-name "${P}-${E}-pg16" 2>/dev/null || true
-
-          # ── RDS subnet group: fix VPC mismatch ────────────────────────────────
-          # If the subnet group is in a DIFFERENT VPC than the one Terraform
-          # currently manages, remove it from state and delete from AWS so
-          # Terraform recreates it in the correct VPC.
-          TF_VPC_ID=$(terraform state show module.vpc.aws_vpc.main 2>/dev/null \
-            | grep -E '^\s+id\s+=' | awk '{print $3}' | tr -d '"' || echo "")
-          SG_VPC_ID=$(aws rds describe-db-subnet-groups \
-            --db-subnet-group-name "${P}-${E}-db-subnet" \
-            --query 'DBSubnetGroups[0].VpcId' --output text 2>/dev/null || echo "")
-          if [ -n "$TF_VPC_ID" ] && [ -n "$SG_VPC_ID" ] && \
-             [ "$SG_VPC_ID" != "None" ] && [ "$TF_VPC_ID" != "$SG_VPC_ID" ]; then
-            echo "VPC mismatch: subnet group is in $SG_VPC_ID, TF manages $TF_VPC_ID — fixing"
-            terraform state rm module.rds.aws_db_subnet_group.main 2>/dev/null || true
-            aws rds delete-db-subnet-group \
-              --db-subnet-group-name "${P}-${E}-db-subnet" 2>/dev/null || true
-          fi
-
-          # ── Orphaned VPCs: delete any project VPCs not in current TF state ───
+          echo "=== Step 5: Delete ALL project-tagged VPCs and their dependencies ==="
           for VPC_ID in $(aws ec2 describe-vpcs \
             --filters "Name=tag:Name,Values=${P}-${E}-vpc" \
             --query 'Vpcs[].VpcId' --output text 2>/dev/null | tr '\t' '\n'); do
-            [ -z "$VPC_ID" ] && continue
-            [ "$VPC_ID" = "$TF_VPC_ID" ] && { echo "Active VPC $VPC_ID — skip"; continue; }
-            echo "Deleting orphaned VPC: $VPC_ID"
-            # NAT Gateways (async — must wait before deleting VPC)
+            [ -z "$VPC_ID" ] || [ "$VPC_ID" = "None" ] && continue
+            echo "  Deleting VPC: $VPC_ID"
+            # Security groups (non-default) — delete before NAT GW
+            for SG in $(aws ec2 describe-security-groups \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'SecurityGroups[?GroupName != `default`].GroupId' \
+              --output text 2>/dev/null | tr '\t' '\n'); do
+              aws ec2 delete-security-group --group-id "$SG" 2>/dev/null || true
+            done
+            # NAT Gateways (async)
             for NAT in $(aws ec2 describe-nat-gateways \
-              --filter "Name=vpc-id,Values=$VPC_ID" "Name=state,Values=available" \
-              --query 'NatGateways[].NatGatewayId' --output text 2>/dev/null); do
+              --filter "Name=vpc-id,Values=$VPC_ID" \
+                       "Name=state,Values=available,pending" \
+              --query 'NatGateways[].NatGatewayId' --output text 2>/dev/null | tr '\t' '\n'); do
               aws ec2 delete-nat-gateway --nat-gateway-id "$NAT" 2>/dev/null || true
             done
+            # Wait for NAT GW to finish deleting (up to 3 min)
             for i in $(seq 1 18); do
               PENDING=$(aws ec2 describe-nat-gateways \
-                --filter "Name=vpc-id,Values=$VPC_ID" "Name=state,Values=available,pending,deleting" \
+                --filter "Name=vpc-id,Values=$VPC_ID" \
+                         "Name=state,Values=available,pending,deleting" \
                 --query 'NatGateways[].NatGatewayId' --output text 2>/dev/null)
-              [ -z "$PENDING" ] && break; sleep 10
+              [ -z "$PENDING" ] && break
+              echo "  Waiting for NAT GW... ($i/18)"
+              sleep 10
             done
             # Internet Gateway
             for IGW in $(aws ec2 describe-internet-gateways \
               --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
-              --query 'InternetGateways[].InternetGatewayId' --output text 2>/dev/null); do
-              aws ec2 detach-internet-gateway --internet-gateway-id "$IGW" --vpc-id "$VPC_ID" 2>/dev/null || true
-              aws ec2 delete-internet-gateway --internet-gateway-id "$IGW" 2>/dev/null || true
+              --query 'InternetGateways[].InternetGatewayId' \
+              --output text 2>/dev/null | tr '\t' '\n'); do
+              aws ec2 detach-internet-gateway \
+                --internet-gateway-id "$IGW" --vpc-id "$VPC_ID" 2>/dev/null || true
+              aws ec2 delete-internet-gateway \
+                --internet-gateway-id "$IGW" 2>/dev/null || true
             done
             # Subnets
             for SUBNET in $(aws ec2 describe-subnets \
               --filters "Name=vpc-id,Values=$VPC_ID" \
-              --query 'Subnets[].SubnetId' --output text 2>/dev/null); do
+              --query 'Subnets[].SubnetId' --output text 2>/dev/null | tr '\t' '\n'); do
               aws ec2 delete-subnet --subnet-id "$SUBNET" 2>/dev/null || true
             done
             # Route tables (non-main)
             for RT in $(aws ec2 describe-route-tables \
               --filters "Name=vpc-id,Values=$VPC_ID" \
               --query 'RouteTables[?Associations[0].Main != `true`].RouteTableId' \
-              --output text 2>/dev/null); do
+              --output text 2>/dev/null | tr '\t' '\n'); do
               aws ec2 delete-route-table --route-table-id "$RT" 2>/dev/null || true
             done
-            # Security groups (non-default)
-            for SG in $(aws ec2 describe-security-groups \
-              --filters "Name=vpc-id,Values=$VPC_ID" \
-              --query 'SecurityGroups[?GroupName != `default`].GroupId' \
-              --output text 2>/dev/null); do
-              aws ec2 delete-security-group --group-id "$SG" 2>/dev/null || true
-            done
             aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>/dev/null || true
-            echo "Deleted orphaned VPC: $VPC_ID"
+            echo "  Deleted VPC: $VPC_ID"
           done
 
-          # ── Orphaned EIPs (unassociated NAT EIPs) ────────────────────────────
+          echo "=== Step 6: Release unassociated project EIPs ==="
           for EIP in $(aws ec2 describe-addresses \
             --filters "Name=tag:Name,Values=${P}-${E}-nat-eip" \
-            --query 'Addresses[?AssociationId==null].AllocationId' \
+            --query 'Addresses[].AllocationId' \
             --output text 2>/dev/null | tr '\t' '\n'); do
-            [ -n "$EIP" ] && aws ec2 release-address --allocation-id "$EIP" 2>/dev/null || true
+            [ -n "$EIP" ] && aws ec2 release-address \
+              --allocation-id "$EIP" 2>/dev/null || true
           done
 
-          echo "Cleanup complete"
+          echo "=== Step 7: Wait for Aurora cluster deletion (started in Step 2) ==="
+          for i in $(seq 1 36); do
+            STATUS=$(aws rds describe-db-clusters \
+              --db-cluster-identifier "$CLUSTER_ID" \
+              --query 'DBClusters[0].Status' \
+              --output text 2>/dev/null || echo "gone")
+            if [ "$STATUS" = "gone" ] || [ "$STATUS" = "None" ] || [ -z "$STATUS" ]; then
+              echo "  Aurora is gone — proceeding"
+              break
+            fi
+            echo "  Aurora status: $STATUS ($i/36)"
+            sleep 10
+          done
 
-      # ── Step 4: Import existing VPC + networking into Terraform state ─────────
-      # Resources created by previous partial Terraform runs are imported so
-      # the next apply sees them as already managed (no duplicate-create errors).
-      - name: Import existing AWS resources into Terraform state
+          echo "=== Step 8: Delete RDS subnet group and parameter group ==="
+          aws rds delete-db-subnet-group \
+            --db-subnet-group-name "${P}-${E}-db-subnet" 2>/dev/null || true
+          aws rds delete-db-cluster-parameter-group \
+            --db-cluster-parameter-group-name "${P}-${E}-aurora-pg16" 2>/dev/null || true
+          # Legacy plain-RDS param group from prior runs
+          aws rds delete-db-parameter-group \
+            --db-parameter-group-name "${P}-${E}-pg16" 2>/dev/null || true
+
+          echo "=== Step 9: Delete Secrets Manager secret ==="
+          aws secretsmanager delete-secret \
+            --secret-id "${P}/${E}/db-credentials" \
+            --force-delete-without-recovery 2>/dev/null || true
+
+          echo "Cleanup complete — Terraform will rebuild all resources from scratch"
+
+      # ── Step 4: Import ECR into Terraform state ───────────────────────────────
+      # ECR is the only resource we preserve across runs (contains the image
+      # we just built). Everything else was deleted in the cleanup step above.
+      - name: Import ECR into Terraform state
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
@@ -308,125 +369,14 @@ jobs:
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
 
-          # Helper: run terraform import and swallow "already managed" / "not found" errors
           tf_import() {
             terraform import -input=false "$@" 2>&1 | grep -v "^$" || true
           }
 
-          # ── VPC ──────────────────────────────────────────────────────────────
-          VPC_ID=$(aws ec2 describe-vpcs \
-            --filters "Name=tag:Name,Values=${P}-${E}-vpc" \
-            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "")
-          [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ] && \
-            tf_import module.vpc.aws_vpc.main "$VPC_ID"
+          tf_import module.ecr.aws_ecr_repository.backend "${P}-${E}-backend"
+          tf_import module.ecr.aws_ecr_lifecycle_policy.backend "${P}-${E}-backend"
 
-          # ── Subnets ───────────────────────────────────────────────────────────
-          for IDX in 0 1; do
-            NUM=$((IDX + 1))
-            SUB=$(aws ec2 describe-subnets \
-              --filters "Name=tag:Name,Values=${P}-${E}-public-${NUM}" \
-                        "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "")
-            [ -n "$SUB" ] && [ "$SUB" != "None" ] && \
-              tf_import "module.vpc.aws_subnet.public[${IDX}]" "$SUB"
-          done
-          for IDX in 0 1; do
-            NUM=$((IDX + 1))
-            SUB=$(aws ec2 describe-subnets \
-              --filters "Name=tag:Name,Values=${P}-${E}-private-${NUM}" \
-                        "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "")
-            [ -n "$SUB" ] && [ "$SUB" != "None" ] && \
-              tf_import "module.vpc.aws_subnet.private[${IDX}]" "$SUB"
-          done
-
-          # ── Internet Gateway ──────────────────────────────────────────────────
-          IGW=$(aws ec2 describe-internet-gateways \
-            --filters "Name=tag:Name,Values=${P}-${E}-igw" \
-            --query 'InternetGateways[0].InternetGatewayId' \
-            --output text 2>/dev/null || echo "")
-          [ -n "$IGW" ] && [ "$IGW" != "None" ] && \
-            tf_import module.vpc.aws_internet_gateway.main "$IGW"
-
-          # ── Elastic IP + NAT Gateway ──────────────────────────────────────────
-          EIP=$(aws ec2 describe-addresses \
-            --filters "Name=tag:Name,Values=${P}-${E}-nat-eip" \
-            --query 'Addresses[0].AllocationId' \
-            --output text 2>/dev/null || echo "")
-          [ -n "$EIP" ] && [ "$EIP" != "None" ] && \
-            tf_import module.vpc.aws_eip.nat "$EIP"
-
-          NAT=$(aws ec2 describe-nat-gateways \
-            --filter "Name=tag:Name,Values=${P}-${E}-nat" \
-                     "Name=state,Values=available" \
-            --query 'NatGateways[0].NatGatewayId' \
-            --output text 2>/dev/null || echo "")
-          [ -n "$NAT" ] && [ "$NAT" != "None" ] && \
-            tf_import module.vpc.aws_nat_gateway.main "$NAT"
-
-          # ── Route Tables + Associations ───────────────────────────────────────
-          PUB_RT=$(aws ec2 describe-route-tables \
-            --filters "Name=tag:Name,Values=${P}-${E}-public-rt" \
-                      "Name=vpc-id,Values=${VPC_ID}" \
-            --query 'RouteTables[0].RouteTableId' \
-            --output text 2>/dev/null || echo "")
-          PRI_RT=$(aws ec2 describe-route-tables \
-            --filters "Name=tag:Name,Values=${P}-${E}-private-rt" \
-                      "Name=vpc-id,Values=${VPC_ID}" \
-            --query 'RouteTables[0].RouteTableId' \
-            --output text 2>/dev/null || echo "")
-          [ -n "$PUB_RT" ] && [ "$PUB_RT" != "None" ] && \
-            tf_import module.vpc.aws_route_table.public "$PUB_RT"
-          [ -n "$PRI_RT" ] && [ "$PRI_RT" != "None" ] && \
-            tf_import module.vpc.aws_route_table.private "$PRI_RT"
-
-          for IDX in 0 1; do
-            NUM=$((IDX + 1))
-            SUB=$(aws ec2 describe-subnets \
-              --filters "Name=tag:Name,Values=${P}-${E}-public-${NUM}" \
-                        "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "")
-            [ -n "$SUB" ] && [ "$SUB" != "None" ] && \
-            [ -n "$PUB_RT" ] && [ "$PUB_RT" != "None" ] && \
-              tf_import "module.vpc.aws_route_table_association.public[${IDX}]" \
-                        "${SUB}/${PUB_RT}"
-          done
-          for IDX in 0 1; do
-            NUM=$((IDX + 1))
-            SUB=$(aws ec2 describe-subnets \
-              --filters "Name=tag:Name,Values=${P}-${E}-private-${NUM}" \
-                        "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "")
-            [ -n "$SUB" ] && [ "$SUB" != "None" ] && \
-            [ -n "$PRI_RT" ] && [ "$PRI_RT" != "None" ] && \
-              tf_import "module.vpc.aws_route_table_association.private[${IDX}]" \
-                        "${SUB}/${PRI_RT}"
-          done
-
-          # ── Security Groups (lambda + alb created in prior partial runs) ──────
-          for SG in "lambda:lambda-sg" "alb:alb-sg"; do
-            RESOURCE="${SG%%:*}"
-            NAME="${SG##*:}"
-            SG_ID=$(aws ec2 describe-security-groups \
-              --filters "Name=group-name,Values=${P}-${E}-${NAME}" \
-                        "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'SecurityGroups[0].GroupId' \
-              --output text 2>/dev/null || echo "")
-            [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ] && \
-              tf_import "module.security_groups.aws_security_group.${RESOURCE}" "$SG_ID"
-          done
-
-          # ── RDS DB Subnet Group (reusable by Aurora) ──────────────────────────
-          tf_import module.rds.aws_db_subnet_group.main "${P}-${E}-db-subnet"
-
-          # ── Secrets Manager secret ────────────────────────────────────────────
-          SECRET_ARN=$(aws secretsmanager describe-secret \
-            --secret-id "${P}/${E}/db-credentials" \
-            --query ARN --output text 2>/dev/null || echo "")
-          [ -n "$SECRET_ARN" ] && [ "$SECRET_ARN" != "None" ] && \
-            tf_import module.rds.aws_secretsmanager_secret.db_credentials "$SECRET_ARN"
-
-          echo "Import step complete"
+          echo "ECR import complete"
 
       # ── Step 5: Terraform Plan + Apply ────────────────────────────────────────
       - name: Terraform Plan
