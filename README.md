@@ -6,7 +6,7 @@ SkillBridge is a comprehensive career acceleration platform designed to bridge t
 
 ![Overview](misc/images/aioverview.png)
 
-View the [Technical Roadmap](Technical_Roadmap.md) for SkillBridge.
+View the [Technical Roadmap](Enterprise-Technical_Roadmap.md) for SkillBridge.
 
 ---
 
@@ -183,25 +183,30 @@ The repository currently contains the Terraform code for the **Capstone Demo (Se
 3. **CI/CD**:
    Push to `main` to trigger the GitHub Actions workflow defined in `.github/workflows/deploy-serverless.yml`.
 
-For detailed deployment steps, see **[walkthrough.md](walkthrough.md)**.
+For detailed deployment steps, see **[Walkthrough.md](Walkthrough.md)**.
 
 ## 📂 Project Structure
 
 ```text
 dsai-capstone/
-├── backend/                # FastAPI Application
-│   ├── app/
-│   │   ├── routers/        # API Endpoints (Auth, Market, Jobs, AI)
-│   │   ├── services/       # Business Logic (Pathways, Simulator)
-│   │   ├── models/         # SQLAlchemy ORM Models
-│   │   └── ml/             # AI Models (FAISS, Embeddings)
-├── frontend/               # Next.js Application
-│   ├── app/                # App Router Pages
-│   └── components/         # Reusable UI Components
-├── n8n/                    # Automation Workflows
-│   └── workflows/          # JSON Workflow exports
-├── data/                   # Seed Data & Scripts
-└── docker-compose.yml      # Container Orchestration
+├── backend/ # FastAPI Application
+│ ├── app/
+│ │ ├── routers/ # API Endpoints (Auth, Market, Jobs, AI)
+│ │ ├── services/ # Business Logic (Pathways, Simulator)
+│ │ ├── models/ # SQLAlchemy ORM Models
+│ │ └── ml/ # AI Models (FAISS, Embeddings)
+├── frontend/ # Next.js Application
+│ ├── app/ # App Router Pages
+│ └── components/ # Reusable UI Components
+├── terraform/ # Infrastructure as Code
+│ ├── modules/ # Reusable Terraform Modules
+│ └── main.tf # Main Configuration
+├── scripts/ # Deployment & Utility Scripts
+├── n8n/ # Automation Workflows
+│ └── workflows/ # JSON Workflow exports
+├── data/ # Seed Data & Scripts
+└── docker-compose.yml # Container Orchestration
+
 ```
 
 ---
