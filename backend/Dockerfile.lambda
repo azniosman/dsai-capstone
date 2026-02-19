@@ -30,7 +30,7 @@ RUN yum install -y gcc gcc-c++ python3-devel && \
 ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
 ENV HF_HOME=/opt/models/huggingface
 
-RUN python -m spacy download en_core_web_sm
+
 
 RUN python -c "\
     from sentence_transformers import SentenceTransformer; \
