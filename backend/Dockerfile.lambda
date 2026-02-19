@@ -14,46 +14,49 @@ ENV HF_HUB_OFFLINE=1
 RUN mkdir -p /opt/models/sentence-transformers /opt/models/huggingface
 
 # ===== Install system dependencies =====
-RUN yum install -y gcc gcc-c++ python3-devel git curl && \
+# git/curl: needed for some pip installs or healthchecks
+RUN yum install -y git curl && \
     yum clean all
 
 # ===== Install Python dependencies =====
 RUN pip install --upgrade pip
 
-# Copy project requirements
-COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
+# 1. Scientific Stack: Force binary wheels to avoid GCC compilation issues
+#    (numpy, scipy, scikit-learn often fail to build on Amazon Linux 2 without this)
+RUN pip install --no-cache-dir --prefer-binary \
+    "numpy<2.0.0" \
+    "scikit-learn==1.3.2" \
+    "scipy"
 
-# Install dependencies from requirements.txt
-# Pin numpy and scikit-learn for compatibility
-RUN pip install --no-cache-dir --prefer-binary "numpy<2.0.0" "scikit-learn==1.3.2" && \
-    pip install --no-cache-dir --prefer-binary -r ${LAMBDA_TASK_ROOT}/requirements.txt
+# 2. NLP Stack: Install spacy and model explicitly via direct URL
+#    (Fixes 404 errors from 'python -m spacy download')
+RUN pip install --no-cache-dir "spacy==3.7.0" && \
+    pip install --no-cache-dir https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl && \
+    python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
 
-# Install specific spaCy version (User request)
-RUN pip install --no-cache-dir spacy==3.7.0
-
-# Install spaCy English model (matching version)
+# 3. AI Stack: Install Sentence Transformers & fix HuggingFace compatibility
 RUN pip install --no-cache-dir \
-    https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
+    "sentence-transformers==2.2.2" \
+    "huggingface-hub<0.25.0"
 
-# Verify spaCy model works
-RUN python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
+# 4. Project Requirements: Install remaining dependencies
+COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
+RUN pip install --no-cache-dir --prefer-binary -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
-# Install Sentence Transformers (User request)
-RUN pip install --no-cache-dir sentence-transformers==2.2.2
+# ===== Pre-download Models =====
 
-# Pre-download Sentence Transformer model so it's cached in the image
+# Download Sentence Transformer model (Temporarily enable online mode)
 RUN HF_HUB_OFFLINE=0 python -c "import os; os.environ['SENTENCE_TRANSFORMERS_HOME']='/opt/models/sentence-transformers'; from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print('ST OK')"
 
-# Lock models offline for production
+# Verify offline mode works
+RUN python -c "import os; os.environ['SENTENCE_TRANSFORMERS_HOME']='/opt/models/sentence-transformers'; os.environ['HF_HUB_OFFLINE']='1'; from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print('Offline mode Verify OK')"
+
+# Lock models offline for production safely
 ENV TRANSFORMERS_OFFLINE=1
 
-# ===== Copy project files =====
+# ===== Application Setup =====
 COPY backend/app/ ${LAMBDA_TASK_ROOT}/app/
 COPY backend/lambda_handler.py ${LAMBDA_TASK_ROOT}/
 COPY data/seed/ ${LAMBDA_TASK_ROOT}/seed_data/
 
-# Verify offline mode works (will be used in Lambda VPC)
-RUN python -c "import os; os.environ['SENTENCE_TRANSFORMERS_HOME']='/opt/models/sentence-transformers'; os.environ['HF_HUB_OFFLINE']='1'; from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print('Offline mode Verify OK')"
-
-# ===== Lambda handler entrypoint =====
 CMD ["lambda_handler.handler"]

@@ -22,26 +22,29 @@ WORKDIR /app
 # ===== Install Python dependencies =====
 RUN pip install --no-cache-dir --upgrade pip
 
-# Copy requirements and install
-COPY backend/requirements.txt .
-# Pin numpy and scikit-learn for compatibility as identified earlier
-RUN pip install --no-cache-dir "numpy<2.0.0" "scikit-learn==1.3.2" && \
-    pip install --no-cache-dir -r requirements.txt
+# 1. Scientific Stack: Force binary wheels
+RUN pip install --no-cache-dir --prefer-binary \
+    "numpy<2.0.0" \
+    "scikit-learn==1.3.2" \
+    "scipy"
 
-# Install specific spaCy version
-RUN pip install --no-cache-dir spacy==3.7.0
+# 2. NLP Stack: Install spacy and model explicitly
+RUN pip install --no-cache-dir "spacy==3.7.0" && \
+    pip install --no-cache-dir https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl && \
+    python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
 
-# Install spaCy English model (matching version)
+# 3. AI Stack: Install Sentence Transformers & fix HuggingFace compatibility
 RUN pip install --no-cache-dir \
-    https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
+    "sentence-transformers==2.2.2" \
+    "huggingface-hub<0.25.0"
 
-# Verify spaCy model works
-RUN python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
+# 4. Project Requirements
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --prefer-binary -r requirements.txt
 
-# Install Sentence Transformers
-RUN pip install --no-cache-dir sentence-transformers==2.2.2
+# ===== Pre-download Models =====
 
-# Pre-download Sentence Transformer model
+# Download Sentence Transformer model (Temporarily enable online mode)
 RUN HF_HUB_OFFLINE=0 python -c "import os; os.environ['SENTENCE_TRANSFORMERS_HOME']='/opt/models/sentence-transformers'; from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print('ST OK')"
 
 # ===== Final Stage =====
@@ -59,7 +62,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages
+# Copy installed packages and models
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /opt/models /opt/models

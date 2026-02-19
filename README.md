@@ -233,28 +233,6 @@ SENTENCE_TRANSFORMER_MODEL=all-MiniLM-L6-v2
 
 ---
 
-## 📸 Screenshots
-
-### 📊 Dashboard & Insights
-
-| Profile Dashboard                       | Career Insights                           |
-| --------------------------------------- | ----------------------------------------- |
-| ![Dashboard](misc/images/dashboard.png) | ![Peer Comparison](misc/images/peers.png) |
-
-### 🚀 Career Growth
-
-| Job Recommendations                               | Skill Gap Analysis                      |
-| ------------------------------------------------- | --------------------------------------- |
-| ![Jobs Recommendations](misc/images/jobmatch.png) | ![Skill Gaps](misc/images/skillgap.png) |
-
-### 🎓 Learning & Coaching
-
-| Personalized Roadmap                | AI Career Coach                 |
-| ----------------------------------- | ------------------------------- |
-| ![Roadmap](misc/images/roadmap.png) | ![Coach](misc/images/coach.png) |
-
----
-
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
