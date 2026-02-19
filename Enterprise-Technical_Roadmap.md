@@ -1,8 +1,8 @@
-# SkillBridge AI — Technical Roadmap
+# SkillBridge — Technical Roadmap
 
 ## 1. Strategic Vision and Roadmap Overview
 
-SkillBridge AI is evolving from a localized MVP into a **production-grade career intelligence ecosystem** designed for Singapore’s **SkillsFuture Career Transition Programme (SCTP)** learners and career switchers.
+SkillBridge is evolving from a localized MVP into a **production-grade career intelligence ecosystem** designed for Singapore’s **SkillsFuture Career Transition Programme (SCTP)** learners and career switchers.
 
 The strategic objective is to provide:
 
@@ -17,22 +17,23 @@ This evolution replaces static data pipelines and basic LLM prompting with a **r
 
 ## 2. Current State vs Target Production State
 
-| Component | Current State (MVP) | Target Production State |
-|----------|--------------------|------------------------|
-| Data Ingestion | Static `seed_db.py` scripts | Live API Gateway (SSG, LinkedIn, Adzuna) |
-| Market Intelligence | Simulated live market script | Real-time automated n8n pipelines |
-| NLP Pipeline | spaCy (`en_core_web_sm`) | Transformer-based custom SG job parser |
-| Embedding Model | `all-MiniLM-L6-v2` | BGE-M3 or OpenAI `text-embedding-3-large` |
-| LLM Orchestration | Basic Gemini 2.0 Flash | Multi-agent RAG with reranking |
-| Vector Storage | Local FAISS index | AWS OpenSearch Serverless (Vector Engine) |
-| Infrastructure | Single-node Docker Compose | Multi-AZ AWS ECS Fargate + Aurora |
-| Security | `.env` files | AWS Secrets Manager + PDPA compliance |
+| Component           | Current State (MVP)          | Target Production State                   |
+| ------------------- | ---------------------------- | ----------------------------------------- |
+| Data Ingestion      | Static `seed_db.py` scripts  | Live API Gateway (SSG, LinkedIn, Adzuna)  |
+| Market Intelligence | Simulated live market script | Real-time automated n8n pipelines         |
+| NLP Pipeline        | spaCy (`en_core_web_sm`)     | Transformer-based custom SG job parser    |
+| Embedding Model     | `all-MiniLM-L6-v2`           | BGE-M3 or OpenAI `text-embedding-3-large` |
+| LLM Orchestration   | Basic Gemini 2.0 Flash       | Multi-agent RAG with reranking            |
+| Vector Storage      | Local FAISS index            | AWS OpenSearch Serverless (Vector Engine) |
+| Infrastructure      | Single-node Docker Compose   | Multi-AZ AWS ECS Fargate + Aurora         |
+| Security            | `.env` files                 | AWS Secrets Manager + PDPA compliance     |
 
 ---
 
 ## 3. Phase 1 — Data Expansion and Real-Time Infrastructure
 
 ### Objective
+
 Build an enterprise-grade, real-time data backbone.
 
 ### Key Initiatives
@@ -89,6 +90,7 @@ Benefits:
 ## 4. Phase 2 — Advanced ML Models and Intelligence Layer
 
 ### Objective
+
 Improve matching accuracy, coaching relevance, and explainability.
 
 ### Key Initiatives
@@ -173,6 +175,7 @@ Enhancements:
 ## 5. Phase 3 — Feature Enhancements and Feedback Ecosystem
 
 ### Objective
+
 Enable continuous learning and user-driven model improvement.
 
 ### Key Initiatives
@@ -235,6 +238,7 @@ Goal:
 ## 6. Infrastructure, Security, and Scalability
 
 ### Objective
+
 Deploy secure, resilient, production-grade AWS infrastructure.
 
 ### Core Components
@@ -356,11 +360,10 @@ Metrics monitored:
 
 ## 9. Outcome
 
-SkillBridge AI will evolve into a:
+SkillBridge will evolve into a:
 
 - Fully automated
 - Production-scale
 - AI-powered career intelligence platform
 
 Designed specifically for Singapore’s workforce transformation ecosystem.
-

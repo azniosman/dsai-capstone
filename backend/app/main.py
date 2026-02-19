@@ -265,7 +265,7 @@ async def lifespan(app):
 
 
 app = FastAPI(
-    title="SkillBridge AI",
+    title="SkillBridge",
     version="0.2.0",
     lifespan=lifespan,
 )
