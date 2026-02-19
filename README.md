@@ -236,15 +236,15 @@ SENTENCE_TRANSFORMER_MODEL=all-MiniLM-L6-v2
 
 ### 📊 Dashboard & Insights
 
-| Profile Dashboard                       | Career Insights                                     |
-| --------------------------------------- | --------------------------------------------------- |
-| ![Dashboard](misc/images/dashboard.png) | ![Career Insights](misc/images/career_insights.png) |
+| Profile Dashboard                       | Career Insights                           |
+| --------------------------------------- | ----------------------------------------- |
+| ![Dashboard](misc/images/dashboard.png) | ![Peer Comparison](misc/images/peers.png) |
 
 ### 🚀 Career Growth
 
-| Job Recommendations           | Skill Gap Analysis                        |
-| ----------------------------- | ----------------------------------------- |
-| ![Jobs](misc/images/jobs.png) | ![Skill Gaps](misc/images/skill_gaps.png) |
+| Job Recommendations                               | Skill Gap Analysis                      |
+| ------------------------------------------------- | --------------------------------------- |
+| ![Jobs Recommendations](misc/images/jobmatch.png) | ![Skill Gaps](misc/images/skillgap.png) |
 
 ### 🎓 Learning & Coaching
 
