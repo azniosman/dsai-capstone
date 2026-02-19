@@ -14,6 +14,8 @@
 
 FROM public.ecr.aws/lambda/python:3.11
 
+# Cache bust: 2026-02-20
+
 # ── Python dependencies ──────────────────────────────────────────────────────
 # All packages use pre-compiled wheels (psycopg2-binary, bcrypt wheel, etc.)
 # so no native build tools (gcc/python3-devel) are required.
