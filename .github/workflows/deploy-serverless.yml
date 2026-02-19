@@ -178,17 +178,23 @@ jobs:
 
       # ── Step 3: Pre-apply cleanup of partially-created resources ─────────────
       # Resources created by previous failed Terraform runs that cannot be
-      # imported cleanly (IAM roles with policies attached, log groups, etc.)
-      # are deleted here so Terraform can recreate them from a clean slate.
+      # imported cleanly are deleted here so Terraform recreates them cleanly.
       - name: Clean up partially-created AWS resources
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
+          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: |
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
 
-          # IAM execution role — detach policies before deleting
+          # ── IAM: delete execution role (with attached policies) + custom policy ──
           ROLE_NAME="${P}-${E}-lambda-exec"
-          echo "Cleaning IAM role: ${ROLE_NAME}"
           POLICY_ARNS=$(aws iam list-attached-role-policies \
             --role-name "$ROLE_NAME" \
             --query 'AttachedPolicies[].PolicyArn' \
@@ -196,22 +202,93 @@ jobs:
           for ARN in $POLICY_ARNS; do
             aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$ARN" 2>/dev/null || true
           done
-          INLINE=$(aws iam list-role-policies \
-            --role-name "$ROLE_NAME" \
-            --query 'PolicyNames[]' \
-            --output text 2>/dev/null || echo "")
-          for POL in $INLINE; do
-            aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name "$POL" 2>/dev/null || true
-          done
           aws iam delete-role --role-name "$ROLE_NAME" 2>/dev/null || true
+          # Also delete the custom policy so Terraform can recreate it
+          aws iam delete-policy \
+            --policy-arn "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy" 2>/dev/null || true
 
-          # CloudWatch log group (API Gateway)
+          # ── CloudWatch log group (API Gateway) ────────────────────────────────
           aws logs delete-log-group \
             --log-group-name "/aws/apigateway/${P}-${E}" 2>/dev/null || true
 
-          # Old RDS parameter group (postgres16 family, incompatible with Aurora)
+          # ── RDS: remove old postgres16 parameter group (no longer in config) ──
           aws rds delete-db-parameter-group \
             --db-parameter-group-name "${P}-${E}-pg16" 2>/dev/null || true
+
+          # ── RDS subnet group: fix VPC mismatch ────────────────────────────────
+          # If the subnet group is in a DIFFERENT VPC than the one Terraform
+          # currently manages, remove it from state and delete from AWS so
+          # Terraform recreates it in the correct VPC.
+          TF_VPC_ID=$(terraform state show module.vpc.aws_vpc.main 2>/dev/null \
+            | grep -E '^\s+id\s+=' | awk '{print $3}' | tr -d '"' || echo "")
+          SG_VPC_ID=$(aws rds describe-db-subnet-groups \
+            --db-subnet-group-name "${P}-${E}-db-subnet" \
+            --query 'DBSubnetGroups[0].VpcId' --output text 2>/dev/null || echo "")
+          if [ -n "$TF_VPC_ID" ] && [ -n "$SG_VPC_ID" ] && \
+             [ "$SG_VPC_ID" != "None" ] && [ "$TF_VPC_ID" != "$SG_VPC_ID" ]; then
+            echo "VPC mismatch: subnet group is in $SG_VPC_ID, TF manages $TF_VPC_ID — fixing"
+            terraform state rm module.rds.aws_db_subnet_group.main 2>/dev/null || true
+            aws rds delete-db-subnet-group \
+              --db-subnet-group-name "${P}-${E}-db-subnet" 2>/dev/null || true
+          fi
+
+          # ── Orphaned VPCs: delete any project VPCs not in current TF state ───
+          for VPC_ID in $(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${P}-${E}-vpc" \
+            --query 'Vpcs[].VpcId' --output text 2>/dev/null | tr '\t' '\n'); do
+            [ -z "$VPC_ID" ] && continue
+            [ "$VPC_ID" = "$TF_VPC_ID" ] && { echo "Active VPC $VPC_ID — skip"; continue; }
+            echo "Deleting orphaned VPC: $VPC_ID"
+            # NAT Gateways (async — must wait before deleting VPC)
+            for NAT in $(aws ec2 describe-nat-gateways \
+              --filter "Name=vpc-id,Values=$VPC_ID" "Name=state,Values=available" \
+              --query 'NatGateways[].NatGatewayId' --output text 2>/dev/null); do
+              aws ec2 delete-nat-gateway --nat-gateway-id "$NAT" 2>/dev/null || true
+            done
+            for i in $(seq 1 18); do
+              PENDING=$(aws ec2 describe-nat-gateways \
+                --filter "Name=vpc-id,Values=$VPC_ID" "Name=state,Values=available,pending,deleting" \
+                --query 'NatGateways[].NatGatewayId' --output text 2>/dev/null)
+              [ -z "$PENDING" ] && break; sleep 10
+            done
+            # Internet Gateway
+            for IGW in $(aws ec2 describe-internet-gateways \
+              --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+              --query 'InternetGateways[].InternetGatewayId' --output text 2>/dev/null); do
+              aws ec2 detach-internet-gateway --internet-gateway-id "$IGW" --vpc-id "$VPC_ID" 2>/dev/null || true
+              aws ec2 delete-internet-gateway --internet-gateway-id "$IGW" 2>/dev/null || true
+            done
+            # Subnets
+            for SUBNET in $(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'Subnets[].SubnetId' --output text 2>/dev/null); do
+              aws ec2 delete-subnet --subnet-id "$SUBNET" 2>/dev/null || true
+            done
+            # Route tables (non-main)
+            for RT in $(aws ec2 describe-route-tables \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'RouteTables[?Associations[0].Main != `true`].RouteTableId' \
+              --output text 2>/dev/null); do
+              aws ec2 delete-route-table --route-table-id "$RT" 2>/dev/null || true
+            done
+            # Security groups (non-default)
+            for SG in $(aws ec2 describe-security-groups \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'SecurityGroups[?GroupName != `default`].GroupId' \
+              --output text 2>/dev/null); do
+              aws ec2 delete-security-group --group-id "$SG" 2>/dev/null || true
+            done
+            aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>/dev/null || true
+            echo "Deleted orphaned VPC: $VPC_ID"
+          done
+
+          # ── Orphaned EIPs (unassociated NAT EIPs) ────────────────────────────
+          for EIP in $(aws ec2 describe-addresses \
+            --filters "Name=tag:Name,Values=${P}-${E}-nat-eip" \
+            --query 'Addresses[?AssociationId==null].AllocationId' \
+            --output text 2>/dev/null | tr '\t' '\n'); do
+            [ -n "$EIP" ] && aws ec2 release-address --allocation-id "$EIP" 2>/dev/null || true
+          done
 
           echo "Cleanup complete"
 
