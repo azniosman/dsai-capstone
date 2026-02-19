@@ -19,10 +19,10 @@ FROM public.ecr.aws/lambda/python:3.11
 # so no native build tools (gcc/python3-devel) are required.
 
 COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
-RUN dnf install -y gcc gcc-c++ python3-devel && \
+RUN yum install -y gcc gcc-c++ python3-devel && \
     pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt && \
-    dnf remove -y gcc gcc-c++ python3-devel && \
-    dnf clean all
+    yum remove -y gcc gcc-c++ python3-devel && \
+    yum clean all
 
 # ── Pre-download NLP models (Lambda runs in private subnet — no internet) ────
 
@@ -32,15 +32,15 @@ ENV HF_HOME=/opt/models/huggingface
 RUN python -m spacy download en_core_web_sm
 
 RUN python -c "\
-from sentence_transformers import SentenceTransformer; \
-SentenceTransformer('all-MiniLM-L6-v2'); \
-print('Sentence Transformer model cached OK')"
+    from sentence_transformers import SentenceTransformer; \
+    SentenceTransformer('all-MiniLM-L6-v2'); \
+    print('Sentence Transformer model cached OK')"
 
 # Verify offline mode works (will be used in Lambda VPC)
 RUN HF_HUB_OFFLINE=1 python -c "\
-import os; os.environ['HF_HUB_OFFLINE']='1'; \
-from sentence_transformers import SentenceTransformer; \
-m = SentenceTransformer('all-MiniLM-L6-v2'); print('Offline mode OK')"
+    import os; os.environ['HF_HUB_OFFLINE']='1'; \
+    from sentence_transformers import SentenceTransformer; \
+    m = SentenceTransformer('all-MiniLM-L6-v2'); print('Offline mode OK')"
 
 # Lock models offline for production
 ENV HF_HUB_OFFLINE=1
