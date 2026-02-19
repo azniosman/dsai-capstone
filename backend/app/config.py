@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
 
+    # AWS
+    aws_region: str = "ap-southeast-1"
+    bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+
     model_config = {
         "env_file": str(_env_file), 
         "extra": "ignore",

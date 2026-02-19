@@ -342,6 +342,10 @@ app.include_router(audit_logs.router, prefix="/api")
 app.include_router(resume_rewriter.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 
+# Voice & AI
+from app.routers import voice
+app.include_router(voice.router, prefix="/api")
+
 
 @app.get("/health")
 def health():
