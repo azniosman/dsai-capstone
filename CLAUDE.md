@@ -8,18 +8,45 @@ SkillBridge — Job Recommendation & Skill Gap Analysis System for SCTP learners
 
 ## Tech Stack
 
-- **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + Recharts
-- **Backend**: Python 3.11 + FastAPI + SQLAlchemy 2 + Pydantic
-- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), spaCy, FAISS
+- **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + Recharts + Framer Motion
+- **Backend**: Python 3.11 + FastAPI + SQLAlchemy 2 + Pydantic + Mangum (Lambda adapter)
+- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), spaCy, FAISS, Google Gemini, AWS Bedrock (Claude 3.5 Sonnet)
 - **Database**: PostgreSQL 16
 - **Automation**: n8n workflows
-- **Deployment**: Docker Compose; AWS via Terraform (ECS Fargate + RDS)
+- **Deployment (capstone)**: Docker Compose locally; AWS Lambda + Aurora Serverless v2 + S3/CloudFront via Terraform
+- **Deployment (enterprise roadmap)**: AWS ECS Fargate + RDS + OpenSearch
+
+## Serverless AWS Deployment
+
+```bash
+# Full automated deploy (ECR → Docker build → Terraform → S3 sync → CF invalidate)
+export TF_VAR_db_password="$(openssl rand -base64 24)"
+export TF_VAR_secret_key="$(openssl rand -hex 32)"
+bash scripts/deploy-serverless.sh dev
+
+# Or step-by-step:
+cd terraform && terraform init
+terraform apply -target=module.ecr -auto-approve          # Step 1: create ECR
+bash scripts/build_and_push.sh dev us-east-1              # Step 2: push image
+terraform apply -var="lambda_image_uri=<ecr_url>" -auto-approve  # Step 3: full apply
+```
+
+The serverless Terraform stack (`terraform/`) targets:
+- **Lambda** (container image from ECR) + **API Gateway HTTP API**
+- **RDS PostgreSQL db.t4g.micro** (private subnet, ~$13/month)
+- **S3 + CloudFront** with OAC (frontend)
+- **Optional OpenSearch** (set `enable_opensearch=true`, adds ~$26/month)
+
+Cost tip: `terraform destroy -target='module.vpc.aws_nat_gateway.main'` to pause NAT Gateway ($32/month) between demos.
 
 ## Build & Run Commands
 
 ```bash
 # Full stack (Docker) — starts db, backend, frontend, n8n
 docker compose up
+
+# Docker deployment helper (wraps docker compose up -d --build)
+bash scripts/deploy.sh
 
 # Backend development (local)
 cd backend
@@ -32,6 +59,9 @@ cd backend && pytest
 cd backend && pytest tests/test_recommender.py -v        # single file
 cd backend && pytest tests/test_recommender.py::test_name -v  # single test
 
+# Comprehensive end-to-end feature test (requires running backend)
+python scripts/full_test.py
+
 # Frontend development
 cd frontend
 npm install
@@ -41,23 +71,31 @@ npm run build     # production build
 
 # Seed database (requires running PostgreSQL)
 python data/scripts/seed_db.py
+
+# AWS deployment scripts
+bash scripts/build_lambda.sh        # packages backend into Lambda ZIP
+bash scripts/build_and_push.sh      # builds Docker images and pushes to ECR
 ```
 
 ## Environment Configuration
 
-Backend settings are in `backend/app/config.py` using `pydantic_settings.BaseSettings`. Key env vars (set in `.env` at project root or via environment):
+Backend settings are in `backend/app/config.py` using `pydantic_settings.BaseSettings`. Key env vars (set in `.env` at project root; see `.env.example`):
 
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB` — DB connection (or `DATABASE_URL` to override)
 - `SECRET_KEY` — JWT signing key (must change from default in production)
-- `GEMINI_API_KEY`, `GEMINI_MODEL` — optional, for LLM chat/interview features
+- `GEMINI_API_KEY`, `GEMINI_MODEL` — optional, for LLM chat/interview features (default model: `gemini-2.0-flash`)
 - `SENTENCE_TRANSFORMER_MODEL` — ML model name (default `all-MiniLM-L6-v2`)
 - `NEXT_PUBLIC_API_URL` — frontend env var pointing to backend (default `http://localhost:8000`)
+- `AWS_REGION` — AWS region (default `ap-southeast-1`)
+- `BEDROCK_MODEL_ID` — AWS Bedrock model (default `anthropic.claude-3-5-sonnet-20241022-v2:0`)
+- `SAGEMAKER_EMBEDDING_ENDPOINT` — optional SageMaker embeddings endpoint name
+- `OPENSEARCH_HOST`, `OPENSEARCH_USERNAME`, `OPENSEARCH_PASSWORD` — optional OpenSearch for enterprise deployment
 
 ## Architecture
 
 ### Backend
 
-- `backend/app/main.py` — FastAPI entry point; handles startup lifecycle: creates tables, syncs schema (`_sync_schema` adds missing columns via ALTER TABLE), seeds reference data, warms up ML models and FAISS indexes
+- `backend/app/main.py` — FastAPI entry point; handles startup lifecycle: creates tables, syncs schema (`_sync_schema` adds missing columns via ALTER TABLE), seeds reference data, warms up ML models and FAISS indexes; exports `handler` (Mangum) for Lambda
 - `backend/app/config.py` — centralized settings via `pydantic_settings`
 - `backend/app/database.py` — SQLAlchemy engine, session factory, `get_db` dependency (pool_size=5, max_overflow=10, pre_ping enabled)
 - `backend/app/auth.py` — JWT utilities (access + refresh tokens, JTI blacklist with TTL cleanup)
@@ -65,25 +103,27 @@ Backend settings are in `backend/app/config.py` using `pydantic_settings.BaseSet
 - `backend/app/limiter.py` — Rate limiting middleware via slowapi
 
 **Routers** (`backend/app/routers/`, all mounted under `/api`):
-auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resume_rewriter, upload, export, dashboard, market, compare, courses, progress, projects, peer, sso, api_keys, audit_logs
+auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resume_rewriter, upload, export, dashboard, market, compare, courses, progress, projects, peer, sso, api_keys, audit_logs, voice
 
 **Services** (`backend/app/services/`):
-`recommender` (hybrid scoring), `skill_matcher` (embedding similarity), `gap_analyzer`, `roadmap_generator`, `course_pathways`, `resume_parser`, `market_simulator`, `subsidy_calculator` (SkillsFuture/MCES), `audit_logger`
+`recommender` (hybrid scoring), `skill_matcher` (embedding similarity), `gap_analyzer`, `roadmap_generator`, `course_pathways`, `resume_parser`, `market_simulator`, `subsidy_calculator` (SkillsFuture/MCES), `audit_logger`, `bedrock_service` (AWS Bedrock LLM), `sagemaker_service` (SageMaker embeddings), `voice_service`, `dashboard_service`
 
 **ML layer** (`backend/app/ml/`):
 
 - `embeddings.py` — Sentence Transformer wrapper; global model instance loaded at startup; `encode_texts()` + cosine similarity
 - `taxonomy.py` — FAISS-based skill normalization; maps free-text skills to canonical taxonomy names (threshold 0.75)
 
-- `backend/app/models/` — SQLAlchemy ORM models (all models have `tenant_id` foreign key)
+- `backend/app/models/` — SQLAlchemy ORM models (all models have `tenant_id` foreign key); includes `snapshot.py` for ML feature snapshots
 - `backend/app/schemas/` — Pydantic request/response schemas
 - `backend/alembic/` — Database migrations (prefer `_sync_schema()` for simple column additions; use Alembic for structural changes)
 - `backend/pyproject.toml` — pytest config; sets `asyncio_mode = auto` (required for async test functions)
 
+**Docker build note**: The backend Dockerfile pre-downloads spaCy and Sentence Transformer models at build time and sets `HF_HUB_OFFLINE=1` so containers work in private subnets without internet access.
+
 ### Frontend
 
-- `frontend/app/` — Next.js App Router; pages by feature: recommendations, skill-gap, roadmap, jd-match, chat, interview, market, compare, courses, progress, projects, peers, resume-rewriter, dashboard
-- `frontend/components/` — `ui/` (shadcn primitives), `layout/` (navbar, breadcrumbs), feature components (gap-table, skill-chip, match-score-bar, roadmap-timeline, workflow-stepper, skeleton-card, empty-state, error-boundary)
+- `frontend/app/` — Next.js App Router; pages by feature: recommendations, skill-gap, roadmap, jd-match, chat, interview, market, compare, courses, progress, projects, peers, resume-rewriter, dashboard, account
+- `frontend/components/` — `ui/` (shadcn primitives), `layout/` (navbar, breadcrumbs), feature components (gap-table, skill-chip, match-score-bar, roadmap-timeline, workflow-stepper, skeleton-card, empty-state, error-boundary, voice-coach, page-transition, theme-provider)
 - `frontend/lib/api-client.ts` — Axios instance with JWT auto-attach and token refresh (shared Promise to prevent race conditions); auto-redirects to `/login` on auth failure
 - `frontend/contexts/tenant-context.tsx` — Multi-tenant theming context; injects CSS custom properties per tenant
 - `frontend/middleware.ts` — Security headers (CSP, X-Frame-Options, Permissions-Policy)
@@ -92,6 +132,12 @@ auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resu
 
 - `data/seed/` — `skills_taxonomy.json` (~150+ skills, categories: programming, cloud, data, security, etc.), `job_roles.json` (SGD salary benchmarks), `sctp_courses.json` (SkillsFuture SCTP courses with subsidy fields)
 - Auto-seeding: backend seeds on startup if the `Global` tenant has no skills data
+
+### Infrastructure
+
+Terraform modules in `terraform/modules/`: `vpc`, `database` (Aurora Serverless v2 + pgvector), `backend` (Lambda + API Gateway), `frontend` (S3 + CloudFront), `alb`, `ecr`, `ecs`, `rds`, `security_groups`, `storage`.
+
+CI/CD: `.github/workflows/deploy-serverless.yml` (currently disabled with `if: false`; deploys via OIDC to AWS ap-southeast-1 using Terraform + Lambda + S3).
 
 ### n8n Workflows
 
@@ -111,7 +157,7 @@ Automation workflows in `n8n/workflows/` (accessible at port 5678):
 - **Hybrid scoring**: `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
 - **Skill levels**: 0 (missing), 0.5 (partial), 1.0 (strong)
 - **FAISS in-memory** for vector similarity search (rebuilt on startup)
-- **LLM fallback**: Gemini API when `GEMINI_API_KEY` is set, otherwise rule-based responses
+- **LLM fallback**: Gemini API when `GEMINI_API_KEY` is set, otherwise rule-based responses; `bedrock_service` provides an alternate path via AWS Bedrock
 - **Auth is optional**: core features (profile, recommendations, skill gap) work without login
 - **Multi-tenancy**: all data models include `tenant_id`; a `Global` tenant is auto-created on startup
 - **Schema sync**: `_sync_schema()` in `main.py` auto-adds new model columns to existing DB tables (no manual migration needed for column additions)

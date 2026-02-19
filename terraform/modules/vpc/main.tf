@@ -1,49 +1,78 @@
-variable "project_name" {}
-variable "environment" {}
-variable "cidr_block" {}
+# Variables are in variables.tf. Outputs are in outputs.tf.
+# No inline output or variable blocks here.
 
-data "aws_availability_zones" "available" {}
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+locals {
+  # Use exactly 2 AZs for RDS subnet group compatibility
+  azs = slice(data.aws_availability_zones.available.names, 0, 2)
+}
+
+# ── VPC ─────────────────────────────────────────────────────────────────────
 
 resource "aws_vpc" "main" {
   cidr_block           = var.cidr_block
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-vpc"
-  }
+  tags = { Name = "${var.project_name}-${var.environment}-vpc" }
 }
+
+# ── Subnets ──────────────────────────────────────────────────────────────────
 
 resource "aws_subnet" "public" {
   count                   = 2
   vpc_id                  = aws_vpc.main.id
   cidr_block              = cidrsubnet(var.cidr_block, 8, count.index)
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  availability_zone       = local.azs[count.index]
   map_public_ip_on_launch = true
 
   tags = {
     Name = "${var.project_name}-${var.environment}-public-${count.index + 1}"
+    Tier = "Public"
   }
 }
 
 resource "aws_subnet" "private" {
   count             = 2
   vpc_id            = aws_vpc.main.id
-  cidr_block        = cidrsubnet(var.cidr_block, 8, count.index + 2)
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+  cidr_block        = cidrsubnet(var.cidr_block, 8, count.index + 10)
+  availability_zone = local.azs[count.index]
 
   tags = {
     Name = "${var.project_name}-${var.environment}-private-${count.index + 1}"
+    Tier = "Private"
   }
 }
+
+# ── Internet Gateway ─────────────────────────────────────────────────────────
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-igw"
-  }
+  tags   = { Name = "${var.project_name}-${var.environment}-igw" }
 }
+
+# ── NAT Gateway — single-AZ, cost-optimised for demo (~$32/month) ────────────
+# To pause costs between demos, destroy just the NAT Gateway:
+#   terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.aws_eip.nat'
+# Then re-create when needed: terraform apply
+
+resource "aws_eip" "nat" {
+  domain     = "vpc"
+  depends_on = [aws_internet_gateway.main]
+  tags       = { Name = "${var.project_name}-${var.environment}-nat-eip" }
+}
+
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public[0].id
+  depends_on    = [aws_internet_gateway.main]
+  tags          = { Name = "${var.project_name}-${var.environment}-nat" }
+}
+
+# ── Route Tables ─────────────────────────────────────────────────────────────
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
@@ -53,29 +82,13 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.main.id
   }
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-public-rt"
-  }
+  tags = { Name = "${var.project_name}-${var.environment}-public-rt" }
 }
 
 resource "aws_route_table_association" "public" {
   count          = 2
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
-}
-
-# NAT Gateway for Private Subnets (Required for Lambda to reach AWS APIs like Bedrock/CloudWatch if inside VPC)
-resource "aws_eip" "nat" {
-  domain = "vpc"
-}
-
-resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-nat"
-  }
 }
 
 resource "aws_route_table" "private" {
@@ -86,49 +99,11 @@ resource "aws_route_table" "private" {
     nat_gateway_id = aws_nat_gateway.main.id
   }
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-private-rt"
-  }
+  tags = { Name = "${var.project_name}-${var.environment}-private-rt" }
 }
 
 resource "aws_route_table_association" "private" {
   count          = 2
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
-}
-
-resource "aws_security_group" "default" {
-  name        = "${var.project_name}-${var.environment}-default-sg"
-  description = "Default security group allowing internal VPC traffic"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-output "vpc_id" {
-  value = aws_vpc.main.id
-}
-
-output "public_subnets" {
-  value = aws_subnet.public[*].id
-}
-
-output "private_subnets" {
-  value = aws_subnet.private[*].id
-}
-
-output "default_security_group_id" {
-  value = aws_security_group.default.id
 }

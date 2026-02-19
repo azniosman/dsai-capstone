@@ -1,0 +1,29 @@
+# Copy this file to terraform.tfvars and fill in real values.
+# NEVER commit terraform.tfvars to git (it contains secrets).
+
+aws_region   = "us-east-1"
+project_name = "skillbridge"
+environment  = "dev"
+
+# Database
+db_username = "skillbridge"
+db_password = "CHANGE_ME_use_openssl_rand_base64_24"
+
+# Backend JWT signing key
+secret_key = "CHANGE_ME_use_openssl_rand_hex_32"
+
+# Optional: Google Gemini fallback (leave empty to use Bedrock only)
+gemini_api_key = ""
+
+# Bedrock model — Claude 3.5 Sonnet v2 (us-east-1 supported)
+bedrock_model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+
+# Set after first ECR apply + docker push:
+# lambda_image_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/skillbridge-dev-backend:latest"
+
+# OpenSearch adds ~$26/month — keep false for basic demo
+enable_opensearch = false
+
+# Lambda sizing (1024 MB recommended for sentence-transformers cold start)
+lambda_memory_mb       = 1024
+lambda_timeout_seconds = 29

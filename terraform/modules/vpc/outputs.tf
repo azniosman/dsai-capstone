@@ -13,3 +13,8 @@ output "private_subnets" {
 output "vpc_cidr_block" {
   value = aws_vpc.main.cidr_block
 }
+
+output "nat_gateway_ip" {
+  value       = aws_eip.nat.public_ip
+  description = "Public IP of NAT Gateway — Lambda egress IP for SG allow-lists"
+}

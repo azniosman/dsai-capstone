@@ -10,9 +10,13 @@ class BedrockService:
     def __init__(self):
         self.client = boto3.client(
             service_name='bedrock-runtime',
-            region_name=settings.aws_region
+            region_name=getattr(settings, 'aws_region', 'us-east-1')
         )
-        self.model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+        # Use configurable model ID from settings (defaults to Claude 3.5 Sonnet v2)
+        self.model_id = getattr(
+            settings, 'bedrock_model_id',
+            "anthropic.claude-3-5-sonnet-20241022-v2:0"
+        )
 
     def invoke_model(self, system_prompt: str, messages: list, temperature: float = 0.7) -> str:
         """

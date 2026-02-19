@@ -1,0 +1,55 @@
+# ============================================================================
+# SkillBridge Lambda Container Image
+#
+# Build context: project root (same as backend/Dockerfile)
+# Uses the AWS Lambda Python 3.11 base image which includes the Lambda
+# Runtime Interface Client (RIC) — no uvicorn needed.
+#
+# CMD = "lambda_handler.handler" (module.function)
+# Terraform image_config.command can override this if needed.
+#
+# Build command (from project root):
+#   docker build -f backend/Dockerfile.lambda -t skillbridge-lambda .
+# ============================================================================
+
+FROM public.ecr.aws/lambda/python:3.11
+
+# Install build tools required by some Python packages (psycopg2-binary, etc.)
+RUN dnf install -y gcc python3-devel && dnf clean all
+
+# ── Python dependencies ──────────────────────────────────────────────────────
+
+COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
+
+# ── Pre-download NLP models (Lambda runs in private subnet — no internet) ────
+
+ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
+ENV HF_HOME=/opt/models/huggingface
+
+RUN python -m spacy download en_core_web_sm
+
+RUN python -c "\
+from sentence_transformers import SentenceTransformer; \
+SentenceTransformer('all-MiniLM-L6-v2'); \
+print('Sentence Transformer model cached OK')"
+
+# Verify offline mode works (will be used in Lambda VPC)
+RUN HF_HUB_OFFLINE=1 python -c "\
+import os; os.environ['HF_HUB_OFFLINE']='1'; \
+from sentence_transformers import SentenceTransformer; \
+m = SentenceTransformer('all-MiniLM-L6-v2'); print('Offline mode OK')"
+
+# Lock models offline for production
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+
+# ── Application code ─────────────────────────────────────────────────────────
+
+COPY backend/app/ ${LAMBDA_TASK_ROOT}/app/
+COPY backend/lambda_handler.py ${LAMBDA_TASK_ROOT}/
+COPY data/seed/ ${LAMBDA_TASK_ROOT}/seed_data/
+
+# ── Lambda handler entrypoint ─────────────────────────────────────────────────
+
+CMD ["lambda_handler.handler"]
