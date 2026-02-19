@@ -19,7 +19,10 @@ FROM public.ecr.aws/lambda/python:3.11
 # so no native build tools (gcc/python3-devel) are required.
 
 COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
-RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
+RUN dnf install -y gcc gcc-c++ python3-devel && \
+    pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt && \
+    dnf remove -y gcc gcc-c++ python3-devel && \
+    dnf clean all
 
 # ── Pre-download NLP models (Lambda runs in private subnet — no internet) ────
 
