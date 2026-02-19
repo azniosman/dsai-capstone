@@ -14,10 +14,9 @@
 
 FROM public.ecr.aws/lambda/python:3.11
 
-# Install build tools required by some Python packages (psycopg2-binary, etc.)
-RUN dnf install -y gcc python3-devel && dnf clean all
-
 # ── Python dependencies ──────────────────────────────────────────────────────
+# All packages use pre-compiled wheels (psycopg2-binary, bcrypt wheel, etc.)
+# so no native build tools (gcc/python3-devel) are required.
 
 COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
 RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
