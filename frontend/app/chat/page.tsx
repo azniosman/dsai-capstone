@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bot, User } from "lucide-react";
+import { Bot, User, Send } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ function TypingIndicator() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="w-2 h-2 rounded-full bg-gray-400 animate-typing-dot"
+          className="w-2 h-2 rounded-full bg-muted-foreground animate-typing-dot"
           style={{ animationDelay: `${i * 0.2}s` }}
         />
       ))}
@@ -74,49 +74,53 @@ export default function CareerChat() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto flex flex-col h-[70vh]">
-      <h1 className="text-2xl font-bold mb-4">WorkD AI Career Advisor</h1>
+    <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
+      <header className="mb-4">
+        <p className="section-label mb-1">AI Advisor</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">Career Coach</h1>
+      </header>
 
-      <Card className="flex-1 overflow-auto p-4 mb-4">
-        <CardContent className="p-0">
+      {/* Message thread */}
+      <Card variant="elevated" className="flex-1 overflow-auto mb-3">
+        <CardContent className="p-4">
           {messages.map((msg, i) => (
             <div
               key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`}
-              className={`flex gap-2 mb-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              className={`flex gap-2.5 mb-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {msg.role === "assistant" && (
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    <Bot className="h-4 w-4" />
+                <Avatar className="h-7 w-7 shrink-0">
+                  <AvatarFallback className="bg-primary text-primary-foreground rounded">
+                    <Bot className="h-3.5 w-3.5" />
                   </AvatarFallback>
                 </Avatar>
               )}
               <div
-                className={`px-3 py-2 rounded-lg max-w-[75%] text-sm whitespace-pre-wrap ${
+                className={`px-3.5 py-2.5 rounded max-w-[78%] text-sm whitespace-pre-wrap leading-relaxed ${
                   msg.role === "user"
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
+                    : "bg-secondary text-foreground border border-border"
                 }`}
               >
                 {msg.content}
               </div>
               {msg.role === "user" && (
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarFallback className="bg-[#00897b] text-white">
-                    <User className="h-4 w-4" />
+                <Avatar className="h-7 w-7 shrink-0">
+                  <AvatarFallback className="bg-emerald-600 text-white rounded">
+                    <User className="h-3.5 w-3.5" />
                   </AvatarFallback>
                 </Avatar>
               )}
             </div>
           ))}
           {loading && (
-            <div className="flex gap-2 mb-4">
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  <Bot className="h-4 w-4" />
+            <div className="flex gap-2.5 mb-4">
+              <Avatar className="h-7 w-7 shrink-0">
+                <AvatarFallback className="bg-primary text-primary-foreground rounded">
+                  <Bot className="h-3.5 w-3.5" />
                 </AvatarFallback>
               </Avatar>
-              <div className="bg-muted rounded-lg">
+              <div className="bg-secondary border border-border rounded">
                 <TypingIndicator />
               </div>
             </div>
@@ -125,13 +129,14 @@ export default function CareerChat() {
         </CardContent>
       </Card>
 
+      {/* Suggested prompts — shown only at start */}
       {messages.length <= 1 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="flex flex-wrap gap-1.5 mb-3">
           {SUGGESTED_PROMPTS.map((prompt) => (
             <Badge
               key={prompt}
-              variant="outline"
-              className="cursor-pointer border-primary text-primary hover:bg-primary/10"
+              variant="accent"
+              className="cursor-pointer hover:bg-primary/20 text-xs"
               onClick={() => send(prompt)}
             >
               {prompt}
@@ -140,6 +145,7 @@ export default function CareerChat() {
         </div>
       )}
 
+      {/* Input row */}
       <div className="flex gap-2">
         <Input
           placeholder="Ask about careers, skills, SCTP courses..."
@@ -147,8 +153,11 @@ export default function CareerChat() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           disabled={loading}
+          className="flex-1"
         />
-        <Button onClick={() => send()} disabled={loading}>Send</Button>
+        <Button onClick={() => send()} disabled={loading} size="icon">
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );

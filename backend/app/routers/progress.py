@@ -1,5 +1,6 @@
 """Progress tracking — record and retrieve skill progress over time."""
 
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -17,7 +18,7 @@ router = APIRouter(tags=["progress"])
 class ProgressEntry(BaseModel):
     skill: str
     level: float
-    recorded_at: str | None = None
+    recorded_at: Optional[str] = None
     model_config = {"from_attributes": True}
 
 

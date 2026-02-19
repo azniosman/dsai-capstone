@@ -1,5 +1,6 @@
 """Singapore labor market insights endpoint."""
 
+from typing import Optional, List
 from app.models.tenant import Tenant
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -16,12 +17,12 @@ router = APIRouter(tags=["market"])
 class MarketInsightResponse(BaseModel):
     role_category: str
     trending_skills: list[str] = []
-    avg_salary_sgd: float | None = None
-    demand_level: str | None = "Medium"
-    hiring_volume: int | None = 0
-    yoy_growth_pct: float | None = 0.0
-    forecast_2026: str | None = None
-    outlook: str | None = None
+    avg_salary_sgd: Optional[float] = None
+    demand_level: Optional[str] = "Medium"
+    hiring_volume: Optional[int] = 0
+    yoy_growth_pct: Optional[float] = 0.0
+    forecast_2026: Optional[str] = None
+    outlook: Optional[str] = None
     model_config = {"from_attributes": True}
 
 

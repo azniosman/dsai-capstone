@@ -1,7 +1,8 @@
+from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from app.models.sctp_course import SCTPCourse
 
-def generate_learning_pathways(skills_needed: list[str], db: Session, tenant_id: int | None = None) -> list[dict]:
+def generate_learning_pathways(skills_needed: List[str], db: Session, tenant_id: Optional[int] = None) -> List[Dict]:
     """
     Generates structured learning pathways for missing skills.
     Groups courses by skill and sorts by level (Beginner -> Intermediate -> Advanced).

@@ -12,7 +12,21 @@ import {
 import SkeletonCard from "@/components/skeleton-card";
 import api from "@/lib/api-client";
 
-const DEMAND_COLORS: Record<string, string> = { high: "#4caf50", medium: "#ff9800", low: "#f44336" };
+const CHART_STYLE = {
+  contentStyle: {
+    backgroundColor: "#ffffff",
+    border: "1px solid #d9d4cc",
+    borderRadius: "6px",
+    fontSize: "12px",
+    color: "#1a1a1a",
+  },
+};
+
+function demandVariant(level: string): "success" | "warning" | "destructive" {
+  if (level === "high") return "success";
+  if (level === "medium") return "warning";
+  return "destructive";
+}
 
 interface Insight {
   role_category: string;
@@ -61,17 +75,24 @@ export default function MarketInsights() {
   }));
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Singapore Tech Market Insights</h1>
+    <div className="space-y-5">
+      <header>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="live-dot" />
+          <p className="section-label">Live Data</p>
+        </div>
+        <h1 className="text-2xl font-extrabold tracking-tight">Singapore Tech Market</h1>
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="p-6">
-          <CardContent className="p-0">
-            <h2 className="text-lg font-bold mb-3">Top In-Demand Skills</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Top skills */}
+        <Card variant="data">
+          <CardContent className="p-5">
+            <p className="section-label mb-3">Top In-Demand Skills</p>
             <div className="flex flex-wrap gap-1.5">
               {data.top_skills_overall.map((skill, i) => (
                 <Badge key={skill} variant={i < 3 ? "default" : "outline"}>
-                  {i < 3 && <TrendingUp className="h-3 w-3 mr-1" />}
+                  {i < 3 && <TrendingUp className="h-2.5 w-2.5 mr-1" />}
                   {skill}
                 </Badge>
               ))}
@@ -79,87 +100,104 @@ export default function MarketInsights() {
           </CardContent>
         </Card>
 
-        <Card className="p-6">
-          <CardContent className="p-0">
-            <h2 className="text-lg font-bold mb-3">Fastest Growing Sectors</h2>
-            {data.highest_demand_sectors.map((sector, i) => (
-              <p key={sector} className="text-base">{i + 1}. {sector}</p>
-            ))}
+        {/* Fastest growing sectors */}
+        <Card variant="metric">
+          <CardContent className="p-5">
+            <p className="section-label mb-3">Fastest Growing Sectors</p>
+            <div className="space-y-1.5">
+              {data.highest_demand_sectors.map((sector, i) => (
+                <div key={sector} className="flex items-center gap-2">
+                  <span className="text-xs font-bold data-num text-primary w-4">{i + 1}</span>
+                  <span className="text-sm font-medium">{sector}</span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="p-6">
-          <CardContent className="p-0">
-            <h2 className="text-lg font-bold mb-3">Average Monthly Salary (SGD)</h2>
-            <div className="h-[300px]" role="img" aria-label="Bar chart of average monthly salaries by tech category">
+        {/* Salary chart */}
+        <Card variant="elevated">
+          <CardContent className="p-5">
+            <p className="section-label mb-4">Avg Monthly Salary (SGD)</p>
+            <div className="h-[280px]" role="img" aria-label="Bar chart of average monthly salaries by tech category">
               <ResponsiveContainer>
                 <BarChart data={salaryData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="category" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
-                  <YAxis />
-                  <Tooltip formatter={(v) => `SGD ${Number(v).toLocaleString()}`} />
-                  <Bar dataKey="salary" fill="#1565c0" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
+                  <XAxis dataKey="category" tick={{ fill: "#6b7280", fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
+                  <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} />
+                  <Tooltip
+                    formatter={(v) => `SGD ${Number(v).toLocaleString()}`}
+                    contentStyle={CHART_STYLE.contentStyle}
+                  />
+                  <Bar dataKey="salary" fill="#00BFFF" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="p-6">
-          <CardContent className="p-0">
-            <h2 className="text-lg font-bold mb-3">YoY Growth (%)</h2>
-            <div className="h-[300px]" role="img" aria-label="Bar chart of year-over-year growth percentages by category">
+        {/* YoY growth chart */}
+        <Card variant="elevated">
+          <CardContent className="p-5">
+            <p className="section-label mb-4">YoY Growth (%)</p>
+            <div className="h-[280px]" role="img" aria-label="Bar chart of year-over-year growth by category">
               <ResponsiveContainer>
                 <BarChart data={salaryData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="category" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
-                  <YAxis />
-                  <Tooltip formatter={(v) => `${v}%`} />
-                  <Bar dataKey="growth" fill="#00897b" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
+                  <XAxis dataKey="category" tick={{ fill: "#6b7280", fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
+                  <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} />
+                  <Tooltip
+                    formatter={(v) => `${v}%`}
+                    contentStyle={CHART_STYLE.contentStyle}
+                  />
+                  <Bar dataKey="growth" fill="#28c76f" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="col-span-1 md:col-span-2 p-6">
-          <CardContent className="p-0">
-            <h2 className="text-lg font-bold mb-3">Market Overview Radar</h2>
+        {/* Radar overview */}
+        <Card variant="data" className="col-span-1 md:col-span-2">
+          <CardContent className="p-5">
+            <p className="section-label mb-4">Market Overview Radar</p>
             <div className="h-[350px]" role="img" aria-label="Radar chart showing market demand and growth across tech categories">
               <ResponsiveContainer>
                 <RadarChart data={radarData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="category" tick={{ fontSize: 11 }} />
-                  <PolarRadiusAxis />
-                  <Radar name="Demand" dataKey="demand" stroke="#1565c0" fill="#1565c0" fillOpacity={0.2} />
-                  <Radar name="Growth %" dataKey="growth" stroke="#00897b" fill="#00897b" fillOpacity={0.2} />
-                  <Legend />
+                  <PolarGrid stroke="#d9d4cc" />
+                  <PolarAngleAxis dataKey="category" tick={{ fill: "#374151", fontSize: 11 }} />
+                  <PolarRadiusAxis tick={{ fill: "#6b7280", fontSize: 10 }} />
+                  <Radar name="Demand" dataKey="demand" stroke="#00BFFF" fill="#00BFFF" fillOpacity={0.2} />
+                  <Radar name="Growth %" dataKey="growth" stroke="#28c76f" fill="#28c76f" fillOpacity={0.2} />
+                  <Legend wrapperStyle={{ color: "#374151", fontSize: "12px" }} />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
+        {/* Sector detail cards */}
         {data.insights.map((ins) => (
-          <Card key={ins.role_category} className="p-6">
-            <CardContent className="p-0">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold">{ins.role_category}</h3>
-                <Badge style={{ backgroundColor: DEMAND_COLORS[ins.demand_level], color: "white" }}>
-                  {ins.demand_level}
-                </Badge>
+          <Card key={ins.role_category} variant="elevated" className="hover-lift">
+            <CardContent className="p-5">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-sm">{ins.role_category}</h3>
+                <Badge variant={demandVariant(ins.demand_level)}>{ins.demand_level}</Badge>
               </div>
-              <p className="text-lg font-bold">SGD {ins.avg_salary_sgd.toLocaleString()}/mo</p>
-              <p className="text-sm text-muted-foreground mb-3">
-                {ins.hiring_volume} openings &middot; {ins.yoy_growth_pct}% YoY growth
+              <p className="text-xl font-extrabold data-num text-primary mb-0.5">
+                SGD {ins.avg_salary_sgd.toLocaleString()}<span className="text-xs font-normal text-muted-foreground">/mo</span>
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                <span className="data-num">{ins.hiring_volume}</span> openings &middot;{" "}
+                <span className="data-num trend-up">{ins.yoy_growth_pct}%</span> YoY growth
               </p>
 
               {ins.forecast_2026 && (
-                <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
-                  <p className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider mb-1">
+                <div className="mb-3 p-3 bg-primary/8 border border-primary/20 rounded">
+                  <p className="section-label text-primary mb-1">
                     2026 Outlook: {ins.forecast_2026}
                   </p>
-                  <p className="text-sm text-blue-600 dark:text-blue-200 leading-snug">
+                  <p className="text-xs leading-relaxed">
                     {ins.outlook}
                   </p>
                 </div>
@@ -167,7 +205,7 @@ export default function MarketInsights() {
 
               <div className="flex flex-wrap gap-1">
                 {ins.trending_skills.slice(0, 4).map((s) => (
-                  <Badge key={s} variant="outline">{s}</Badge>
+                  <Badge key={s} variant="accent" className="text-xs">{s}</Badge>
                 ))}
               </div>
             </CardContent>

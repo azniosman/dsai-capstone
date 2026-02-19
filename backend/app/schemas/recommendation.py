@@ -1,3 +1,4 @@
+from typing import Optional, List
 from pydantic import BaseModel
 
 
@@ -12,7 +13,7 @@ class RoleRecommendation(BaseModel):
     matched_skills: list[str]
     missing_skills: list[str]
     rationale: str
-    salary_range: str | None
+    salary_range: Optional[str]
     skill_match_quality: str = "developing"  # "strong", "moderate", "developing"
 
 

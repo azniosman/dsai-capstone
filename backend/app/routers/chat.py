@@ -2,6 +2,7 @@
 
 import logging
 
+from typing import Optional, List, Union
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -24,7 +25,7 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    profile_id: int | None = None
+    profile_id: Optional[int] = None
     messages: list[ChatMessage]
 
 
@@ -32,7 +33,7 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-def _build_market_insights_table(insights: list | None = None) -> str:
+def _build_market_insights_table(insights: Optional[List] = None) -> str:
     """Format market insights as a ranked table sorted by YoY growth."""
     source = insights if insights else DEFAULT_INSIGHTS
     # Handle DB objects or dicts
@@ -231,7 +232,7 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
         ))
 
 
-def _fallback_response(user_msg: str, profile_id: int | None = None, db: Session | None = None, tenant_id: int | None = None) -> str:
+def _fallback_response(user_msg: str, profile_id: Optional[int] = None, db: Optional[Session] = None, tenant_id: Optional[int] = None) -> str:
     """WorkD AI rule-based fallback when no LLM API key is configured."""
     msg = user_msg.lower()
 

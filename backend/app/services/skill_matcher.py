@@ -1,6 +1,8 @@
 """Skill matching using Sentence Transformers + FAISS for similarity search."""
 
+from typing import Optional, Union, Tuple
 import faiss
+from typing import List, Dict # Added redundant but safe imports if needed, or stick to what's there
 import numpy as np
 
 from app.ml.embeddings import encode_texts
@@ -22,7 +24,6 @@ from functools import lru_cache
 @lru_cache(maxsize=1024)
 def _cached_encode(texts: tuple[str]) -> np.ndarray:
     """Cache embedding generation for immutable tuple of texts."""
-    print(f"DEBUG: CACHE MISS - Encoding {len(texts)} texts: {texts[:2]}...")
     return encode_texts(list(texts)).astype(np.float32)
 
 
@@ -41,7 +42,7 @@ def match_skills(
     required_skills: list[str],
     partial_threshold: float = 0.6,
     strong_threshold: float = 0.85,
-    cached_index: tuple[faiss.Index, list[str]] | None = None,
+    cached_index: Optional[Tuple[faiss.Index, List[str]]] = None,
 ) -> dict[str, float]:
     """Score each required skill against user skills.
 
@@ -81,7 +82,7 @@ def match_skills(
 def compute_content_similarity(
     user_skills: list[str], 
     role_skills: list[str], 
-    cached_index: tuple[faiss.Index, list[str]] | None = None
+    cached_index: Optional[Tuple[faiss.Index, List[str]]] = None
 ) -> float:
     """Compute weighted content similarity between user skills and role requirements.
 
@@ -97,8 +98,6 @@ def compute_content_similarity(
         w = CATEGORY_WEIGHTS.get(get_skill_category(skill), 1.0)
         weighted_sum += score * w
         weight_total += w
-    if weight_total == 0:
-        return 0.0
     if weight_total == 0:
         return 0.0
     return weighted_sum / weight_total

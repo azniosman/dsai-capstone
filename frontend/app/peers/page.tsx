@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SkeletonCard from "@/components/skeleton-card";
 import EmptyState from "@/components/empty-state";
@@ -24,6 +23,36 @@ interface PeerData {
   your_skills_count: number;
   your_experience: number;
   peer_insights: PeerInsight[];
+}
+
+function CompareBar({ yours, avg, label }: { yours: number; avg: number; label: string }) {
+  const max = Math.max(yours, avg, 1);
+  const youPct = Math.min((yours / max) * 100, 100);
+  const avgPct = Math.min((avg / max) * 100, 100);
+  const ahead = yours >= avg;
+
+  return (
+    <div>
+      <div className="flex justify-between mb-1">
+        <span className="section-label">{label}</span>
+        <span className="text-xs text-muted-foreground data-num">
+          You: <span className={`font-bold ${ahead ? "text-primary" : "text-amber-500"}`}>{yours}</span>
+          {" "}· Avg: {avg}
+        </span>
+      </div>
+      <div className="space-y-1">
+        <div className="score-bar-track w-full">
+          <div
+            className={`score-bar-fill ${ahead ? "bg-primary" : "bg-amber-500"}`}
+            style={{ width: `${youPct}%` }}
+          />
+        </div>
+        <div className="score-bar-track w-full">
+          <div className="score-bar-fill bg-muted-foreground/40" style={{ width: `${avgPct}%` }} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function PeerComparison() {
@@ -54,73 +83,71 @@ export default function PeerComparison() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-2">Peer Comparison</h1>
-      <p className="text-sm text-muted-foreground mb-6">
-        See how your profile compares to others targeting similar roles.
-      </p>
+    <div className="space-y-5">
+      <header>
+        <p className="section-label mb-1">Benchmarking</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">Peer Comparison</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Anonymised comparison with professionals targeting similar roles.
+        </p>
+      </header>
 
-      <Card className="p-6 mb-6">
-        <CardContent className="p-0">
-          <p className="text-sm font-semibold">Your Profile</p>
-          <p>Skills: {data.your_skills_count} &middot; Experience: {data.your_experience} years</p>
+      {/* Your stats */}
+      <Card variant="metric">
+        <CardContent className="p-5">
+          <p className="section-label mb-3">Your Profile</p>
+          <div className="flex gap-6">
+            <div>
+              <div className="kpi-number-accent" style={{ fontSize: "2rem" }}>{data.your_skills_count}</div>
+              <p className="text-xs text-muted-foreground mt-1">Skills</p>
+            </div>
+            <div>
+              <div className="kpi-number" style={{ fontSize: "2rem" }}>{data.your_experience}</div>
+              <p className="text-xs text-muted-foreground mt-1">Years exp.</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {data.peer_insights.map((peer) => (
-          <Card key={peer.role_title} className="p-6 h-full">
-            <CardContent className="p-0">
-              <h2 className="text-lg font-bold mb-4">{peer.role_title}</h2>
+          <Card key={peer.role_title} variant="elevated" className="h-full">
+            <CardContent className="p-5">
+              <h2 className="font-bold text-sm mb-4 leading-tight">{peer.role_title}</h2>
 
-              <div className="mb-4">
-                <p className="text-xs text-muted-foreground mb-1">Skills Count (You vs Peers)</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold">{data.your_skills_count}</span>
-                  <Progress
-                    value={Math.min((data.your_skills_count / Math.max(peer.avg_skills_count, 1)) * 100, 100)}
-                    className={`flex-1 h-2 ${
-                      data.your_skills_count >= peer.avg_skills_count
-                        ? "[&>div]:bg-green-500"
-                        : "[&>div]:bg-orange-500"
-                    }`}
-                  />
-                  <span className="text-sm text-muted-foreground">{peer.avg_skills_count} avg</span>
-                </div>
+              <div className="space-y-4 mb-4">
+                <CompareBar
+                  label="Skills Count"
+                  yours={data.your_skills_count}
+                  avg={peer.avg_skills_count}
+                />
+                <CompareBar
+                  label="Experience (yrs)"
+                  yours={data.your_experience}
+                  avg={peer.avg_experience_years}
+                />
               </div>
 
-              <div className="mb-4">
-                <p className="text-xs text-muted-foreground mb-1">Experience (You vs Peers)</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold">{data.your_experience}yr</span>
-                  <Progress
-                    value={Math.min((data.your_experience / Math.max(peer.avg_experience_years, 1)) * 100, 100)}
-                    className={`flex-1 h-2 ${
-                      data.your_experience >= peer.avg_experience_years
-                        ? "[&>div]:bg-green-500"
-                        : "[&>div]:bg-orange-500"
-                    }`}
-                  />
-                  <span className="text-sm text-muted-foreground">{peer.avg_experience_years}yr avg</span>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground mb-1">Most Common Skills Among Peers</p>
+              <p className="section-label mb-2">Most Common Peer Skills</p>
               <div className="flex flex-wrap gap-1 mb-4">
                 {peer.most_common_skills.map((s) => (
-                  <Badge key={s} variant="outline">{s}</Badge>
+                  <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
                 ))}
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                Typical education: {peer.most_common_education} &middot;{" "}
-                {Math.round(peer.career_switcher_pct * 100)}% are career switchers
-              </p>
-              {peer.total_peers > 0 && (
+              <div className="border-t border-border pt-3 space-y-1">
                 <p className="text-xs text-muted-foreground">
-                  Based on {peer.total_peers} similar profiles
+                  Typical education: <span className="text-foreground font-medium">{peer.most_common_education}</span>
                 </p>
-              )}
+                <p className="text-xs text-muted-foreground">
+                  <span className="data-num font-semibold">{Math.round(peer.career_switcher_pct * 100)}%</span> are career switchers
+                </p>
+                {peer.total_peers > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Based on <span className="data-num font-semibold">{peer.total_peers}</span> similar profiles
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
         ))}

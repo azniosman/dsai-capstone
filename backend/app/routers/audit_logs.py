@@ -1,5 +1,4 @@
-from typing import Any
-
+from typing import Any, Optional, List
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -17,10 +16,10 @@ router = APIRouter(prefix="/audit-logs", tags=["audit-logs"])
 class AuditLogResponse(BaseModel):
     id: int
     tenant_id: int
-    user_id: int | None
+    user_id: Optional[int]
     action: str
     timestamp: datetime
-    details: dict[str, Any] | None
+    details: Optional[dict[str, Any]]
     model_config = {"from_attributes": True}
 
 

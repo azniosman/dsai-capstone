@@ -1,6 +1,7 @@
 """Dashboard summary endpoint — aggregates key profile metrics in a single call."""
 
 import logging
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -16,7 +17,7 @@ router = APIRouter(tags=["dashboard"])
 class DashboardSummary(BaseModel):
     profile_id: int
     name: str
-    education: str | None
+    education: Optional[str]
     years_experience: int
     skills: list[str]
     is_career_switcher: bool
@@ -24,6 +25,9 @@ class DashboardSummary(BaseModel):
     recommendations_count: int
     gaps_identified: int
     progress_entries: int
+    skills_delta: int
+    recommendations_delta: int
+    gaps_delta: int
     career_readiness: float  # 0-100 percentage
 
 
@@ -57,18 +61,10 @@ def get_dashboard_summary(
     total_gaps = 0
     if recommendations:
         from app.services.gap_analyzer import analyze_gaps
-        # Analyze gaps for the top recommended role
-        top_role_id = recommendations[0].role_id
-        # We need to fetch the role object or use the service efficiently
-        # gap_analyzer.analyze_gaps analyzes *all* relevant roles or specific ones?
-        # Let's check gap_analyzer signature. It usually returns a list of gaps for reviewed roles.
-        # For dashboard summary, we might just want a simple count or use the pre-computed 'missing_skills' from recommendations.
-        
         # Optimization: use the 'missing_skills' already returned by get_recommendations for the top 3
         # This avoids re-running the gap analyzer service which might be heavy.
         
-        # Sum gaps from top 3 recommendations to give a sense of "work to do"
-        # Or just show gaps for the #1 role. Let's do #1 role.
+        # for dashboard summary, we show gaps for the #1 role.
         total_gaps = len(recommendations[0].missing_skills)
 
     # Count progress entries
@@ -79,6 +75,21 @@ def get_dashboard_summary(
         .count()
     )
 
+    # Calculate current metrics package
+    current_metrics = {
+        "skills_count": len(user_skills),
+        "recommendations_count": len(recommendations),
+        "gaps_count": total_gaps,
+        "career_readiness": career_readiness,
+    }
+
+    # Capture snapshot and calculate deltas
+    from app.services.dashboard_service import capture_daily_snapshot, get_dashboard_deltas
+    
+    # Lazy capture: we capture the snapshot when the user visits the dashboard
+    capture_daily_snapshot(profile, db, current_metrics)
+    deltas = get_dashboard_deltas(profile, db, current_metrics)
+
     return DashboardSummary(
         profile_id=profile.id,
         name=profile.name,
@@ -86,10 +97,13 @@ def get_dashboard_summary(
         years_experience=profile.years_experience,
         skills=profile.skills or [],
         is_career_switcher=profile.is_career_switcher,
-        skills_count=len(profile.skills or []),
-        recommendations_count=len(recommendations),
-        gaps_identified=total_gaps,
+        skills_count=current_metrics["skills_count"],
+        recommendations_count=current_metrics["recommendations_count"],
+        gaps_identified=current_metrics["gaps_count"],
         progress_entries=progress_count,
         # Ensure readiness is nicely bounded
         career_readiness=min(100.0, max(0.0, career_readiness)),
+        skills_delta=deltas["skills_delta"],
+        recommendations_delta=deltas["recommendations_delta"],
+        gaps_delta=deltas["gaps_delta"],
     )

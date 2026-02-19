@@ -1,3 +1,4 @@
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -16,10 +17,10 @@ class CourseItem(BaseModel):
     title: str
     provider: str
     skills_taught: list[str]
-    duration_weeks: int | None
+    duration_weeks: Optional[int]
     level: str
-    url: str | None
-    certification: str | None
+    url: Optional[str]
+    certification: Optional[str]
     course_fee: float
     subsidy_percent: float
     mces_eligible: bool
@@ -52,10 +53,10 @@ class SubsidyResponse(BaseModel):
 
 @router.get("/courses", response_model=CourseListResponse)
 def list_courses(
-    skill: str | None = None,
-    provider: str | None = None,
-    level: str | None = None,
-    mces_eligible: bool | None = None,
+    skill: Optional[str] = None,
+    provider: Optional[str] = None,
+    level: Optional[str] = None,
+    mces_eligible: Optional[bool] = None,
     db: Session = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
 ):

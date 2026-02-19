@@ -17,8 +17,8 @@ interface TenantContextValue {
 const defaultConfig: TenantConfig = {
   name: "SkillBridge AI",
   logoUrl: "",
-  primaryColor: "#1565c0",
-  secondaryColor: "#00897b",
+  primaryColor: "#00BFFF",   // Countrast sky blue
+  secondaryColor: "#E8562A", // Countrast burnt orange
 };
 
 export const TenantContext = createContext<TenantContextValue>({

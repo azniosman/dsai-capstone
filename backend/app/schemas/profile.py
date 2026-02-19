@@ -1,34 +1,35 @@
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
 class ProfileCreate(BaseModel):
     name: str = Field(max_length=200)
-    education: str | None = Field(None, max_length=500)
+    education: Optional[str] = Field(None, max_length=500)
     years_experience: int = 0
-    age: int | None = None
-    skills: list[str] = []
-    resume_text: str | None = Field(None, max_length=50000)
+    age: Optional[int] = None
+    skills: List[str] = []
+    resume_text: Optional[str] = Field(None, max_length=50000)
     is_career_switcher: bool = False
 
 
 class ProfileUpdate(BaseModel):
-    name: str | None = Field(None, max_length=200)
-    education: str | None = Field(None, max_length=500)
-    years_experience: int | None = None
-    age: int | None = None
-    skills: list[str] | None = None
-    resume_text: str | None = Field(None, max_length=50000)
-    is_career_switcher: bool | None = None
+    name: Optional[str] = Field(None, max_length=200)
+    education: Optional[str] = Field(None, max_length=500)
+    years_experience: Optional[int] = None
+    age: Optional[int] = None
+    skills: Optional[List[str]] = None
+    resume_text: Optional[str] = Field(None, max_length=50000)
+    is_career_switcher: Optional[bool] = None
 
 
 class ProfileResponse(BaseModel):
     id: int
-    user_id: int | None = None
+    user_id: Optional[int] = None
     name: str
-    education: str | None
+    education: Optional[str]
     years_experience: int
-    age: int | None
-    skills: list[str]
+    age: Optional[int]
+    skills: List[str]
     is_career_switcher: bool
 
     model_config = {"from_attributes": True}

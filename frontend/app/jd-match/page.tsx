@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,17 @@ import { toast } from "sonner";
 import GapTable from "@/components/gap-table";
 import api from "@/lib/api-client";
 
-const GAP_COLORS: Record<string, string> = { none: "#4caf50", low: "#2196f3", medium: "#ff9800", high: "#f44336" };
+const GAP_COLORS: Record<string, string> = {
+  none: "#28c76f",
+  low: "#00BFFF",
+  medium: "#f9a825",
+  high: "#e84848",
+};
+
+const CHART_STYLE = {
+  contentStyle: { backgroundColor: "#ffffff", border: "1px solid #d9d4cc", borderRadius: "6px", fontSize: "12px", color: "#1a1a1a" },
+  labelStyle: { color: "#374151" },
+};
 
 interface Gap {
   skill: string;
@@ -69,18 +79,32 @@ export default function JDMatch() {
     skill: g.skill, level: g.user_level, severity: g.gap_severity,
   })) || [];
 
-  return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">Job Description Match</h1>
+  const score = result ? Math.round(result.match_score * 100) : 0;
+  const scoreColor = score >= 60 ? "text-primary" : score >= 40 ? "text-amber-500" : "text-destructive";
 
-      <Card className="p-6 mb-6">
-        <CardContent className="p-0 space-y-4">
-          <div>
-            <Label htmlFor="title">Job Title (optional)</Label>
+  return (
+    <div className="space-y-5">
+      <header>
+        <p className="section-label mb-1">Analysis Tool</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">Job Description Match</h1>
+      </header>
+
+      <Card variant="data">
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <FileText className="h-4 w-4 text-primary" />
+            <p className="section-label">Paste a JD to score your profile against it</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="title" className="text-xs font-semibold uppercase tracking-widest" style={{ letterSpacing: "0.08em" }}>
+              Job Title (optional)
+            </Label>
             <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
-          <div>
-            <Label htmlFor="jd">Paste Job Description</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="jd" className="text-xs font-semibold uppercase tracking-widest" style={{ letterSpacing: "0.08em" }}>
+              Job Description
+            </Label>
             <Textarea
               id="jd"
               rows={8}
@@ -90,51 +114,67 @@ export default function JDMatch() {
             />
           </div>
           <Button onClick={handleMatch} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Analyze Match
           </Button>
         </CardContent>
       </Card>
 
-      {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
       {result && (
-        <>
-          <Card className="p-6 mb-6">
-            <CardContent className="p-0">
-              <h2 className="text-lg font-bold">{result.job_title}</h2>
-              <p className={`text-3xl font-bold ${result.match_score >= 0.6 ? "text-green-600" : "text-orange-500"}`}>
-                {Math.round(result.match_score * 100)}% Match
-              </p>
+        <div className="space-y-5">
+          {/* Score card */}
+          <Card variant="metric">
+            <CardContent className="p-5">
+              <p className="section-label mb-2">{result.job_title}</p>
+              <div className={`kpi-number-accent ${scoreColor}`} style={{ fontSize: "3rem" }}>
+                {score}<span className="text-xl font-normal text-muted-foreground">%</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 mb-4">Match Score</p>
+              <div className="score-bar-track w-full">
+                <div
+                  className="score-bar-fill"
+                  style={{ width: `${score}%`, background: score >= 60 ? "hsl(190 100% 50%)" : score >= 40 ? "hsl(38 95% 56%)" : "hsl(5 82% 56%)" }}
+                />
+              </div>
               <div className="mt-4 flex gap-1.5 flex-wrap items-center">
-                <span className="text-sm font-semibold">Extracted Skills:</span>
+                <p className="section-label mr-1">Extracted Skills</p>
                 {result.extracted_skills.map((s) => (
-                  <Badge key={s} variant="outline">{s}</Badge>
+                  <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
                 ))}
               </div>
             </CardContent>
           </Card>
 
           {chartData.length > 0 && (
-            <div className="h-[300px] mb-6" role="img" aria-label="Bar chart showing your skill levels for this job">
-              <ResponsiveContainer>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" domain={[0, 1]} />
-                  <YAxis type="category" dataKey="skill" width={100} tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v) => `${Math.round(Number(v) * 100)}%`} />
-                  <Bar dataKey="level" name="Your Level">
-                    {chartData.map((entry, i) => (
-                      <Cell key={i} fill={GAP_COLORS[entry.severity]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <Card variant="elevated">
+              <CardContent className="p-5">
+                <p className="section-label mb-4">Your Skill Levels</p>
+                <div className="h-[300px]" role="img" aria-label="Bar chart showing your skill levels for this job">
+                  <ResponsiveContainer>
+                    <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
+                      <XAxis type="number" domain={[0, 1]} tick={{ fill: "#6b7280", fontSize: 11 }} />
+                      <YAxis type="category" dataKey="skill" width={100} tick={{ fill: "#374151", fontSize: 11 }} />
+                      <Tooltip
+                        formatter={(v) => `${Math.round(Number(v) * 100)}%`}
+                        contentStyle={CHART_STYLE.contentStyle}
+                      />
+                      <Bar dataKey="level" name="Your Level" radius={[0, 3, 3, 0]}>
+                        {chartData.map((entry, i) => (
+                          <Cell key={i} fill={GAP_COLORS[entry.severity]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <GapTable gaps={result.gaps} />
-        </>
+        </div>
       )}
     </div>
   );

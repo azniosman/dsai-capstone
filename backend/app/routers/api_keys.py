@@ -1,3 +1,4 @@
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
 class APIKeyCreate(BaseModel):
     name: str
-    expires_at: datetime | None = None
+    expires_at: Optional[datetime] = None
 
 
 class APIKeyResponse(BaseModel):
@@ -24,7 +25,7 @@ class APIKeyResponse(BaseModel):
     key: str
     name: str
     created_at: datetime
-    expires_at: datetime | None
+    expires_at: Optional[datetime]
     is_active: bool
     model_config = {"from_attributes": True}
 

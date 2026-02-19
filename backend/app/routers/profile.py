@@ -77,6 +77,22 @@ def create_profile(
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
+@router.post("/profile/parse-resume")
+def parse_resume(payload: dict):
+    """
+    Extract skills from resume text.
+    Payload: {"resume_text": "..."}
+    """
+    from app.services.resume_parser import extract_skills
+    
+    resume_text = payload.get("resume_text", "")
+    if not resume_text:
+        raise HTTPException(status_code=400, detail="Resume text is required")
+        
+    skills = extract_skills(resume_text)
+    return {"skills": skills}
+
+
 @router.get("/profile/{profile_id}", response_model=ProfileResponse)
 def get_profile(profile_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     from app.models.user_profile import UserProfile

@@ -9,6 +9,7 @@ import {
 
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Profile",
+  "/dashboard": "Dashboard",
   "/recommendations": "Job Matches",
   "/skill-gap": "Skill Gaps",
   "/roadmap": "Roadmap",
@@ -21,6 +22,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/projects": "Projects",
   "/progress": "Progress",
   "/courses": "Courses",
+  "/resume-rewriter": "Resume Rewriter",
   "/account": "Account Settings",
   "/login": "Login",
 };

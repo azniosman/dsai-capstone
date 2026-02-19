@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { GraduationCap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -75,103 +76,115 @@ export default function CourseBrowser() {
     : courses;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-2">SCTP Course Browser</h1>
-      <p className="text-sm text-muted-foreground mb-6">
-        Browse SkillsFuture Career Transition Programme courses with real-time subsidy calculations.
-      </p>
+    <div className="space-y-5">
+      <header>
+        <p className="section-label mb-1">Upskilling</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">SCTP Course Browser</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          SkillsFuture Career Transition Programme courses with real-time subsidy calculations.
+        </p>
+      </header>
 
-      <div className="flex gap-4 mb-6 flex-wrap items-center">
-        <Select value={provider} onValueChange={setProvider}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Providers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Providers</SelectItem>
-            {providers.map((p) => (
-              <SelectItem key={p} value={p}>{p}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Filters */}
+      <Card variant="data">
+        <CardContent className="p-4">
+          <div className="flex gap-4 flex-wrap items-end">
+            <Select value={provider} onValueChange={setProvider}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Providers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Providers</SelectItem>
+                {providers.map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={level} onValueChange={setLevel}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="All Levels" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Levels</SelectItem>
-            <SelectItem value="beginner">Beginner</SelectItem>
-            <SelectItem value="intermediate">Intermediate</SelectItem>
-            <SelectItem value="advanced">Advanced</SelectItem>
-          </SelectContent>
-        </Select>
+            <Select value={level} onValueChange={setLevel}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="All Levels" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Levels</SelectItem>
+                <SelectItem value="beginner">Beginner</SelectItem>
+                <SelectItem value="intermediate">Intermediate</SelectItem>
+                <SelectItem value="advanced">Advanced</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <div className="flex items-center gap-2">
-          <Switch checked={mcesOnly} onCheckedChange={setMcesOnly} id="mces" />
-          <Label htmlFor="mces" className="text-sm">MCES Eligible</Label>
-        </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={mcesOnly} onCheckedChange={setMcesOnly} id="mces" />
+              <Label htmlFor="mces" className="text-sm font-medium">MCES Eligible</Label>
+            </div>
 
-        <Input
-          placeholder="Search by skill..."
-          value={skillSearch}
-          onChange={(e) => setSkillSearch(e.target.value)}
-          className="w-[200px]"
-        />
-      </div>
+            <Input
+              placeholder="Search by skill..."
+              value={skillSearch}
+              onChange={(e) => setSkillSearch(e.target.value)}
+              className="w-[200px]"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       {loading && <SkeletonCard count={4} />}
 
       {!loading && (
-        <p className="text-sm text-muted-foreground mb-4">
-          Showing {filtered.length} course{filtered.length !== 1 ? "s" : ""}
-        </p>
+        <div className="flex items-center gap-2 mb-1">
+          <GraduationCap className="h-3.5 w-3.5 text-primary" />
+          <p className="section-label">
+            {filtered.length} course{filtered.length !== 1 ? "s" : ""} available
+          </p>
+        </div>
       )}
 
       {!loading && !error && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {filtered.map((course) => (
-            <Card key={course.id} className="p-6">
-              <CardContent className="p-0">
-                <div className="flex justify-between items-start flex-wrap gap-2">
+            <Card key={course.id} variant="elevated" className="hover-lift">
+              <CardContent className="p-5">
+                <div className="flex justify-between items-start flex-wrap gap-2 mb-3">
                   <div>
-                    <h2 className="text-lg font-bold">{course.title}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {course.provider} &middot; {course.duration_weeks} weeks &middot; {course.level}
+                    <h2 className="text-base font-bold leading-tight">{course.title}</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {course.provider} &middot; {course.duration_weeks}w &middot; {course.level}
                     </p>
                   </div>
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-1.5 items-center flex-wrap">
                     {course.mces_eligible && (
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">MCES Eligible</Badge>
+                      <Badge variant="success">MCES Eligible</Badge>
                     )}
                     {course.certification && (
-                      <Badge variant="outline">{course.certification}</Badge>
+                      <Badge variant="accent">{course.certification}</Badge>
                     )}
                   </div>
                 </div>
 
-                <div className="flex gap-1 flex-wrap mt-3">
+                <div className="flex gap-1 flex-wrap mb-4">
                   {course.skills_taught.map((s) => (
-                    <Badge key={s} variant="outline">{s}</Badge>
+                    <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
                   ))}
                 </div>
 
-                <div className="flex gap-6 mt-4 flex-wrap">
+                {/* Fee breakdown */}
+                <div className="grid grid-cols-4 gap-3 border-t border-border pt-3">
                   <div>
-                    <p className="text-xs text-muted-foreground">Course Fee</p>
-                    <p className="font-semibold">${course.course_fee.toLocaleString()}</p>
+                    <p className="section-label mb-1">Course Fee</p>
+                    <p className="font-bold data-num text-sm">${course.course_fee.toLocaleString()}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Subsidy ({course.subsidy_percent}%)</p>
-                    <p className="font-semibold text-green-600">-${course.subsidy_amount.toLocaleString()}</p>
+                    <p className="section-label mb-1">Subsidy ({course.subsidy_percent}%)</p>
+                    <p className="font-bold data-num text-sm text-emerald-500">-${course.subsidy_amount.toLocaleString()}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">SFC Offset</p>
-                    <p className="font-semibold text-blue-600">-${course.sfc_applicable.toLocaleString()}</p>
+                    <p className="section-label mb-1">SFC Offset</p>
+                    <p className="font-bold data-num text-sm text-primary">-${course.sfc_applicable.toLocaleString()}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">You Pay</p>
-                    <p className="font-bold text-primary">${course.nett_payable.toLocaleString()}</p>
+                    <p className="section-label mb-1">You Pay</p>
+                    <p className="font-extrabold data-num text-base text-primary">${course.nett_payable.toLocaleString()}</p>
                   </div>
                 </div>
               </CardContent>

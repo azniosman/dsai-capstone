@@ -2,6 +2,7 @@
 
 import json
 import os
+from typing import Optional, List, Dict, Tuple
 
 import faiss
 import numpy as np
@@ -62,7 +63,7 @@ def get_taxonomy_index():
     return _taxonomy_index, _taxonomy_skills
 
 
-def normalize_skill(skill_text: str, threshold: float = 0.75) -> str | None:
+def normalize_skill(skill_text: str, threshold: float = 0.75) -> Optional[str]:
     """Map a free-text skill to the closest canonical taxonomy skill.
 
     Returns the canonical skill name if similarity >= threshold, else None.

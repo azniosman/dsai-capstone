@@ -1,4 +1,5 @@
 import random
+from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from app.models.market_insight import MarketInsight
 from app.models.tenant import Tenant
@@ -72,7 +73,7 @@ def update_demand_level(volume: int) -> str:
     else:
         return "low"
 
-def simulate_market_changes(db: Session, tenant_id: int | None = None):
+def simulate_market_changes(db: Session, tenant_id: Optional[int] = None):
     """
     Simulates daily market fluctuations.
     - Updates Salary (+/- 5%)

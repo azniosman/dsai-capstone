@@ -1,4 +1,4 @@
-import secrets
+from typing import Optional, Union
 from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -49,7 +49,7 @@ def get_api_key(
 def get_optional_api_key(
     api_key: str = Depends(api_key_header),
     db: Session = Depends(get_db),
-) -> APIKey | None:
+) -> Optional[APIKey]:
     """Return validated API key if X-API-Key header is present, else None. Raises when header is present but invalid."""
     if not api_key or not api_key.strip():
         return None
@@ -74,8 +74,8 @@ def get_optional_api_key(
 
 
 def get_current_tenant_for_read(
-    api_key: APIKey | None = Depends(get_optional_api_key),
-    user: User | None = Depends(get_current_user_optional),
+    api_key: Optional[APIKey] = Depends(get_optional_api_key),
+    user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ) -> Tenant:
     """Resolve tenant for read-only endpoints. Requires X-API-Key or JWT; no anonymous access."""
@@ -109,7 +109,7 @@ def create_api_key(
     name: str, 
     tenant_id: int, 
     db: Session, 
-    expires_at: datetime | None = None
+    expires_at: Optional[datetime] = None
 ) -> APIKey:
     key = secrets.token_urlsafe(32) # Generate a secure random key
     db_api_key = APIKey(
