@@ -31,6 +31,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    engine: Optional[str] = "SkillBridge Knowledge Engine"
 
 
 def _build_market_insights_table(insights: Optional[List] = None) -> str:
@@ -137,12 +138,15 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
     tenant_id = user.tenant_id if user else 1  # fallback to global tenant
     if not settings.gemini_api_key:
         # Fallback: rule-based response when no API key configured
-        return ChatResponse(reply=_fallback_response(
-            payload.messages[-1].content if payload.messages else "",
-            profile_id=payload.profile_id,
-            db=db,
-            tenant_id=tenant_id
-        ))
+        return ChatResponse(
+            reply=_fallback_response(
+                payload.messages[-1].content if payload.messages else "",
+                profile_id=payload.profile_id,
+                db=db,
+                tenant_id=tenant_id
+            ),
+            engine="SkillBridge Knowledge Engine (Local Fallback)"
+        )
 
     profile = None
     recommendations = None
@@ -203,7 +207,7 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
             system_prompt=system_prompt,
             messages=[m.dict() for m in payload.messages]
         )
-        return ChatResponse(reply=response_text)
+        return ChatResponse(reply=response_text, engine="AWS Bedrock (Claude 3.5 Sonnet)")
 
     except Exception as e_bedrock:
         logging.error(f"Bedrock API error: {e_bedrock}")
@@ -227,17 +231,20 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
                 
                 chat = model.start_chat(history=history)
                 response = chat.send_message(payload.messages[-1].content)
-                return ChatResponse(reply=response.text)
+                return ChatResponse(reply=response.text, engine=f"Google Gemini ({settings.gemini_model})")
             except Exception as e_gemini:
                 logging.error(f"Gemini API error (fallback): {e_gemini}")
 
         # Fallback to rule-based response
-        return ChatResponse(reply=_fallback_response(
-            payload.messages[-1].content if payload.messages else "",
-            profile_id=payload.profile_id,
-            db=db,
-            tenant_id=tenant_id
-        ))
+        return ChatResponse(
+            reply=_fallback_response(
+                payload.messages[-1].content if payload.messages else "",
+                profile_id=payload.profile_id,
+                db=db,
+                tenant_id=tenant_id
+            ),
+            engine="SkillBridge Knowledge Engine (Local Fallback)"
+        )
 
 
 def _fallback_response(user_msg: str, profile_id: Optional[int] = None, db: Optional[Session] = None, tenant_id: Optional[int] = None) -> str:

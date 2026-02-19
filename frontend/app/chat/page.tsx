@@ -47,6 +47,7 @@ export default function CareerChat() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [engine, setEngine] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,6 +70,9 @@ export default function CareerChat() {
         messages: newMsgs.map((m) => ({ role: m.role, content: m.content })),
       });
       setMessages([...newMsgs, { role: "assistant", content: res.data.reply }]);
+      if (res.data.engine) {
+        setEngine(res.data.engine);
+      }
     } catch (err) {
       console.error(err);
       setMessages([
@@ -85,9 +89,19 @@ export default function CareerChat() {
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
-      <header className="mb-4">
-        <p className="section-label mb-1">AI Advisor</p>
-        <h1 className="text-2xl font-extrabold tracking-tight">Career Coach</h1>
+      <header className="mb-4 flex justify-between items-end">
+        <div>
+          <p className="section-label mb-1">AI Advisor</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">
+            Career Coach
+          </h1>
+        </div>
+        {engine && (
+          <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1.5 opacity-70">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            {engine}
+          </div>
+        )}
       </header>
 
       {/* Message thread */}
