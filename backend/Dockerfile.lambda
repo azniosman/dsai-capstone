@@ -35,7 +35,13 @@ RUN pip install --no-cache-dir "spacy==3.7.0" && \
     pip install --no-cache-dir https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl && \
     python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
 
-# 3. AI Stack: Install Sentence Transformers & fix HuggingFace compatibility
+# 3. AI Stack — CPU-only PyTorch + Sentence Transformers
+# Install torch CPU first so pip doesn't pull the 2GB+ CUDA variant later.
+# Lambda has no GPU; torch+cpu is ~200MB vs ~2GB for the default CUDA build.
+RUN pip install --no-cache-dir \
+    "torch==2.0.1+cpu" \
+    --index-url https://download.pytorch.org/whl/cpu
+
 RUN pip install --no-cache-dir --prefer-binary \
     "sentencepiece" \
     "sentence-transformers==2.2.2" \
