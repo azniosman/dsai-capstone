@@ -39,7 +39,11 @@ function TypingIndicator() {
 
 export default function CareerChat() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Hi! I'm WorkD AI, your Senior Career Advisor specialising in Singapore's tech market. Ask me about job roles, skill gaps, SCTP courses, subsidies, or career transition strategies." },
+    {
+      role: "assistant",
+      content:
+        "Hi! I'm SkillBridge AI, your Senior Career Advisor specialising in Singapore's tech market. Ask me about job roles, skill gaps, SCTP courses, subsidies, or career transition strategies.",
+    },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -67,7 +71,13 @@ export default function CareerChat() {
       setMessages([...newMsgs, { role: "assistant", content: res.data.reply }]);
     } catch (err) {
       console.error(err);
-      setMessages([...newMsgs, { role: "assistant", content: "Sorry, I encountered an error. Please try again." }]);
+      setMessages([
+        ...newMsgs,
+        {
+          role: "assistant",
+          content: "Sorry, I encountered an error. Please try again.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }

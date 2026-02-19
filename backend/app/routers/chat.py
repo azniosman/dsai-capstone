@@ -1,4 +1,4 @@
-"""LLM career coach chatbot endpoint — WorkD AI persona."""
+"""LLM career coach chatbot endpoint — SkillBridge AI persona."""
 
 import logging
 
@@ -61,7 +61,7 @@ def _build_market_insights_table(insights: Optional[List] = None) -> str:
 
 def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap_courses=None, market_insights=None, pathways=None):
     parts = [
-        "You are 'WorkD AI,' a Senior Career Advisor specialising in the Singapore Labor Market.",
+        "You are 'SkillBridge AI,' a Senior Career Advisor specialising in the Singapore Labor Market.",
         "You have deep knowledge of the SSG Skills Framework, MySkillsFuture portal, and SCTP initiatives.",
         "",
         "Your Voice: Professional, encouraging, yet data-driven. Use localised terms like",
@@ -241,7 +241,7 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
 
 
 def _fallback_response(user_msg: str, profile_id: Optional[int] = None, db: Optional[Session] = None, tenant_id: Optional[int] = None) -> str:
-    """WorkD AI rule-based fallback when no LLM API key is configured."""
+    """SkillBridge AI rule-based fallback when no LLM API key is configured."""
     msg = user_msg.lower()
 
     # Try to load user context for personalised responses
@@ -326,7 +326,7 @@ def _fallback_response(user_msg: str, profile_id: Optional[int] = None, db: Opti
         lines.append(f"\nThese sectors have the strongest demand. I'd recommend focusing your upskilling on these areas.{course_hint}")
         return "\n".join(lines)
 
-    return ("Hi! I'm WorkD AI, your Senior Career Advisor specialising in Singapore's tech market. "
+    return ("Hi! I'm SkillBridge AI, your Senior Career Advisor specialising in Singapore's tech market. "
             "I can help you with:\n\n"
             "- Understanding your job recommendations and match scores\n"
             "- Identifying high-growth roles matching your skills\n"

@@ -17,11 +17,11 @@
         },
         {
             "parameters": {
-                "fromEmail": "notifications@workd.ai",
+                "fromEmail": "notifications@skillbridge.ai",
                 "toEmail": "={{$json[\"email\"]}}",
                 "subject": "Your Career Analysis is Ready",
-                "text": "Hi {{$json[\"name\"]}},\n\nYour profile analysis is complete! Log in to view your personalized job recommendations and skill gap analysis.\n\nBest,\nWorkD AI Team",
-                "html": "<p>Hi <b>{{$json[\"name\"]}}</b>,</p><p>Your profile analysis is complete! <a href=\"http://localhost:3000\">Log in</a> to view your personalized job recommendations and skill gap analysis.</p><p>Best,<br>WorkD AI Team</p>"
+                "text": "Hi {{$json[\"name\"]}},\n\nYour profile analysis is complete! Log in to view your personalized job recommendations and skill gap analysis.\n\nBest,\nSkillBridge AI Team",
+                "html": "<p>Hi <b>{{$json[\"name\"]}}</b>,</p><p>Your profile analysis is complete! <a href=\"http://localhost:3000\">Log in</a> to view your personalized job recommendations and skill gap analysis.</p><p>Best,<br>SkillBridge AI Team</p>"
             },
             "name": "Send Email",
             "type": "n8n-nodes-base.emailSend",
