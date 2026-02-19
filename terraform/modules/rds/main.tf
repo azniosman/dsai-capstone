@@ -1,4 +1,8 @@
-# Variables in variables.tf. Outputs in outputs.tf.
+# Aurora Serverless v2 (PostgreSQL 16) — capstone-demo.md architecture.
+# Cost: ~$0.12/ACU-hr * 0.5 ACU = ~$43/month at minimum capacity.
+# To pause between demos (scale to near-zero):
+#   aws rds modify-db-cluster --db-cluster-identifier <id> \
+#     --serverlessv2-scaling-configuration MinCapacity=0,MaxCapacity=2
 
 resource "aws_db_subnet_group" "main" {
   name       = "${var.project_name}-${var.environment}-db-subnet"
@@ -7,9 +11,9 @@ resource "aws_db_subnet_group" "main" {
   tags = { Name = "${var.project_name}-${var.environment}-db-subnet-group" }
 }
 
-resource "aws_db_parameter_group" "postgres16" {
-  name   = "${var.project_name}-${var.environment}-pg16"
-  family = "postgres16"
+resource "aws_rds_cluster_parameter_group" "aurora_pg16" {
+  name   = "${var.project_name}-${var.environment}-aurora-pg16"
+  family = "aurora-postgresql16"
 
   parameter {
     name  = "log_connections"
@@ -18,45 +22,47 @@ resource "aws_db_parameter_group" "postgres16" {
 
   parameter {
     name         = "log_min_duration_statement"
-    value        = "1000" # Log queries taking > 1 second
-    apply_method = "immediate"
+    value        = "1000"
+    apply_method = "pending-reboot"
   }
 
-  tags = { Name = "${var.project_name}-${var.environment}-pg16-params" }
+  tags = { Name = "${var.project_name}-${var.environment}-aurora-params" }
 }
 
-resource "aws_db_instance" "main" {
-  identifier     = "${var.project_name}-${var.environment}-db"
-  engine         = "postgres"
-  engine_version = "16"     # AWS selects latest 16.x minor version
-  instance_class = var.instance_class
-  db_name        = var.db_name
-  username       = var.db_username
-  password       = var.db_password
-  port           = 5432
+resource "aws_rds_cluster" "main" {
+  cluster_identifier = "${var.project_name}-${var.environment}-aurora"
+  engine             = "aurora-postgresql"
+  engine_version     = "16.4"
+  database_name      = var.db_name
+  master_username    = var.db_username
+  master_password    = var.db_password
 
-  allocated_storage     = var.allocated_storage_gb
-  max_allocated_storage = 100 # Auto-scale storage up to 100 GB
-  storage_type          = "gp3"
-  storage_encrypted     = true
+  db_subnet_group_name            = aws_db_subnet_group.main.name
+  vpc_security_group_ids          = var.security_group_ids
+  db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.aurora_pg16.name
 
-  vpc_security_group_ids = var.security_group_ids
-  db_subnet_group_name   = aws_db_subnet_group.main.name
-  parameter_group_name   = aws_db_parameter_group.postgres16.name
+  serverlessv2_scaling_configuration {
+    min_capacity = 0.5 # Always-warm for demos (~$43/mo); set to 0 to pause
+    max_capacity = 2   # Burst up to 2 ACU (4 GB RAM) for peak load
+  }
 
-  publicly_accessible     = false # Private subnet only — Lambda accesses via VPC
-  multi_az                = false # Single-AZ saves ~$13/month for demo
-  backup_retention_period = 1     # 1-day backup (minimum; set 0 to disable)
-  backup_window           = "03:00-04:00"
-  maintenance_window      = "sun:04:00-sun:05:00"
+  storage_encrypted       = true
+  skip_final_snapshot     = true
+  deletion_protection     = false
+  backup_retention_period = 1
 
-  skip_final_snapshot = true  # Allows clean destroy without a snapshot
-  deletion_protection = false # Set true in production
-
-  tags = { Name = "${var.project_name}-${var.environment}-postgres" }
+  tags = { Name = "${var.project_name}-${var.environment}-aurora" }
 }
 
-# ── Secrets Manager — store DB credentials so Lambda never has the plain password ──
+resource "aws_rds_cluster_instance" "main" {
+  identifier         = "${var.project_name}-${var.environment}-aurora-1"
+  cluster_identifier = aws_rds_cluster.main.id
+  instance_class     = "db.serverless"
+  engine             = aws_rds_cluster.main.engine
+  engine_version     = aws_rds_cluster.main.engine_version
+
+  tags = { Name = "${var.project_name}-${var.environment}-aurora-instance" }
+}
 
 resource "aws_secretsmanager_secret" "db_credentials" {
   name                    = "${var.project_name}/${var.environment}/db-credentials"
@@ -69,18 +75,18 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
   secret_id = aws_secretsmanager_secret.db_credentials.id
 
   secret_string = jsonencode({
-    username = aws_db_instance.main.username
+    username = aws_rds_cluster.main.master_username
     password = var.db_password
-    engine   = "postgres"
-    host     = aws_db_instance.main.address
+    engine   = "aurora-postgresql"
+    host     = aws_rds_cluster.main.endpoint
     port     = 5432
-    dbname   = aws_db_instance.main.db_name
+    dbname   = aws_rds_cluster.main.database_name
     url = format(
       "postgresql://%s:%s@%s:5432/%s",
-      aws_db_instance.main.username,
+      aws_rds_cluster.main.master_username,
       var.db_password,
-      aws_db_instance.main.address,
-      aws_db_instance.main.db_name
+      aws_rds_cluster.main.endpoint,
+      aws_rds_cluster.main.database_name
     )
   })
 }

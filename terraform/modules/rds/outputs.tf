@@ -1,19 +1,19 @@
 output "db_endpoint" {
-  description = "RDS endpoint (host:port)"
-  value       = aws_db_instance.main.endpoint
+  description = "Aurora cluster writer endpoint (host:port)"
+  value       = "${aws_rds_cluster.main.endpoint}:5432"
 }
 
 output "db_address" {
-  description = "RDS hostname (without port)"
-  value       = aws_db_instance.main.address
+  description = "Aurora cluster writer hostname (without port)"
+  value       = aws_rds_cluster.main.endpoint
 }
 
 output "db_port" {
-  value = aws_db_instance.main.port
+  value = 5432
 }
 
 output "db_name" {
-  value = aws_db_instance.main.db_name
+  value = aws_rds_cluster.main.database_name
 }
 
 output "db_secret_arn" {

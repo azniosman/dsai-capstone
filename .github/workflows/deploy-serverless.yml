@@ -25,7 +25,7 @@ on:
         type: boolean
 
 permissions:
-  id-token: write # needed if you later switch to OIDC
+  id-token: write
   contents: read
 
 env:
@@ -48,7 +48,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── AWS Auth ────────────────────────────────────────────────────────────
+      # ── AWS Auth ─────────────────────────────────────────────────────────────
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -56,48 +56,69 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ env.AWS_REGION }}
 
-      # ── Terraform state backend (S3) ───────────────────────────────────────
-      # Creates the state bucket once; subsequent runs are no-ops.
-      - name: Bootstrap Terraform state bucket
+      # ── Terraform state bucket (idempotent) ──────────────────────────────────
+      # S3 backend keeps state across CI runs so resources aren't re-created.
+      - name: Ensure Terraform state bucket exists
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
         run: |
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-          BUCKET="${PROJECT_NAME}-tfstate-${ACCOUNT}"
-          echo "TF_BACKEND_BUCKET=${BUCKET}" >> $GITHUB_ENV
+          STATE_BUCKET="skillbridge-tfstate-${ACCOUNT}-${{ env.ENVIRONMENT }}"
+          echo "STATE_BUCKET=${STATE_BUCKET}" >> $GITHUB_ENV
 
-          # Create bucket (idempotent — BucketAlreadyOwnedByYou is not an error)
+          # Create bucket (us-east-1 does NOT use --create-bucket-configuration)
           aws s3api create-bucket \
-            --bucket "${BUCKET}" \
-            --region "${AWS_REGION}" 2>&1 | grep -v "BucketAlreadyOwnedByYou" || true
+            --bucket "$STATE_BUCKET" \
+            --region "${{ env.AWS_REGION }}" 2>/dev/null || true
 
-          # Enable versioning so we can recover from bad state
+          # Enable versioning so state file history is preserved
           aws s3api put-bucket-versioning \
-            --bucket "${BUCKET}" \
+            --bucket "$STATE_BUCKET" \
             --versioning-configuration Status=Enabled 2>/dev/null || true
 
-          # Block all public access on the state bucket
+          # Block public access on state bucket
           aws s3api put-public-access-block \
-            --bucket "${BUCKET}" \
+            --bucket "$STATE_BUCKET" \
             --public-access-block-configuration \
-              "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" \
-            2>/dev/null || true
+              BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true 2>/dev/null || true
 
-      # ── Terraform — Init ───────────────────────────────────────────────────
+          echo "State bucket: $STATE_BUCKET"
+
+      # ── Terraform — Init ──────────────────────────────────────────────────────
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         run: |
-          terraform init -upgrade -input=false \
-            -backend-config="bucket=${TF_BACKEND_BUCKET}" \
-            -backend-config="key=${ENVIRONMENT}/terraform.tfstate" \
-            -backend-config="region=${AWS_REGION}" \
+          terraform init \
+            -upgrade \
+            -input=false \
+            -backend-config="bucket=${{ env.STATE_BUCKET }}" \
+            -backend-config="key=${{ env.ENVIRONMENT }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
             -backend-config="encrypt=true"
 
-      # ── Step 1: Create ECR (targeted apply, idempotent) ────────────────────
-      - name: Import existing resources into Terraform state
+      # Skip-terraform path still needs init for output reads
+      - name: Terraform Init (skip_terraform path)
+        if: ${{ github.event.inputs.skip_terraform == 'true' }}
+        working-directory: ./terraform
+        run: |
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          STATE_BUCKET="skillbridge-tfstate-${ACCOUNT}-${{ env.ENVIRONMENT }}"
+          echo "STATE_BUCKET=${STATE_BUCKET}" >> $GITHUB_ENV
+          terraform init \
+            -upgrade \
+            -input=false \
+            -backend-config="bucket=${STATE_BUCKET}" \
+            -backend-config="key=${{ env.ENVIRONMENT }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true"
+
+      # ── Step 1: Import existing ECR + targeted apply ──────────────────────────
+      - name: Import ECR into Terraform state
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
@@ -106,55 +127,16 @@ jobs:
           TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
           TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
           TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        # Import any resources that already exist in AWS but not in state.
-        # Each import uses `|| true` so the step succeeds even if the resource
-        # doesn't exist in AWS or is already in state.
         run: |
-          # ECR repository & lifecycle policy
           terraform import -input=false \
             module.ecr.aws_ecr_repository.backend \
-            "${PROJECT_NAME}-${ENVIRONMENT}-backend" \
+            "${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-backend" \
             2>&1 | grep -v "^$" || true
 
           terraform import -input=false \
             module.ecr.aws_ecr_lifecycle_policy.backend \
-            "${PROJECT_NAME}-${ENVIRONMENT}-backend" \
+            "${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-backend" \
             2>&1 | grep -v "^$" || true
-
-          # IAM role
-          terraform import -input=false \
-            module.iam.aws_iam_role.lambda_exec \
-            "${PROJECT_NAME}-${ENVIRONMENT}-lambda-exec" \
-            2>&1 | grep -v "^$" || true
-
-          # CloudWatch Log Group for API Gateway
-          terraform import -input=false \
-            module.api_gateway.aws_cloudwatch_log_group.api_gw \
-            "/aws/apigateway/${PROJECT_NAME}-${ENVIRONMENT}" \
-            2>&1 | grep -v "^$" || true
-
-          # RDS DB Subnet Group
-          terraform import -input=false \
-            module.rds.aws_db_subnet_group.main \
-            "${PROJECT_NAME}-${ENVIRONMENT}-db-subnet" \
-            2>&1 | grep -v "^$" || true
-
-          # RDS DB Parameter Group
-          terraform import -input=false \
-            module.rds.aws_db_parameter_group.postgres16 \
-            "${PROJECT_NAME}-${ENVIRONMENT}-pg16" \
-            2>&1 | grep -v "^$" || true
-
-          # Secrets Manager Secret (import by ARN)
-          SECRET_ARN=$(aws secretsmanager describe-secret \
-            --secret-id "${PROJECT_NAME}/${ENVIRONMENT}/db-credentials" \
-            --query ARN --output text 2>/dev/null || true)
-          if [ -n "${SECRET_ARN}" ] && [ "${SECRET_ARN}" != "None" ]; then
-            terraform import -input=false \
-              module.rds.aws_secretsmanager_secret.db_credentials \
-              "${SECRET_ARN}" \
-              2>&1 | grep -v "^$" || true
-          fi
 
       - name: Create ECR repository
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
@@ -167,7 +149,7 @@ jobs:
           TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: terraform apply -target=module.ecr -auto-approve -input=false
 
-      # ── Step 2: Build and push Lambda container image ──────────────────────
+      # ── Step 2: Build and push Lambda container image ───────────────────────
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -194,7 +176,182 @@ jobs:
 
           echo "IMAGE_URI=${ECR}:${IMAGE_TAG}" >> $GITHUB_ENV
 
-      # ── Step 3: Terraform Plan + Apply ────────────────────────────────────
+      # ── Step 3: Pre-apply cleanup of partially-created resources ─────────────
+      # Resources created by previous failed Terraform runs that cannot be
+      # imported cleanly (IAM roles with policies attached, log groups, etc.)
+      # are deleted here so Terraform can recreate them from a clean slate.
+      - name: Clean up partially-created AWS resources
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+
+          # IAM execution role — detach policies before deleting
+          ROLE_NAME="${P}-${E}-lambda-exec"
+          echo "Cleaning IAM role: ${ROLE_NAME}"
+          POLICY_ARNS=$(aws iam list-attached-role-policies \
+            --role-name "$ROLE_NAME" \
+            --query 'AttachedPolicies[].PolicyArn' \
+            --output text 2>/dev/null || echo "")
+          for ARN in $POLICY_ARNS; do
+            aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$ARN" 2>/dev/null || true
+          done
+          INLINE=$(aws iam list-role-policies \
+            --role-name "$ROLE_NAME" \
+            --query 'PolicyNames[]' \
+            --output text 2>/dev/null || echo "")
+          for POL in $INLINE; do
+            aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name "$POL" 2>/dev/null || true
+          done
+          aws iam delete-role --role-name "$ROLE_NAME" 2>/dev/null || true
+
+          # CloudWatch log group (API Gateway)
+          aws logs delete-log-group \
+            --log-group-name "/aws/apigateway/${P}-${E}" 2>/dev/null || true
+
+          # Old RDS parameter group (postgres16 family, incompatible with Aurora)
+          aws rds delete-db-parameter-group \
+            --db-parameter-group-name "${P}-${E}-pg16" 2>/dev/null || true
+
+          echo "Cleanup complete"
+
+      # ── Step 4: Import existing VPC + networking into Terraform state ─────────
+      # Resources created by previous partial Terraform runs are imported so
+      # the next apply sees them as already managed (no duplicate-create errors).
+      - name: Import existing AWS resources into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
+          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+
+          # Helper: run terraform import and swallow "already managed" / "not found" errors
+          tf_import() {
+            terraform import -input=false "$@" 2>&1 | grep -v "^$" || true
+          }
+
+          # ── VPC ──────────────────────────────────────────────────────────────
+          VPC_ID=$(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${P}-${E}-vpc" \
+            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "")
+          [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ] && \
+            tf_import module.vpc.aws_vpc.main "$VPC_ID"
+
+          # ── Subnets ───────────────────────────────────────────────────────────
+          for IDX in 0 1; do
+            NUM=$((IDX + 1))
+            SUB=$(aws ec2 describe-subnets \
+              --filters "Name=tag:Name,Values=${P}-${E}-public-${NUM}" \
+                        "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "")
+            [ -n "$SUB" ] && [ "$SUB" != "None" ] && \
+              tf_import "module.vpc.aws_subnet.public[${IDX}]" "$SUB"
+          done
+          for IDX in 0 1; do
+            NUM=$((IDX + 1))
+            SUB=$(aws ec2 describe-subnets \
+              --filters "Name=tag:Name,Values=${P}-${E}-private-${NUM}" \
+                        "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "")
+            [ -n "$SUB" ] && [ "$SUB" != "None" ] && \
+              tf_import "module.vpc.aws_subnet.private[${IDX}]" "$SUB"
+          done
+
+          # ── Internet Gateway ──────────────────────────────────────────────────
+          IGW=$(aws ec2 describe-internet-gateways \
+            --filters "Name=tag:Name,Values=${P}-${E}-igw" \
+            --query 'InternetGateways[0].InternetGatewayId' \
+            --output text 2>/dev/null || echo "")
+          [ -n "$IGW" ] && [ "$IGW" != "None" ] && \
+            tf_import module.vpc.aws_internet_gateway.main "$IGW"
+
+          # ── Elastic IP + NAT Gateway ──────────────────────────────────────────
+          EIP=$(aws ec2 describe-addresses \
+            --filters "Name=tag:Name,Values=${P}-${E}-nat-eip" \
+            --query 'Addresses[0].AllocationId' \
+            --output text 2>/dev/null || echo "")
+          [ -n "$EIP" ] && [ "$EIP" != "None" ] && \
+            tf_import module.vpc.aws_eip.nat "$EIP"
+
+          NAT=$(aws ec2 describe-nat-gateways \
+            --filter "Name=tag:Name,Values=${P}-${E}-nat" \
+                     "Name=state,Values=available" \
+            --query 'NatGateways[0].NatGatewayId' \
+            --output text 2>/dev/null || echo "")
+          [ -n "$NAT" ] && [ "$NAT" != "None" ] && \
+            tf_import module.vpc.aws_nat_gateway.main "$NAT"
+
+          # ── Route Tables + Associations ───────────────────────────────────────
+          PUB_RT=$(aws ec2 describe-route-tables \
+            --filters "Name=tag:Name,Values=${P}-${E}-public-rt" \
+                      "Name=vpc-id,Values=${VPC_ID}" \
+            --query 'RouteTables[0].RouteTableId' \
+            --output text 2>/dev/null || echo "")
+          PRI_RT=$(aws ec2 describe-route-tables \
+            --filters "Name=tag:Name,Values=${P}-${E}-private-rt" \
+                      "Name=vpc-id,Values=${VPC_ID}" \
+            --query 'RouteTables[0].RouteTableId' \
+            --output text 2>/dev/null || echo "")
+          [ -n "$PUB_RT" ] && [ "$PUB_RT" != "None" ] && \
+            tf_import module.vpc.aws_route_table.public "$PUB_RT"
+          [ -n "$PRI_RT" ] && [ "$PRI_RT" != "None" ] && \
+            tf_import module.vpc.aws_route_table.private "$PRI_RT"
+
+          for IDX in 0 1; do
+            NUM=$((IDX + 1))
+            SUB=$(aws ec2 describe-subnets \
+              --filters "Name=tag:Name,Values=${P}-${E}-public-${NUM}" \
+                        "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "")
+            [ -n "$SUB" ] && [ "$SUB" != "None" ] && \
+            [ -n "$PUB_RT" ] && [ "$PUB_RT" != "None" ] && \
+              tf_import "module.vpc.aws_route_table_association.public[${IDX}]" \
+                        "${SUB}/${PUB_RT}"
+          done
+          for IDX in 0 1; do
+            NUM=$((IDX + 1))
+            SUB=$(aws ec2 describe-subnets \
+              --filters "Name=tag:Name,Values=${P}-${E}-private-${NUM}" \
+                        "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "")
+            [ -n "$SUB" ] && [ "$SUB" != "None" ] && \
+            [ -n "$PRI_RT" ] && [ "$PRI_RT" != "None" ] && \
+              tf_import "module.vpc.aws_route_table_association.private[${IDX}]" \
+                        "${SUB}/${PRI_RT}"
+          done
+
+          # ── Security Groups (lambda + alb created in prior partial runs) ──────
+          for SG in "lambda:lambda-sg" "alb:alb-sg"; do
+            RESOURCE="${SG%%:*}"
+            NAME="${SG##*:}"
+            SG_ID=$(aws ec2 describe-security-groups \
+              --filters "Name=group-name,Values=${P}-${E}-${NAME}" \
+                        "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'SecurityGroups[0].GroupId' \
+              --output text 2>/dev/null || echo "")
+            [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ] && \
+              tf_import "module.security_groups.aws_security_group.${RESOURCE}" "$SG_ID"
+          done
+
+          # ── RDS DB Subnet Group (reusable by Aurora) ──────────────────────────
+          tf_import module.rds.aws_db_subnet_group.main "${P}-${E}-db-subnet"
+
+          # ── Secrets Manager secret ────────────────────────────────────────────
+          SECRET_ARN=$(aws secretsmanager describe-secret \
+            --secret-id "${P}/${E}/db-credentials" \
+            --query ARN --output text 2>/dev/null || echo "")
+          [ -n "$SECRET_ARN" ] && [ "$SECRET_ARN" != "None" ] && \
+            tf_import module.rds.aws_secretsmanager_secret.db_credentials "$SECRET_ARN"
+
+          echo "Import step complete"
+
+      # ── Step 5: Terraform Plan + Apply ────────────────────────────────────────
       - name: Terraform Plan
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
@@ -221,7 +378,7 @@ jobs:
           TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: terraform apply -auto-approve tfplan
 
-      # ── Capture Terraform outputs ─────────────────────────────────────────
+      # ── Capture Terraform outputs ─────────────────────────────────────────────
       - name: Read Terraform outputs
         id: tf
         working-directory: ./terraform
@@ -232,7 +389,7 @@ jobs:
           echo "cf_id=$(terraform output -raw cloudfront_id)"         >> $GITHUB_OUTPUT
           echo "frontend_url=$(terraform output -raw frontend_url)"   >> $GITHUB_OUTPUT
 
-      # ── Step 4: Build and deploy frontend ─────────────────────────────────
+      # ── Step 6: Build and deploy frontend ────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -267,7 +424,7 @@ jobs:
             --include "*.html" \
             --region "${{ env.AWS_REGION }}"
 
-      # ── Step 5: Invalidate CloudFront cache (skipped when CF is disabled) ─
+      # ── Step 7: Invalidate CloudFront (skipped when CF is disabled) ──────────
       - name: Invalidate CloudFront
         if: ${{ steps.tf.outputs.cf_id != '' }}
         run: |
@@ -275,7 +432,7 @@ jobs:
             --distribution-id "${{ steps.tf.outputs.cf_id }}" \
             --paths "/*"
 
-      # ── Summary ───────────────────────────────────────────────────────────
+      # ── Summary ───────────────────────────────────────────────────────────────
       - name: Deployment summary
         run: |
           echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
@@ -286,3 +443,7 @@ jobs:
           echo "| API      | ${{ steps.tf.outputs.api_url }} |" >> $GITHUB_STEP_SUMMARY
           echo "| S3 Bucket| ${{ steps.tf.outputs.s3_bucket }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Image    | ${{ env.IMAGE_URI }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Cost notes (capstone-demo.md):**" >> $GITHUB_STEP_SUMMARY
+          echo "- Aurora Serverless v2: ~\$43/mo (0.5 ACU min)" >> $GITHUB_STEP_SUMMARY
+          echo "- NAT Gateway: ~\$32/mo — destroy with: \`terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.aws_eip.nat'\`" >> $GITHUB_STEP_SUMMARY
