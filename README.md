@@ -110,7 +110,6 @@ cd backend
 # Create environment
 conda create -n skillbridge python=3.11 -y && conda activate skillbridge
 pip install -r requirements.txt
-python -m spacy download en_core_web_sm
 
 # Run Server
 uvicorn app.main:app --reload

@@ -1,36 +1,57 @@
+# ===== Base Image =====
 FROM python:3.11-slim AS builder
 
-WORKDIR /app
+# ===== Set environment variables =====
+ENV PYTHONUNBUFFERED=1
+ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
+ENV HF_HOME=/opt/models/huggingface
+ENV HF_HUB_OFFLINE=1
 
+# Create directories for models
+RUN mkdir -p /opt/models/sentence-transformers /opt/models/huggingface
+
+# ===== Install system dependencies =====
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /app
 
+# ===== Install Python dependencies =====
+RUN pip install --no-cache-dir --upgrade pip
 
-# Install spaCy
+# Copy requirements and install
+COPY backend/requirements.txt .
+# Pin numpy and scikit-learn for compatibility as identified earlier
+RUN pip install --no-cache-dir "numpy<2.0.0" "scikit-learn==1.3.2" && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Install specific spaCy version
 RUN pip install --no-cache-dir spacy==3.7.0
 
-# Install English model explicitly
-RUN pip install --no-cache-dir https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
+# Install spaCy English model (matching version)
+RUN pip install --no-cache-dir \
+    https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
 
-# Verify spaCy can load the model
+# Verify spaCy model works
 RUN python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
 
+# Install Sentence Transformers
+RUN pip install --no-cache-dir sentence-transformers==2.2.2
 
+# Pre-download Sentence Transformer model
+RUN HF_HUB_OFFLINE=0 python -c "import os; os.environ['SENTENCE_TRANSFORMERS_HOME']='/opt/models/sentence-transformers'; from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print('ST OK')"
 
-# Pre-download the Sentence Transformer model so it's cached in the image
-# (ECS tasks in private subnets cannot download at runtime)
-ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
-RUN python -c "import os; os.makedirs('/opt/models/sentence-transformers', exist_ok=True); from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
-
-# Verify both models work
-RUN python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
-RUN python -c "import os; os.environ['SENTENCE_TRANSFORMERS_HOME']='/opt/models/sentence-transformers'; os.environ['HF_HUB_OFFLINE']='1'; from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print('ST OK')"
-
+# ===== Final Stage =====
 FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
+ENV HF_HOME=/opt/models/huggingface
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
 
 WORKDIR /app
 
@@ -38,25 +59,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy all installed packages (including spaCy model)
+# Copy installed packages
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /opt/models /opt/models
 
-# Copy the cached Sentence Transformer model
-COPY --from=builder /opt/models/sentence-transformers /opt/models/sentence-transformers
-# Copy HuggingFace cache (tokenizers, configs)
-COPY --from=builder /root/.cache/huggingface /opt/models/huggingface
+# Copy project files
+COPY backend/ /app/
+COPY data/seed/ /app/seed_data/
 
 RUN useradd --create-home appuser
-COPY --chown=appuser:appuser backend/ .
-COPY --chown=appuser:appuser data/seed/ ./seed_data/
-
-# Point all model caches and enable full offline mode
-ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
-ENV HF_HOME=/opt/models/huggingface
-ENV HF_HUB_OFFLINE=1
-ENV TRANSFORMERS_OFFLINE=1
-
+RUN chown -R appuser:appuser /app /opt/models
 USER appuser
 
 EXPOSE 8000

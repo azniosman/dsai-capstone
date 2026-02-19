@@ -1,65 +1,59 @@
 # ============================================================================
 # SkillBridge Lambda Container Image
-#
-# Build context: project root (same as backend/Dockerfile)
-# Uses the AWS Lambda Python 3.11 base image which includes the Lambda
-# Runtime Interface Client (RIC) — no uvicorn needed.
-#
-# CMD = "lambda_handler.handler" (module.function)
-# Terraform image_config.command can override this if needed.
-#
-# Build command (from project root):
-#   docker build -f backend/Dockerfile.lambda -t skillbridge-lambda .
 # ============================================================================
 
 FROM public.ecr.aws/lambda/python:3.11
 
-# Cache bust: 2026-02-20
-
-# ── Python dependencies ──────────────────────────────────────────────────────
-# All packages use pre-compiled wheels (psycopg2-binary, bcrypt wheel, etc.)
-# so no native build tools (gcc/python3-devel) are required.
-
-COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
-RUN yum install -y gcc gcc-c++ python3-devel && \
-    pip install --upgrade pip && \
-    pip install --no-cache-dir --prefer-binary -r ${LAMBDA_TASK_ROOT}/requirements.txt && \
-    yum clean all
-
-# Install spaCy and model explicitly (after cleanup to keep image small, though requirements.txt installs deps first)
-RUN pip install --no-cache-dir spacy==3.7.0 && \
-    pip install --no-cache-dir https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl && \
-    python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
-
-
-# ── Pre-download NLP models (Lambda runs in private subnet — no internet) ────
-
+# ===== Set environment variables =====
+ENV PYTHONUNBUFFERED=1
 ENV SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
 ENV HF_HOME=/opt/models/huggingface
+ENV HF_HUB_OFFLINE=1
 
+# Create directories for models
+RUN mkdir -p /opt/models/sentence-transformers /opt/models/huggingface
 
+# ===== Install system dependencies =====
+RUN yum install -y gcc gcc-c++ python3-devel git curl && \
+    yum clean all
 
-RUN python -c "\
-    from sentence_transformers import SentenceTransformer; \
-    SentenceTransformer('all-MiniLM-L6-v2'); \
-    print('Sentence Transformer model cached OK')"
+# ===== Install Python dependencies =====
+RUN pip install --upgrade pip
 
-# Verify offline mode works (will be used in Lambda VPC)
-RUN HF_HUB_OFFLINE=1 python -c "\
-    import os; os.environ['HF_HUB_OFFLINE']='1'; \
-    from sentence_transformers import SentenceTransformer; \
-    m = SentenceTransformer('all-MiniLM-L6-v2'); print('Offline mode OK')"
+# Copy project requirements
+COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
+
+# Install dependencies from requirements.txt
+# Pin numpy and scikit-learn for compatibility
+RUN pip install --no-cache-dir "numpy<2.0.0" "scikit-learn==1.3.2" && \
+    pip install --no-cache-dir --prefer-binary -r ${LAMBDA_TASK_ROOT}/requirements.txt
+
+# Install specific spaCy version (User request)
+RUN pip install --no-cache-dir spacy==3.7.0
+
+# Install spaCy English model (matching version)
+RUN pip install --no-cache-dir \
+    https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
+
+# Verify spaCy model works
+RUN python -c "import spacy; nlp = spacy.load('en_core_web_sm'); print('spaCy OK')"
+
+# Install Sentence Transformers (User request)
+RUN pip install --no-cache-dir sentence-transformers==2.2.2
+
+# Pre-download Sentence Transformer model so it's cached in the image
+RUN HF_HUB_OFFLINE=0 python -c "import os; os.environ['SENTENCE_TRANSFORMERS_HOME']='/opt/models/sentence-transformers'; from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print('ST OK')"
 
 # Lock models offline for production
-ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 
-# ── Application code ─────────────────────────────────────────────────────────
-
+# ===== Copy project files =====
 COPY backend/app/ ${LAMBDA_TASK_ROOT}/app/
 COPY backend/lambda_handler.py ${LAMBDA_TASK_ROOT}/
 COPY data/seed/ ${LAMBDA_TASK_ROOT}/seed_data/
 
-# ── Lambda handler entrypoint ─────────────────────────────────────────────────
+# Verify offline mode works (will be used in Lambda VPC)
+RUN python -c "import os; os.environ['SENTENCE_TRANSFORMERS_HOME']='/opt/models/sentence-transformers'; os.environ['HF_HUB_OFFLINE']='1'; from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print('Offline mode Verify OK')"
 
+# ===== Lambda handler entrypoint =====
 CMD ["lambda_handler.handler"]
