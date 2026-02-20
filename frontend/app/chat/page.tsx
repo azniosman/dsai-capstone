@@ -69,10 +69,28 @@ export default function CareerChat() {
         profile_id: profileId ? parseInt(profileId) : null,
         messages: newMsgs.map((m) => ({ role: m.role, content: m.content })),
       });
-      setMessages([...newMsgs, { role: "assistant", content: res.data.reply }]);
-      if (res.data.engine) {
-        setEngine(res.data.engine);
+
+      // Backend returns text/event-stream (SSE). First line is [ENGINE: ...] metadata;
+      // remaining lines are the reply text.
+      let reply: string;
+      let engineName: string | null = null;
+      if (typeof res.data === "string") {
+        const lines = res.data.split("\n");
+        const engineLine = lines.find((l: string) => l.startsWith("[ENGINE:"));
+        if (engineLine) {
+          engineName = engineLine.replace(/^\[ENGINE:\s*/, "").replace(/\]$/, "").trim();
+        }
+        reply = lines
+          .filter((l: string) => !l.startsWith("[ENGINE:"))
+          .join("\n")
+          .trim();
+      } else {
+        reply = res.data.reply ?? "";
+        engineName = res.data.engine ?? null;
       }
+
+      setMessages([...newMsgs, { role: "assistant", content: reply }]);
+      if (engineName) setEngine(engineName);
     } catch (err) {
       console.error(err);
       setMessages([
