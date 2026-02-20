@@ -31,6 +31,7 @@ echo ""
 echo "→ Building Lambda container image..."
 docker build \
   --platform linux/amd64 \
+  --provenance=false \
   -f backend/Dockerfile.lambda \
   -t "${ECR_BACKEND}:latest" \
   -t "${ECR_BACKEND}:$(git rev-parse --short HEAD 2>/dev/null || echo 'local')" \

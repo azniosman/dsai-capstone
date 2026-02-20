@@ -36,7 +36,9 @@ def create_profile(
 
         skills = payload.skills or []
         if payload.resume_text:
-            skills = list(set(skills + extract_skills(payload.resume_text)))
+            extracted = extract_skills(payload.resume_text)
+            extracted_skills = extracted.get("skills", []) if isinstance(extracted, dict) else (extracted or [])
+            skills = list(set(skills + extracted_skills))
 
         tenant_id = 1  # default to global tenant
         if user:
@@ -89,7 +91,8 @@ def parse_resume(payload: dict):
     if not resume_text:
         raise HTTPException(status_code=400, detail="Resume text is required")
         
-    skills = extract_skills(resume_text)
+    extracted = extract_skills(resume_text)
+    skills = extracted.get("skills", []) if isinstance(extracted, dict) else (extracted or [])
     return {"skills": skills}
 
 
