@@ -24,12 +24,11 @@ on:
         default: false
         type: boolean
 
-# OIDC: allows the runner to assume an IAM role without long-lived keys.
-# Static-key fallback: if you prefer AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY,
-# remove the role-to-assume line in the "Configure AWS credentials" step and
-# uncomment the two key lines instead. The id-token permission can be removed too.
+# Auth: static IAM keys stored in the GitHub "dev"/"prod" environment secrets.
+# To upgrade to OIDC (keyless): create an OIDC provider + IAM role in AWS,
+# add AWS_ROLE_ARN secret, swap the credentials step to use role-to-assume,
+# and change id-token permission to write.
 permissions:
-  id-token: write   # required for OIDC role assumption
   contents: read
 
 env:
@@ -52,19 +51,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── AWS Auth (OIDC — no long-lived keys) ─────────────────────────────────
-      # Prerequisites: create an OIDC provider + IAM role in your account.
-      # See the README section "GitHub Actions OIDC Setup" for the one-time steps.
-      # Store the role ARN as GitHub secret AWS_ROLE_ARN.
-      #
-      # Static-key fallback: replace role-to-assume with:
-      #   aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #   aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      # ── AWS Auth ─────────────────────────────────────────────────────────────
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region:     ${{ env.AWS_REGION }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
 
       # Aurora master password forbids: '/', '@', '"', space
       # base64 output (from openssl rand -base64) may contain '/' — strip it.
