@@ -244,6 +244,14 @@ jobs:
           TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
           TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: |
+          # Disable bash -e for this entire step.
+          # This is a delete/cleanup script: every AWS CLI and terraform command
+          # uses explicit "|| true" or structured if/else for error handling.
+          # bash -e causes the step to abort immediately when any command
+          # substitution (RESULT=$(aws ...)) returns non-zero, which always
+          # happens on a first deploy when no resources exist yet (exit 254).
+          set +e
+
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
@@ -471,6 +479,7 @@ jobs:
             --region "${{ env.AWS_REGION }}" 2>/dev/null || true
 
           echo "Cleanup complete — Terraform will rebuild all resources from scratch"
+          exit 0
 
       # ── Step 4: Re-import ECR (only resource we kept across the cleanup) ───────
       - name: Import ECR into Terraform state
