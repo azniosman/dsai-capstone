@@ -334,7 +334,8 @@ jobs:
           done
 
           echo "=== Step 7: Wait for Aurora cluster deletion (started in Step 2) ==="
-          for i in $(seq 1 36); do
+          # Aurora Serverless v2 can take up to 15 minutes to fully delete.
+          for i in $(seq 1 90); do
             STATUS=$(aws rds describe-db-clusters \
               --db-cluster-identifier "$CLUSTER_ID" \
               --query 'DBClusters[0].Status' \
@@ -343,15 +344,33 @@ jobs:
               echo "  Aurora is gone — proceeding"
               break
             fi
-            echo "  Aurora status: $STATUS ($i/36)"
+            echo "  Aurora status: $STATUS ($i/90)"
             sleep 10
           done
 
-          echo "=== Step 8: Delete RDS subnet group and parameter group ==="
-          aws rds delete-db-subnet-group \
-            --db-subnet-group-name "${P}-${E}-db-subnet" 2>/dev/null || true
-          aws rds delete-db-cluster-parameter-group \
-            --db-cluster-parameter-group-name "${P}-${E}-aurora-pg16" 2>/dev/null || true
+          echo "=== Step 8: Delete RDS subnet group and parameter group (with retries) ==="
+          # Retry up to 60 × 10s = 10 minutes in case Aurora is still releasing the subnet group.
+          for i in $(seq 1 60); do
+            RESULT=$(aws rds delete-db-subnet-group \
+              --db-subnet-group-name "${P}-${E}-db-subnet" 2>&1)
+            if [ $? -eq 0 ] || echo "$RESULT" | grep -qi "DBSubnetGroupNotFoundFault\|Cannot find"; then
+              echo "  Subnet group deleted (or already gone)"
+              break
+            fi
+            echo "  Waiting for subnet group to be deletable ($i/60): $RESULT"
+            sleep 10
+          done
+          # Parameter group — retry briefly (usually instant once cluster is gone)
+          for i in $(seq 1 12); do
+            RESULT=$(aws rds delete-db-cluster-parameter-group \
+              --db-cluster-parameter-group-name "${P}-${E}-aurora-pg16" 2>&1)
+            if [ $? -eq 0 ] || echo "$RESULT" | grep -qi "DBParameterGroupNotFoundFault\|Cannot find"; then
+              echo "  Cluster parameter group deleted (or already gone)"
+              break
+            fi
+            echo "  Waiting for parameter group ($i/12): $RESULT"
+            sleep 10
+          done
           # Legacy plain-RDS param group from prior runs
           aws rds delete-db-parameter-group \
             --db-parameter-group-name "${P}-${E}-pg16" 2>/dev/null || true
