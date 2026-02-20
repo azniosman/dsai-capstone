@@ -76,9 +76,9 @@ variable "lambda_memory_mb" {
 }
 
 variable "lambda_timeout_seconds" {
-  description = "Lambda timeout in seconds (capped at 29 by API Gateway)"
+  description = "Lambda timeout in seconds. API Gateway caps response at 29s, but higher values (120s) allow the Lambda INIT to complete on cold starts so the container stays warm for subsequent requests."
   type        = number
-  default     = 29
+  default     = 120
 }
 
 variable "enable_sagemaker" {

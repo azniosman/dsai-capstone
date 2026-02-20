@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import threading
 from typing import Optional, List, Union, Any, Dict
 from contextlib import asynccontextmanager
 
@@ -227,29 +228,31 @@ def _seed_database():
         db.close()
 
 
-@asynccontextmanager
-async def lifespan(app):
-    _seed_database()
-    # Pre-load ML model to avoid cold-start timeouts
+def _background_ml_warmup():
+    """Load ML models and warm caches in a background thread.
+
+    Running these in a daemon thread lets the lifespan complete quickly so
+    Lambda accepts requests before the 29-second API Gateway timeout fires.
+    The models will be ready within a few seconds of the first request arriving.
+    """
     try:
-        logger.info("Pre-loading ML model...")
+        logger.info("[bg-warmup] Pre-loading ML model...")
         from app.ml.embeddings import warmup_model
         warmup_model()
-        logger.info("ML model loaded successfully")
+        logger.info("[bg-warmup] ML model loaded")
     except Exception as e:
-        logger.warning("ML model warmup failed (will retry on first request): %s", e)
-    # Pre-build taxonomy FAISS index so first request is fast
+        logger.warning("[bg-warmup] ML model warmup failed: %s", e)
+
     try:
-        logger.info("Pre-building taxonomy FAISS index...")
+        logger.info("[bg-warmup] Pre-building taxonomy FAISS index...")
         from app.ml.taxonomy import get_taxonomy_index
         get_taxonomy_index()
-        logger.info("Taxonomy index built successfully")
+        logger.info("[bg-warmup] Taxonomy index built")
     except Exception as e:
-        logger.warning("Taxonomy index warmup failed (will retry on first request): %s", e)
-        
-    # Pre-compute embeddings for all job roles to avoid timeout on first recommendation request
+        logger.warning("[bg-warmup] Taxonomy index warmup failed: %s", e)
+
     try:
-        logger.info("Warming up skill cache for job roles...")
+        logger.info("[bg-warmup] Warming up skill cache for job roles...")
         from app.services.skill_matcher import warmup_skill_cache
         db = SessionLocal()
         try:
@@ -260,18 +263,30 @@ async def lifespan(app):
                     skill_sets.append(r.required_skills)
                 if r.preferred_skills:
                     skill_sets.append(r.preferred_skills)
-                # Also warm up the combined skills used in compute_content_similarity
                 if r.required_skills and r.preferred_skills:
                     skill_sets.append(r.required_skills + r.preferred_skills)
-            
             count = warmup_skill_cache(skill_sets)
-            logger.info("Skill cache warmed up with %d unique skill sets from %d roles", count, len(roles))
+            logger.info("[bg-warmup] Skill cache warm: %d sets from %d roles", count, len(roles))
         finally:
             db.close()
     except Exception as e:
-        logger.warning("Skill cache warmup failed: %s", e)
+        logger.warning("[bg-warmup] Skill cache warmup failed: %s", e)
 
-    logger.info("Application startup complete")
+    logger.info("[bg-warmup] Background ML warmup complete")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    # DB must be ready before we accept requests — keep synchronous
+    _seed_database()
+
+    # ML model warmup is expensive (~10-15 s); run in background so the
+    # lifespan completes quickly and Lambda can start serving requests
+    # before the API Gateway 29-second timeout fires on cold starts.
+    t = threading.Thread(target=_background_ml_warmup, daemon=True, name="ml-warmup")
+    t.start()
+
+    logger.info("Application startup complete (ML warmup running in background)")
     yield
 
 
