@@ -5,7 +5,6 @@ const isExport = process.env.NEXT_OUTPUT === "export";
 const nextConfig: NextConfig = {
   output: isExport ? "export" : "standalone",
   images: isExport ? { unoptimized: true } : undefined,
-  trailingSlash: true,
   ...(isExport
     ? {}
     : {
