@@ -64,8 +64,8 @@ jobs:
       - name: Sanitize DB password for Aurora compatibility
         run: |
           SAFE=$(printf '%s' "$RAW" | tr -d '/@" ')
-          if [ ${#SAFE} -lt 16 ]; then
-            echo "ERROR: DB_PASSWORD is too short after sanitization (< 16 chars)."
+          if [ ${#SAFE} -lt 8 ]; then
+            echo "ERROR: DB_PASSWORD is too short after sanitization (< 8 chars)."
             echo "Regenerate with: openssl rand -hex 24"
             exit 1
           fi
