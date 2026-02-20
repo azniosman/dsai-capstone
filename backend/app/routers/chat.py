@@ -203,31 +203,22 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
     system_prompt = _build_system_prompt(profile, recommendations, skill_gaps, roadmap_courses, market_insights, pathways)
 
     # Try Bedrock - fall back to Gemini - fall back to Rules
+    # Note: invoke_model (blocking) is used instead of invoke_model_with_stream because
+    # API Gateway + Lambda buffers the full response regardless; streaming connections
+    # get cut by the 29s API GW integration timeout before the response completes.
     try:
         from app.services.bedrock_service import bedrock_service
-        
-        # Generator function for StreamingResponse
-        def bedrock_stream():
-            try:
-                # We yield the initial metadata/engine chunk for the frontend to know the source
-                # The frontend can choose to display it or not.
-                yield '[ENGINE: AWS Bedrock (Claude 3.5 Sonnet)]\n'
-                
-                # Stream the chunks
-                stream = bedrock_service.invoke_model_with_stream(
-                    system_prompt=system_prompt,
-                    messages=[m.dict() for m in payload.messages]
-                )
-                for chunk in stream:
-                    yield chunk
-            except Exception as e:
-                logging.error(f"Bedrock streaming failed mid-stream: {e}")
-                yield f"\n[Error: Connection interrupted. Please try again.]"
 
-        return StreamingResponse(
-            bedrock_stream(), 
-            media_type="text/event-stream"
+        reply = bedrock_service.invoke_model(
+            system_prompt=system_prompt,
+            messages=[m.dict() for m in payload.messages]
         )
+
+        def bedrock_stream():
+            yield '[ENGINE: AWS Bedrock (Claude 3.5 Sonnet)]\n'
+            yield reply
+
+        return StreamingResponse(bedrock_stream(), media_type="text/event-stream")
 
     except Exception as e_bedrock:
         logging.error(f"Bedrock API error: {e_bedrock}")
