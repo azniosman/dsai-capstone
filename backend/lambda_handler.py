@@ -75,20 +75,25 @@ def _bootstrap_env() -> None:
 # Bootstrap must run before importing app (which initialises DB engine on import)
 _bootstrap_env()
 
-from app.main import app, _seed_database  # noqa: E402
+import threading  # noqa: E402
+
+from app.main import app, _seed_database, _background_ml_warmup  # noqa: E402
 
 from mangum import Mangum  # noqa: E402
 
 # Initialise DB schema + seed data during Lambda cold start (module-level).
-# Mangum is configured with lifespan="off" so the FastAPI startup event never
-# fires — we must call _seed_database() explicitly here, after _bootstrap_env()
-# has populated the POSTGRES_* credentials from Secrets Manager.
-# This is idempotent: create_all() is a no-op when tables already exist, and
-# the seeder checks for existing data before inserting.
+# Mangum lifespan="off" means the FastAPI startup event never fires, so we
+# call _seed_database() explicitly after _bootstrap_env() has set credentials.
+# Idempotent: create_all() is a no-op when tables already exist.
 try:
     _seed_database()
     logger.info("DB initialisation complete")
 except Exception as exc:
     logger.error("DB initialisation failed: %s", exc)
+
+# Pre-load ML model + FAISS index in the background so the first recommender /
+# jd-match / skill-gap request doesn't hit a cold model-load penalty.
+# Daemon thread: exits automatically if Lambda container is recycled.
+threading.Thread(target=_background_ml_warmup, daemon=True, name="ml-warmup").start()
 
 handler = Mangum(app, lifespan="off")

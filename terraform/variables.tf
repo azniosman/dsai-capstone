@@ -72,7 +72,7 @@ variable "enable_cloudfront" {
 variable "lambda_memory_mb" {
   description = "Lambda memory in MB (higher = faster cold start for ML models)"
   type        = number
-  default     = 1024
+  default     = 3008
 }
 
 variable "lambda_timeout_seconds" {
