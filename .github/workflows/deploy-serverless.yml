@@ -319,12 +319,16 @@ jobs:
             aws lambda delete-function \
               --function-name "${P}-${E}-${FN}" 2>/dev/null || true
           done
-          API_ID=$(aws apigatewayv2 get-apis \
-            --query "Items[?Name=='${P}-${E}-api'].ApiId" \
-            --output text 2>/dev/null || echo "")
-          for AID in $API_ID; do
-            [ -z "$AID" ] || [ "$AID" = "None" ] && continue
-            aws apigatewayv2 delete-api --api-id "$AID" 2>/dev/null || true
+          # Delete both the HTTP API and ALL WebSocket voice-ws APIs (avoid duplicates)
+          for API_NAME in "${P}-${E}-api" "${P}-${E}-voice-ws"; do
+            API_IDS=$(aws apigatewayv2 get-apis \
+              --query "Items[?Name=='${API_NAME}'].ApiId" \
+              --output text 2>/dev/null || echo "")
+            for AID in $API_IDS; do
+              [ -z "$AID" ] || [ "$AID" = "None" ] && continue
+              echo "  Deleting API Gateway: ${API_NAME} (${AID})"
+              aws apigatewayv2 delete-api --api-id "$AID" 2>/dev/null || true
+            done
           done
           for LG in \
             "/aws/lambda/${P}-${E}-api" \
@@ -566,11 +570,12 @@ jobs:
         id: tf
         working-directory: ./terraform
         run: |
-          echo "api_url=$(terraform output -raw api_endpoint)"        >> $GITHUB_OUTPUT
-          echo "s3_bucket=$(terraform output -raw s3_bucket_name)"    >> $GITHUB_OUTPUT
-          echo "cf_domain=$(terraform output -raw cloudfront_domain)" >> $GITHUB_OUTPUT
-          echo "cf_id=$(terraform output -raw cloudfront_id)"         >> $GITHUB_OUTPUT
-          echo "frontend_url=$(terraform output -raw frontend_url)"   >> $GITHUB_OUTPUT
+          echo "api_url=$(terraform output -raw api_endpoint)"          >> $GITHUB_OUTPUT
+          echo "s3_bucket=$(terraform output -raw s3_bucket_name)"      >> $GITHUB_OUTPUT
+          echo "cf_domain=$(terraform output -raw cloudfront_domain)"   >> $GITHUB_OUTPUT
+          echo "cf_id=$(terraform output -raw cloudfront_id)"           >> $GITHUB_OUTPUT
+          echo "frontend_url=$(terraform output -raw frontend_url)"     >> $GITHUB_OUTPUT
+          echo "ws_url=$(terraform output -raw websocket_endpoint)"     >> $GITHUB_OUTPUT
 
       # ── Step 6: Build and deploy frontend ────────────────────────────────────
       - name: Setup Node.js
@@ -587,8 +592,9 @@ jobs:
       - name: Build frontend (Next.js static export)
         working-directory: ./frontend
         env:
-          NEXT_PUBLIC_API_URL: ${{ steps.tf.outputs.api_url }}
-          NEXT_PUBLIC_APP_URL: ${{ steps.tf.outputs.frontend_url }}
+          NEXT_PUBLIC_API_URL:      ${{ steps.tf.outputs.api_url }}
+          NEXT_PUBLIC_APP_URL:      ${{ steps.tf.outputs.frontend_url }}
+          NEXT_PUBLIC_VOICE_WS_URL: ${{ steps.tf.outputs.ws_url }}
           NEXT_OUTPUT: export
         run: npm run build
 
@@ -672,10 +678,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend | ${{ steps.tf.outputs.frontend_url }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| API      | ${{ steps.tf.outputs.api_url }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| S3 Bucket| ${{ steps.tf.outputs.s3_bucket }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image    | ${{ env.IMAGE_URI }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend   | ${{ steps.tf.outputs.frontend_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API        | ${{ steps.tf.outputs.api_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| WebSocket  | ${{ steps.tf.outputs.ws_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| S3 Bucket  | ${{ steps.tf.outputs.s3_bucket }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image      | ${{ env.IMAGE_URI }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Cost notes:**" >> $GITHUB_STEP_SUMMARY
           echo "- Aurora Serverless v2: ~\$43/mo (0.5 ACU min)" >> $GITHUB_STEP_SUMMARY
