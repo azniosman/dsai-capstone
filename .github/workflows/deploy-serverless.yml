@@ -447,6 +447,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: ${{ steps.tf.outputs.api_url }}
           NEXT_PUBLIC_APP_URL: ${{ steps.tf.outputs.frontend_url }}
+          NEXT_OUTPUT: export
         run: npm run build
 
       - name: Sync frontend to S3
