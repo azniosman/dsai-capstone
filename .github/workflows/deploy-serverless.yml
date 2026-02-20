@@ -56,6 +56,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ env.AWS_REGION }}
 
+      # Aurora master password forbids: '/', '@', '"', space
+      # base64 output (from openssl rand -base64) may contain '/' -- strip it.
+      - name: Sanitize DB password for Aurora compatibility
+        run: |
+          SAFE=$(printf '%s' "$RAW" | tr -d '/@" ')
+          echo "SAFE_DB_PASSWORD=${SAFE}" >> $GITHUB_ENV
+        env:
+          RAW: ${{ secrets.DB_PASSWORD }}
+
       # ── Terraform state bucket (idempotent) ──────────────────────────────────
       # S3 backend keeps state across CI runs so resources aren't re-created.
       - name: Ensure Terraform state bucket exists
@@ -124,7 +133,7 @@ jobs:
         env:
           TF_VAR_aws_region:        ${{ env.AWS_REGION }}
           TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
           TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
           TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: |
@@ -144,7 +153,7 @@ jobs:
         env:
           TF_VAR_aws_region:        ${{ env.AWS_REGION }}
           TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
           TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
           TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: terraform apply -target=module.ecr -auto-approve -input=false
@@ -187,7 +196,7 @@ jobs:
         env:
           TF_VAR_aws_region:        ${{ env.AWS_REGION }}
           TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
           TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
           TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: |
@@ -204,11 +213,12 @@ jobs:
             module.iam \
             module.lambda_backend \
             module.api_gateway \
-            module.s3_frontend \
-            "module.cloudfront[0]" \
-            "module.opensearch[0]"; do
+            module.s3_frontend; do
             terraform state rm "$MOD" 2>&1 | head -3 || true
           done
+          # Indexed modules use bracket notation; remove individually
+          terraform state rm 'module.cloudfront[0]' 2>/dev/null || true
+          terraform state rm 'module.opensearch[0]' 2>/dev/null || true
 
           echo "=== Step 2: Kick off Aurora cluster deletion (async — runs during VPC cleanup) ==="
           CLUSTER_ID="${P}-${E}-aurora"
@@ -362,12 +372,16 @@ jobs:
         env:
           TF_VAR_aws_region:        ${{ env.AWS_REGION }}
           TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
           TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
           TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
         run: |
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
+
+          # Remove from state first in case they were imported earlier in this run
+          terraform state rm module.ecr.aws_ecr_repository.backend 2>/dev/null || true
+          terraform state rm module.ecr.aws_ecr_lifecycle_policy.backend 2>/dev/null || true
 
           tf_import() {
             terraform import -input=false "$@" 2>&1 | grep -v "^$" || true
@@ -385,7 +399,7 @@ jobs:
         env:
           TF_VAR_aws_region:        ${{ env.AWS_REGION }}
           TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
           TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
           TF_VAR_gemini_api_key:    ${{ secrets.GEMINI_API_KEY }}
           TF_VAR_lambda_image_uri:  ${{ env.IMAGE_URI }}
@@ -398,7 +412,7 @@ jobs:
         env:
           TF_VAR_aws_region:        ${{ env.AWS_REGION }}
           TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ secrets.DB_PASSWORD }}
+          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
           TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
           TF_VAR_gemini_api_key:    ${{ secrets.GEMINI_API_KEY }}
           TF_VAR_lambda_image_uri:  ${{ env.IMAGE_URI }}
