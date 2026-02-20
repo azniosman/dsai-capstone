@@ -615,6 +615,23 @@ jobs:
             --include "*.html" \
             --region "${{ env.AWS_REGION }}"
 
+          # Pass 3: Extension-less copies for clean URL routing.
+          # Next.js App Router static export generates flat `login.html` files.
+          # S3 website hosting only serves /login.html for the exact key "login.html",
+          # NOT for the URL "/login". Copy each route HTML as an extension-less key
+          # so S3 serves /login, /dashboard, etc. directly without CloudFront.
+          # index.html and 404.html are excluded (served by S3 website config already).
+          while IFS= read -r key; do
+            route="${key%.html}"
+            aws s3 cp "s3://${BUCKET}/${key}" "s3://${BUCKET}/${route}" \
+              --content-type "text/html; charset=utf-8" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --metadata-directive REPLACE \
+              --region "${{ env.AWS_REGION }}"
+          done < <(aws s3 ls "s3://${BUCKET}/" --region "${{ env.AWS_REGION }}" \
+            | awk '/\.html$/ {print $4}' \
+            | grep -v -E '^(index|404|_not-found)\.html$')
+
       # ── Step 7: Invalidate CloudFront (skipped when CF is disabled) ──────────
       - name: Invalidate CloudFront
         if: ${{ steps.tf.outputs.cf_id != '' }}
