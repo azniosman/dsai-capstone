@@ -50,7 +50,7 @@ bash scripts/deploy.sh
 
 # Backend development (local)
 cd backend
-pip install -r requirements.txt
+pip install -r requirements.txt          # or: conda create -n skillbridge python=3.11 -y && conda activate skillbridge
 python -m spacy download en_core_web_sm   # required for NLP features
 uvicorn app.main:app --reload             # runs on :8000
 
@@ -59,8 +59,9 @@ cd backend && pytest
 cd backend && pytest tests/test_recommender.py -v        # single file
 cd backend && pytest tests/test_recommender.py::test_name -v  # single test
 
-# Comprehensive end-to-end feature test (requires running backend)
-python scripts/full_test.py
+# End-to-end feature tests (requires running backend)
+python scripts/full_test.py        # comprehensive API walkthrough
+python scripts/verify_features.py  # feature flag / smoke check
 
 # Frontend development
 cd frontend
@@ -103,7 +104,7 @@ Backend settings are in `backend/app/config.py` using `pydantic_settings.BaseSet
 - `backend/app/limiter.py` — Rate limiting middleware via slowapi
 
 **Routers** (`backend/app/routers/`, all mounted under `/api`):
-auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resume_rewriter, upload, export, dashboard, market, compare, courses, progress, projects, peer, sso, api_keys, audit_logs, voice
+auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resume_rewriter, upload, export, dashboard, market, compare, courses, progress, projects, peer, sso, api_keys, audit_logs, voice, rag, gap_analysis
 
 **Services** (`backend/app/services/`):
 `recommender` (hybrid scoring), `skill_matcher` (embedding similarity), `gap_analyzer`, `roadmap_generator`, `course_pathways`, `resume_parser`, `market_simulator`, `subsidy_calculator` (SkillsFuture/MCES), `audit_logger`, `bedrock_service` (AWS Bedrock LLM), `sagemaker_service` (SageMaker embeddings), `voice_service`, `dashboard_service`
@@ -133,9 +134,21 @@ auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resu
 - `data/seed/` — `skills_taxonomy.json` (~150+ skills, categories: programming, cloud, data, security, etc.), `job_roles.json` (SGD salary benchmarks), `sctp_courses.json` (SkillsFuture SCTP courses with subsidy fields)
 - Auto-seeding: backend seeds on startup if the `Global` tenant has no skills data
 
+### Dedicated Lambda Handlers
+
+`lambdas/` contains standalone Lambda functions for async/event-driven workloads, separate from the main FastAPI/Mangum handler:
+
+- `base.py` — shared `bootstrap_env()` that populates env vars from AWS Secrets Manager at cold start (idempotent)
+- `bedrock_orchestrator.py` — AWS Bedrock LLM orchestration
+- `embedding_generator.py` — SageMaker embedding generation
+- `gap_analysis_handler.py` — async skill gap analysis
+- `rag_query_handler.py` — RAG pipeline queries
+- `resume_upload_handler.py` — S3-triggered resume processing
+- `voice_coaching_handler.py` — WebSocket voice coaching pipeline
+
 ### Infrastructure
 
-Terraform modules in `terraform/modules/`: `vpc`, `database` (Aurora Serverless v2 + pgvector), `backend` (Lambda + API Gateway), `frontend` (S3 + CloudFront), `alb`, `ecr`, `ecs`, `rds`, `security_groups`, `storage`.
+Terraform modules in `terraform/modules/`: `vpc`, `database` (Aurora Serverless v2 + pgvector), `backend` (Lambda + API Gateway), `lambda_backend`, `api_gateway`, `frontend` (S3 + CloudFront), `s3_frontend`, `cloudfront`, `alb`, `ecr`, `ecs`, `rds`, `security_groups`, `storage`, `iam`, `opensearch`, `sagemaker`, `websocket`.
 
 CI/CD: `.github/workflows/deploy-serverless.yml` (currently disabled with `if: false`; deploys via OIDC to AWS ap-southeast-1 using Terraform + Lambda + S3).
 
@@ -210,3 +223,6 @@ Automation workflows in `n8n/workflows/` (accessible at port 5678):
 | GET    | /api/api-keys/                | List API keys (admin)                 |
 | DELETE | /api/api-keys/{id}            | Revoke API key (admin)                |
 | GET    | /api/audit-logs/              | List audit logs (admin)               |
+| POST   | /api/rag/query                | RAG-based document retrieval          |
+| POST   | /api/gap-analysis             | Async skill gap analysis              |
+| POST   | /api/voice                    | Voice coaching session                |

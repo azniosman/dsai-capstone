@@ -35,6 +35,34 @@ module "security_groups" {
   vpc_cidr     = module.vpc.vpc_cidr_block
 }
 
+# 2b. S3 Uploads bucket — resume PDFs and voice Transcribe staging
+# Referenced in the IAM policy and needed by resume-upload + voice Lambdas.
+resource "aws_s3_bucket" "uploads" {
+  bucket        = "${var.project_name}-${var.environment}-uploads"
+  force_destroy = true
+
+  tags = { Name = "${var.project_name}-${var.environment}-uploads" }
+}
+
+resource "aws_s3_bucket_public_access_block" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
 # 3. ECR — container registry for the Lambda backend image
 module "ecr" {
   source = "./modules/ecr"
@@ -86,16 +114,17 @@ module "lambda_backend" {
   lambda_image_uri = var.lambda_image_uri != "" ? var.lambda_image_uri : "${module.ecr.backend_repo_url}:latest"
 
   # Application configuration
-  db_secret_arn    = module.rds.db_secret_arn
-  db_host          = module.rds.db_address
-  db_name          = "skillbridge"
-  db_username      = var.db_username
-  bedrock_model_id = var.bedrock_model_id
-  gemini_api_key   = var.gemini_api_key
-  secret_key       = var.secret_key
-  opensearch_url   = var.enable_opensearch ? "https://${module.opensearch[0].opensearch_endpoint}" : ""
+  db_secret_arn           = module.rds.db_secret_arn
+  db_host                 = module.rds.db_address
+  db_name                 = "skillbridge"
+  db_username             = var.db_username
+  bedrock_model_id        = var.bedrock_model_id
+  gemini_api_key          = var.gemini_api_key
+  secret_key              = var.secret_key
+  opensearch_url          = var.enable_opensearch ? "https://${module.opensearch[0].opensearch_endpoint}" : ""
+  voice_transcribe_bucket = aws_s3_bucket.uploads.id
 
-  depends_on = [module.rds, module.iam]
+  depends_on = [module.rds, module.iam, aws_s3_bucket.uploads]
 }
 
 # 11. WebSocket API — voice coaching (conditional)
