@@ -137,15 +137,21 @@ def _build_system_prompt(profile, recommendations=None, skill_gaps=None, roadmap
 def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depends(get_current_user_optional)):
     tenant_id = user.tenant_id if user else 1  # fallback to global tenant
     if not settings.gemini_api_key:
-        # Fallback: rule-based response when no API key configured
-        return ChatResponse(
-            reply=_fallback_response(
+        def no_key_fallback_stream():
+            yield '[ENGINE: SkillBridge Knowledge Engine (Local Fallback)]\n'
+            response = _fallback_response(
                 payload.messages[-1].content if payload.messages else "",
                 profile_id=payload.profile_id,
                 db=db,
                 tenant_id=tenant_id
-            ),
-            engine="SkillBridge Knowledge Engine (Local Fallback)"
+            )
+            words = response.split(" ")
+            for i in range(0, len(words), 5):
+                yield " ".join(words[i:i+5]) + " "
+                
+        return StreamingResponse(
+            no_key_fallback_stream(),
+            media_type="text/event-stream"
         )
 
     profile = None
@@ -200,14 +206,28 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
     try:
         from app.services.bedrock_service import bedrock_service
         
-        # Convert messages for Bedrock
-        # We already have the system prompt
-        
-        response_text = bedrock_service.invoke_model(
-            system_prompt=system_prompt,
-            messages=[m.dict() for m in payload.messages]
+        # Generator function for StreamingResponse
+        def bedrock_stream():
+            try:
+                # We yield the initial metadata/engine chunk for the frontend to know the source
+                # The frontend can choose to display it or not.
+                yield '[ENGINE: AWS Bedrock (Claude 3.5 Sonnet)]\n'
+                
+                # Stream the chunks
+                stream = bedrock_service.invoke_model_with_stream(
+                    system_prompt=system_prompt,
+                    messages=[m.dict() for m in payload.messages]
+                )
+                for chunk in stream:
+                    yield chunk
+            except Exception as e:
+                logging.error(f"Bedrock streaming failed mid-stream: {e}")
+                yield f"\n[Error: Connection interrupted. Please try again.]"
+
+        return StreamingResponse(
+            bedrock_stream(), 
+            media_type="text/event-stream"
         )
-        return ChatResponse(reply=response_text, engine="AWS Bedrock (Claude 3.5 Sonnet)")
 
     except Exception as e_bedrock:
         logging.error(f"Bedrock API error: {e_bedrock}")
@@ -236,14 +256,22 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
                 logging.error(f"Gemini API error (fallback): {e_gemini}")
 
         # Fallback to rule-based response
-        return ChatResponse(
-            reply=_fallback_response(
+        def fallback_stream():
+            yield '[ENGINE: SkillBridge Knowledge Engine (Local Fallback)]\n'
+            response = _fallback_response(
                 payload.messages[-1].content if payload.messages else "",
                 profile_id=payload.profile_id,
                 db=db,
                 tenant_id=tenant_id
-            ),
-            engine="SkillBridge Knowledge Engine (Local Fallback)"
+            )
+            # Simulate streaming block by block
+            words = response.split(" ")
+            for i in range(0, len(words), 5):
+                yield " ".join(words[i:i+5]) + " "
+                
+        return StreamingResponse(
+            fallback_stream(),
+            media_type="text/event-stream"
         )
 
 

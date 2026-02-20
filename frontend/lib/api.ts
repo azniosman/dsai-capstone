@@ -192,6 +192,11 @@ export interface ResumeUploadResult {
   experience_years?: number;
   raw_text_preview?: string;
   profile_id?: number;
+  readiness_score?: number;
+  strengths?: string[];
+  missing_skills?: string[];
+  recommended_courses?: string[];
+  suggested_roles?: string[];
 }
 
 export interface SubsidyResult {
@@ -210,21 +215,26 @@ export interface SubsidyResult {
 export const authApi = {
   /** Register a new user account */
   register: (payload: { name: string; email: string; password: string }) =>
-    api.post<{ access_token: string; refresh_token?: string; user: User }>(
-      "/api/auth/register",
-      payload
-    ).then((r) => r.data),
+    api
+      .post<{
+        access_token: string;
+        refresh_token?: string;
+        user: User;
+      }>("/api/auth/register", payload)
+      .then((r) => r.data),
 
   /** Login and receive JWT tokens */
   login: (payload: { email: string; password: string }) =>
-    api.post<{ access_token: string; refresh_token?: string; user: User }>(
-      "/api/auth/login",
-      payload
-    ).then((r) => r.data),
+    api
+      .post<{
+        access_token: string;
+        refresh_token?: string;
+        user: User;
+      }>("/api/auth/login", payload)
+      .then((r) => r.data),
 
   /** Fetch the currently authenticated user */
-  me: () =>
-    api.get<User>("/api/auth/me").then((r) => r.data),
+  me: () => api.get<User>("/api/auth/me").then((r) => r.data),
 
   /** Logout and invalidate refresh token */
   logout: (refreshToken: string) =>
@@ -244,12 +254,10 @@ export const profileApi = {
     is_career_switcher?: boolean;
     skills?: string[];
     email?: string;
-  }) =>
-    api.post<Profile>("/api/profile", payload).then((r) => r.data),
+  }) => api.post<Profile>("/api/profile", payload).then((r) => r.data),
 
   /** Get the profile linked to the current user */
-  me: () =>
-    api.get<Profile>("/api/profile/me").then((r) => r.data),
+  me: () => api.get<Profile>("/api/profile/me").then((r) => r.data),
 
   /** Update profile by ID */
   update: (id: number, payload: Partial<Profile>) =>
@@ -268,20 +276,22 @@ export const resumeApi = {
   upload: (
     file: File,
     profileId?: number,
-    onProgress?: (pct: number) => void
+    onProgress?: (pct: number) => void,
   ) => {
     const form = new FormData();
     form.append("file", file);
     if (profileId) form.append("profile_id", String(profileId));
 
-    return api.post<ResumeUploadResult>("/api/upload-resume", form, {
-      headers: { "Content-Type": "multipart/form-data" },
-      onUploadProgress: (e) => {
-        if (e.total && onProgress) {
-          onProgress(Math.round((e.loaded / e.total) * 100));
-        }
-      },
-    }).then((r) => r.data);
+    return api
+      .post<ResumeUploadResult>("/api/upload-resume", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (e) => {
+          if (e.total && onProgress) {
+            onProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        },
+      })
+      .then((r) => r.data);
   },
 };
 
@@ -292,9 +302,11 @@ export const resumeApi = {
 export const recommendApi = {
   /** Get job recommendations for a profile */
   get: (profileId: number) =>
-    api.post<RecommendationsResponse>("/api/recommend", {
-      profile_id: profileId,
-    }).then((r) => r.data),
+    api
+      .post<RecommendationsResponse>("/api/recommend", {
+        profile_id: profileId,
+      })
+      .then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────
@@ -304,7 +316,9 @@ export const recommendApi = {
 export const skillGapApi = {
   /** Get skill gap analysis for a profile */
   get: (profileId: number) =>
-    api.get<SkillGapResponse>(`/api/skill-gap/${profileId}`).then((r) => r.data),
+    api
+      .get<SkillGapResponse>(`/api/skill-gap/${profileId}`)
+      .then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────
@@ -314,7 +328,9 @@ export const skillGapApi = {
 export const roadmapApi = {
   /** Get upskilling roadmap for a profile */
   get: (profileId: number) =>
-    api.get<RoadmapResponse>(`/api/upskilling/${profileId}`).then((r) => r.data),
+    api
+      .get<RoadmapResponse>(`/api/upskilling/${profileId}`)
+      .then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────
@@ -323,14 +339,57 @@ export const roadmapApi = {
 
 export const chatApi = {
   /**
-   * Send a message to the AI career coach.
+   * Send a message to the AI career coach and stream the response.
    * Messages must include the full conversation history.
+   * On chunk received, it fires the `onChunk` callback.
    */
-  send: (payload: {
-    profile_id?: number | null;
-    messages: ChatMessage[];
-  }) =>
-    api.post<ChatResponse>("/api/chat", payload).then((r) => r.data),
+  sendStream: async (
+    payload: { profile_id?: number | null; messages: ChatMessage[] },
+    onChunk: (chunk: string) => void
+  ): Promise<void> => {
+    try {
+      // We use raw fetch here because axios doesn't natively support ReadableStream
+      // in the browser easily without custom adapters.
+      
+      const token = typeof window !== 'undefined' ? localStorage.getItem('skillbridge_access_token') : null;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      
+      const response = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Chat API error: ${response.status}`);
+      }
+
+      if (!response.body) {
+        throw new Error("ReadableStream not yet supported in this browser.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        onChunk(chunk);
+      }
+    } catch (e) {
+      console.error("Stream failed:", e);
+      throw e;
+    }
+  },
 };
 
 // ─────────────────────────────────────────────
@@ -343,8 +402,7 @@ export const jdMatchApi = {
     profile_id: number;
     job_description: string;
     job_title?: string;
-  }) =>
-    api.post<JDMatchResult>("/api/jd-match", payload).then((r) => r.data),
+  }) => api.post<JDMatchResult>("/api/jd-match", payload).then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────
@@ -373,8 +431,7 @@ export const dashboardApi = {
 
 export const coursesApi = {
   /** List all SCTP courses */
-  list: () =>
-    api.get<Course[]>("/api/courses").then((r) => r.data),
+  list: () => api.get<Course[]>("/api/courses").then((r) => r.data),
 
   /** Calculate SkillsFuture subsidy for a course */
   calculateSubsidy: (payload: {
@@ -383,7 +440,9 @@ export const coursesApi = {
     is_sme?: boolean;
     is_mces?: boolean;
   }) =>
-    api.post<SubsidyResult>("/api/calculate-subsidy", payload).then((r) => r.data),
+    api
+      .post<SubsidyResult>("/api/calculate-subsidy", payload)
+      .then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────
@@ -392,8 +451,7 @@ export const coursesApi = {
 
 export const rolesApi = {
   /** List all job roles */
-  list: () =>
-    api.get<Role[]>("/api/roles").then((r) => r.data),
+  list: () => api.get<Role[]>("/api/roles").then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────
@@ -408,10 +466,13 @@ export const interviewApi = {
     difficulty: "beginner" | "intermediate" | "advanced";
     messages: ChatMessage[];
   }) =>
-    api.post<{ reply: string; is_final: boolean; feedback?: string }>(
-      "/api/interview",
-      payload
-    ).then((r) => r.data),
+    api
+      .post<{
+        reply: string;
+        is_final: boolean;
+        feedback?: string;
+      }>("/api/interview", payload)
+      .then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────
@@ -425,11 +486,13 @@ export const resumeRewriterApi = {
     target_role?: string;
     profile_id?: number | null;
   }) =>
-    api.post<{
-      original: string;
-      optimised: string;
-      explanation: string;
-    }>("/api/resume-rewriter", payload).then((r) => r.data),
+    api
+      .post<{
+        original: string;
+        optimised: string;
+        explanation: string;
+      }>("/api/resume-rewriter", payload)
+      .then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────
@@ -439,19 +502,21 @@ export const resumeRewriterApi = {
 export const compareApi = {
   /** Compare multiple roles for a profile */
   compare: (payload: { profile_id: number; role_ids: number[] }) =>
-    api.post<{
-      common_skills: string[];
-      roles: Array<{
-        role_id: number;
-        title: string;
-        match_score: number;
-        transition_difficulty: string;
-        avg_salary: number;
-        matched_skills: string[];
-        missing_skills: string[];
-        unique_skills: string[];
-      }>;
-    }>("/api/compare-roles", payload).then((r) => r.data),
+    api
+      .post<{
+        common_skills: string[];
+        roles: Array<{
+          role_id: number;
+          title: string;
+          match_score: number;
+          transition_difficulty: string;
+          avg_salary: number;
+          matched_skills: string[];
+          missing_skills: string[];
+          unique_skills: string[];
+        }>;
+      }>("/api/compare-roles", payload)
+      .then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────

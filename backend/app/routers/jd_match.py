@@ -39,8 +39,9 @@ def jd_match(payload: JDMatchRequest, db: Session = Depends(get_db), tenant: Ten
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    # Extract skills from JD text
-    jd_skills = extract_skills(payload.job_description)
+    # Extract skills from JD text (returns dict; pull the skills list)
+    parsed = extract_skills(payload.job_description)
+    jd_skills = parsed.get("skills", []) if isinstance(parsed, dict) else parsed
     if not jd_skills:
         raise HTTPException(status_code=400, detail="Could not extract skills from job description")
 

@@ -21,7 +21,7 @@ from app.routers import (
     auth, profile, recommend, skill_gap, upskilling,
     upload, jd_match, progress, chat, interview,
     market, compare, peer, projects, export, courses, sso, api_keys, audit_logs,
-    resume_rewriter, dashboard, rag, gap_analysis,
+    resume_rewriter, dashboard, rag, gap_analysis, demo
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -371,6 +371,9 @@ app.include_router(dashboard.router, prefix="/api")
 # RAG & AI Analysis
 app.include_router(rag.router, prefix="/api")
 app.include_router(gap_analysis.router, prefix="/api")
+
+# Demo Preloading
+app.include_router(demo.router, prefix="/api")
 
 # Voice & AI
 from app.routers import voice

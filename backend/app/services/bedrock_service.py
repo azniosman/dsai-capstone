@@ -74,4 +74,46 @@ class BedrockService:
             logger.error(f"Bedrock invocation failed: {e}")
             raise e
 
+    def invoke_model_with_stream(self, system_prompt: str, messages: list, temperature: float = 0.7):
+        """
+        Invokes Claude 3.5 Sonnet on AWS Bedrock and returns a streaming generator.
+        """
+        formatted_messages = []
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+            if role == "model":
+                role = "assistant"
+            
+            formatted_messages.append({
+                "role": role,
+                "content": [{"type": "text", "text": content}]
+            })
+
+        body = json.dumps({
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 2048,
+            "system": system_prompt,
+            "messages": formatted_messages,
+            "temperature": temperature,
+            "top_p": 0.9,
+        })
+
+        try:
+            response = self.client.invoke_model_with_response_stream(
+                body=body,
+                modelId=self.model_id,
+                accept='application/json',
+                contentType='application/json'
+            )
+
+            for event in response.get('body'):
+                chunk = json.loads(event.get('chunk').get('bytes').decode())
+                if chunk['type'] == 'content_block_delta':
+                    yield chunk['delta']['text']
+                    
+        except ClientError as e:
+            logger.error(f"Bedrock streaming invocation failed: {e}")
+            raise e
+
 bedrock_service = BedrockService()

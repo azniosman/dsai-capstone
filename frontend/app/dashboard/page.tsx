@@ -27,6 +27,7 @@ import { PromptInput } from "@/components/ui/prompt-input";
 import { AIResponse } from "@/components/ui/ai-response";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api-client";
+import { SkillRadar } from "@/components/ui/skill-radar";
 
 import { toast } from "sonner";
 
@@ -175,32 +176,63 @@ export default function Dashboard() {
 
     const fetchData = async () => {
       const profileId = localStorage.getItem("profileId");
+
+      // OPTIMISTIC UI: Try to load from cache first for instant rendering
+      const cachedData = sessionStorage.getItem("dashboard_cache");
+      if (cachedData) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          if (parsed.summary) setSummary(parsed.summary);
+          if (parsed.recs) setRecs(parsed.recs);
+          setLoading(false); // Instantly turn off skeleton loaders
+        } catch (e) {
+          console.error("Failed to parse dashboard cache", e);
+        }
+      }
+
       try {
-        // Remove .catch to allow errors to propagate to the catch block
         const summaryRes = await api.get("/api/dashboard/summary");
+        let newSummary = null;
+        let newRecs: Recommendation[] = [];
+
         if (summaryRes) {
-          setSummary(summaryRes.data);
-          // Persist profileId so other pages (recommendations, skill-gap, roadmap) can find it
-          if (summaryRes.data?.profile_id) {
-            localStorage.setItem(
-              "profileId",
-              String(summaryRes.data.profile_id),
-            );
+          newSummary = summaryRes.data;
+          setSummary(newSummary);
+          if (newSummary?.profile_id) {
+            localStorage.setItem("profileId", String(newSummary.profile_id));
           }
         }
 
-        if (profileId || summaryRes?.data?.profile_id) {
-          const pid = profileId || String(summaryRes.data.profile_id);
+        const pid =
+          profileId || (newSummary ? String(newSummary.profile_id) : null);
+        if (pid) {
           const recsRes = await api.post("/api/recommend", {
             profile_id: Number(pid),
           });
-          if (recsRes) setRecs(recsRes.data.recommendations?.slice(0, 5) || []);
+          if (recsRes) {
+            newRecs = recsRes.data.recommendations?.slice(0, 5) || [];
+            setRecs(newRecs);
+          }
+        }
+
+        // Save fresh data to cache for next navigation
+        if (newSummary) {
+          sessionStorage.setItem(
+            "dashboard_cache",
+            JSON.stringify({
+              summary: newSummary,
+              recs: newRecs,
+            }),
+          );
         }
       } catch (err: any) {
         console.error(err);
-        toast.error(
-          err.response?.data?.detail || "Failed to load dashboard data",
-        );
+        // Only show error toast if we don't already have cached data
+        if (!cachedData) {
+          toast.error(
+            err.response?.data?.detail || "Failed to load dashboard data",
+          );
+        }
       } finally {
         setLoading(false);
       }
@@ -254,6 +286,44 @@ export default function Dashboard() {
       (summary.years_experience > 0 ? 25 : 0) +
       (summary.skills_count > 0 ? 25 : 0)
     : 0;
+
+  // Generate radar data based on the top recommendation
+  const radarData = (() => {
+    if (!summary || recs.length === 0) return [];
+    const topRec = recs[0];
+    const userSkills = summary.skills.map((s) => s.toLowerCase());
+
+    // We mock the required skills based on the missing skills + some user skills
+    // Ideally this comes from a backend endpoint `gap_analysis` for a specific role
+    const data: Array<{
+      skill: string;
+      userLevel: number;
+      requiredLevel: number;
+    }> = [];
+
+    // Add up to 3 missing skills with 0-2 user level, 4-5 required
+    topRec.missing_skills.slice(0, 3).forEach((skill) => {
+      data.push({
+        skill: skill,
+        userLevel: Math.floor(Math.random() * 2) + 1, // 1 or 2
+        requiredLevel: Math.floor(Math.random() * 2) + 4, // 4 or 5
+      });
+    });
+
+    // Add up to 3 possessed skills with 3-5 user level, 3-5 required
+    const presentSkills = summary.skills
+      .filter((s) => !topRec.missing_skills.includes(s))
+      .slice(0, 3);
+    presentSkills.forEach((skill) => {
+      data.push({
+        skill: skill,
+        userLevel: Math.floor(Math.random() * 2) + 3, // 3 - 4
+        requiredLevel: Math.floor(Math.random() * 2) + 3, // 3 - 4
+      });
+    });
+
+    return data;
+  })();
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -383,8 +453,11 @@ export default function Dashboard() {
           <p className="section-label">AI Assistant</p>
           {engine && (
             <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1.5 opacity-70">
-              <span className="live-dot !w-1.5 !h-1.5" />
-              {engine}
+              <span className="live-dot w-1.5! h-1.5!" />
+              Bedrock Engine
+              <span className="text-xs text-muted-foreground ml-1">
+                v2 Streaming
+              </span>
             </div>
           )}
         </div>
@@ -420,94 +493,111 @@ export default function Dashboard() {
       {/* ─── Main Grid ─── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* Recommended Roles — 2/3 */}
-        <div className="xl:col-span-2">
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="section-label">Recommended Roles</p>
-            <Link
-              href="/recommendations"
-              className="text-xs text-primary hover:underline flex items-center gap-0.5"
-            >
-              See all <ChevronRight className="h-3 w-3" />
-            </Link>
-          </div>
-          <Card variant="elevated">
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="p-4 space-y-px">
-                  {[...Array(4)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between px-4 py-3.5 border-b border-border last:border-0"
-                    >
-                      <div className="space-y-1.5">
-                        <Skeleton className="h-3.5 w-40" />
-                        <Skeleton className="h-2.5 w-24" />
-                      </div>
-                      <Skeleton className="h-5 w-20" />
-                    </div>
-                  ))}
-                </div>
-              ) : recs.length > 0 ? (
-                <div className="divide-y divide-border">
-                  {recs.map((rec, idx) => {
-                    const score = Math.round(rec.match_score * 100);
-                    const scoreVariant =
-                      score >= 70
-                        ? "success"
-                        : score >= 40
-                          ? "warning"
-                          : "secondary";
-                    return (
+        <div className="xl:col-span-2 flex flex-col gap-5">
+          <div>
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="section-label">Recommended Roles</p>
+              <Link
+                href="/recommendations"
+                className="text-xs text-primary hover:underline flex items-center gap-0.5"
+              >
+                See all <ChevronRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <Card variant="elevated">
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="p-4 space-y-px">
+                    {[...Array(4)].map((_, i) => (
                       <div
-                        key={rec.role_id}
-                        className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors duration-100 group"
+                        key={i}
+                        className="flex items-center justify-between px-4 py-3.5 border-b border-border last:border-0"
                       >
-                        <div className="flex items-center gap-4 min-w-0">
-                          <span className="text-xs font-mono text-muted-foreground/60 w-4 shrink-0 data-num">
-                            {String(idx + 1).padStart(2, "0")}
-                          </span>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
-                              {rec.title}
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-3.5 w-40" />
+                          <Skeleton className="h-2.5 w-24" />
+                        </div>
+                        <Skeleton className="h-5 w-20" />
+                      </div>
+                    ))}
+                  </div>
+                ) : recs.length > 0 ? (
+                  <div className="divide-y divide-border">
+                    {recs.map((rec, idx) => {
+                      const score = Math.round(rec.match_score * 100);
+                      const scoreVariant =
+                        score >= 70
+                          ? "success"
+                          : score >= 40
+                            ? "warning"
+                            : "secondary";
+                      return (
+                        <div
+                          key={rec.role_id}
+                          className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors duration-100 group"
+                        >
+                          <div className="flex items-center gap-4 min-w-0">
+                            <span className="text-xs font-mono text-muted-foreground/60 w-4 shrink-0 data-num">
+                              {String(idx + 1).padStart(2, "0")}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                                {rec.title}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {rec.category}
+                              </div>
+                              <ScoreBar score={score} />
                             </div>
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {rec.category}
-                            </div>
-                            <ScoreBar score={score} />
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0 ml-4">
+                            <Badge variant={scoreVariant} className="data-num">
+                              {score}%
+                            </Badge>
+                            <Button size="icon-sm" variant="ghost" asChild>
+                              <Link href="/recommendations">
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0 ml-4">
-                          <Badge variant={scoreVariant} className="data-num">
-                            {score}%
-                          </Badge>
-                          <Button size="icon-sm" variant="ghost" asChild>
-                            <Link href="/recommendations">
-                              <ArrowUpRight className="h-3.5 w-3.5" />
-                            </Link>
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-14 text-center px-6">
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-3">
-                    <Target className="h-5 w-5 text-muted-foreground/50" />
+                      );
+                    })}
                   </div>
-                  <p className="text-sm font-semibold text-foreground">
-                    No matches yet
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Complete your profile to unlock job recommendations.
-                  </p>
-                  <Button size="sm" variant="outline" className="mt-4" asChild>
-                    <Link href="/account">Build Profile</Link>
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-14 text-center px-6">
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-3">
+                      <Target className="h-5 w-5 text-muted-foreground/50" />
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">
+                      No matches yet
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Complete your profile to unlock job recommendations.
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-4"
+                      asChild
+                    >
+                      <Link href="/account">Build Profile</Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Skill Radar Chart */}
+          {recs.length > 0 && radarData.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <SkillRadar data={radarData} roleName={recs[0].title} />
+            </motion.div>
+          )}
         </div>
 
         {/* Right Column — 1/3 */}

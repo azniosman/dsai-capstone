@@ -17,6 +17,18 @@ export const services = {
     });
   },
 
+  processInterviewTurn: async (file: Blob, profileId?: number) => {
+    const formData = new FormData();
+    formData.append("audio", file, "recording.webm");
+    if (profileId) {
+       formData.append("profile_id", profileId.toString());
+    }
+    const response = await api.post("/api/voice/interview_turn", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return response.data;
+  },
+
   // AI Coach (Chat)
   sendChatMessage: async (messages: any[], profileId?: number) => {
     return api.post("/api/chat", { messages, profile_id: profileId });

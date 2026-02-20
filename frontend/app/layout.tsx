@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import ErrorBoundary from "@/components/error-boundary";
 import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
+import { DemoToggle } from "@/components/DemoToggle";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -37,6 +38,7 @@ export default function RootLayout({
           <TenantProvider>
             <ErrorBoundary>
               <AppShell>{children}</AppShell>
+              <DemoToggle />
               <Toaster />
             </ErrorBoundary>
           </TenantProvider>

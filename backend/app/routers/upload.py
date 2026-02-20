@@ -25,6 +25,11 @@ ALLOWED_CONTENT_TYPES = {
 class UploadResponse(BaseModel):
     text: str
     skills: list[str]
+    readiness_score: int
+    strengths: list[str]
+    missing_skills: list[str]
+    recommended_courses: list[str]
+    suggested_roles: list[str]
     embedding_id: Optional[int] = None
 
 
@@ -80,7 +85,8 @@ async def upload_resume(
         raise HTTPException(status_code=400, detail=f"Unsupported file type: .{ext}")
 
     from app.services.resume_parser import extract_skills
-    skills = extract_skills(text)
+    parsed_data = extract_skills(text)
+    skills = parsed_data.get("skills", [])
 
     # Store Titan embedding — non-fatal (skipped in local dev without Bedrock)
     embedding_id: Optional[int] = None
@@ -98,4 +104,13 @@ async def upload_resume(
     except Exception as e:
         logger.warning("Resume embedding skipped (Bedrock unavailable in local dev): %s", e)
 
-    return UploadResponse(text=text, skills=skills, embedding_id=embedding_id)
+    return UploadResponse(
+        text=text, 
+        skills=skills, 
+        readiness_score=parsed_data.get("readiness_score", 0),
+        strengths=parsed_data.get("strengths", []),
+        missing_skills=parsed_data.get("missing_skills", []),
+        recommended_courses=parsed_data.get("recommended_courses", []),
+        suggested_roles=parsed_data.get("suggested_roles", []),
+        embedding_id=embedding_id
+    )
