@@ -9,7 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import SkeletonCard from "@/components/skeleton-card";
 import api from "@/lib/api-client";
@@ -50,10 +54,15 @@ export default function CourseBrowser() {
         if (provider) params.provider = provider;
         if (level) params.level = level;
         if (mcesOnly) params.mces_eligible = true;
-        const res = await api.get("/api/courses", { params, signal: controller.signal });
+        const res = await api.get("/api/courses", {
+          params,
+          signal: controller.signal,
+        });
         setCourses(res.data.courses);
         if (providers.length === 0 && res.data.courses.length > 0) {
-          const uniqueProviders = [...new Set(res.data.courses.map((c: Course) => c.provider))].sort() as string[];
+          const uniqueProviders = [
+            ...new Set(res.data.courses.map((c: Course) => c.provider)),
+          ].sort() as string[];
           setProviders(uniqueProviders);
         }
       } catch (err) {
@@ -67,11 +76,13 @@ export default function CourseBrowser() {
     };
     fetchCourses();
     return () => controller.abort();
-  }, [provider, level, mcesOnly]);
+  }, [provider, level, mcesOnly, providers.length]);
 
   const filtered = skillSearch
     ? courses.filter((c) =>
-        c.skills_taught.some((s) => s.toLowerCase().includes(skillSearch.toLowerCase()))
+        c.skills_taught.some((s) =>
+          s.toLowerCase().includes(skillSearch.toLowerCase()),
+        ),
       )
     : courses;
 
@@ -79,9 +90,12 @@ export default function CourseBrowser() {
     <div className="space-y-5">
       <header>
         <p className="section-label mb-1">Upskilling</p>
-        <h1 className="text-2xl font-extrabold tracking-tight">SCTP Course Browser</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          SCTP Course Browser
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          SkillsFuture Career Transition Programme courses with real-time subsidy calculations.
+          SkillsFuture Career Transition Programme courses with real-time
+          subsidy calculations.
         </p>
       </header>
 
@@ -96,7 +110,9 @@ export default function CourseBrowser() {
               <SelectContent>
                 <SelectItem value="all">All Providers</SelectItem>
                 {providers.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -114,8 +130,14 @@ export default function CourseBrowser() {
             </Select>
 
             <div className="flex items-center gap-2">
-              <Switch checked={mcesOnly} onCheckedChange={setMcesOnly} id="mces" />
-              <Label htmlFor="mces" className="text-sm font-medium">MCES Eligible</Label>
+              <Switch
+                checked={mcesOnly}
+                onCheckedChange={setMcesOnly}
+                id="mces"
+              />
+              <Label htmlFor="mces" className="text-sm font-medium">
+                MCES Eligible
+              </Label>
             </div>
 
             <Input
@@ -128,7 +150,11 @@ export default function CourseBrowser() {
         </CardContent>
       </Card>
 
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
       {loading && <SkeletonCard count={4} />}
 
       {!loading && (
@@ -147,9 +173,12 @@ export default function CourseBrowser() {
               <CardContent className="p-5">
                 <div className="flex justify-between items-start flex-wrap gap-2 mb-3">
                   <div>
-                    <h2 className="text-base font-bold leading-tight">{course.title}</h2>
+                    <h2 className="text-base font-bold leading-tight">
+                      {course.title}
+                    </h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {course.provider} &middot; {course.duration_weeks}w &middot; {course.level}
+                      {course.provider} &middot; {course.duration_weeks}w
+                      &middot; {course.level}
                     </p>
                   </div>
                   <div className="flex gap-1.5 items-center flex-wrap">
@@ -164,7 +193,9 @@ export default function CourseBrowser() {
 
                 <div className="flex gap-1 flex-wrap mb-4">
                   {course.skills_taught.map((s) => (
-                    <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
+                    <Badge key={s} variant="outline" className="text-xs">
+                      {s}
+                    </Badge>
                   ))}
                 </div>
 
@@ -172,19 +203,29 @@ export default function CourseBrowser() {
                 <div className="grid grid-cols-4 gap-3 border-t border-border pt-3">
                   <div>
                     <p className="section-label mb-1">Course Fee</p>
-                    <p className="font-bold data-num text-sm">${course.course_fee.toLocaleString()}</p>
+                    <p className="font-bold data-num text-sm">
+                      ${course.course_fee.toLocaleString()}
+                    </p>
                   </div>
                   <div>
-                    <p className="section-label mb-1">Subsidy ({course.subsidy_percent}%)</p>
-                    <p className="font-bold data-num text-sm text-emerald-500">-${course.subsidy_amount.toLocaleString()}</p>
+                    <p className="section-label mb-1">
+                      Subsidy ({course.subsidy_percent}%)
+                    </p>
+                    <p className="font-bold data-num text-sm text-emerald-500">
+                      -${course.subsidy_amount.toLocaleString()}
+                    </p>
                   </div>
                   <div>
                     <p className="section-label mb-1">SFC Offset</p>
-                    <p className="font-bold data-num text-sm text-primary">-${course.sfc_applicable.toLocaleString()}</p>
+                    <p className="font-bold data-num text-sm text-primary">
+                      -${course.sfc_applicable.toLocaleString()}
+                    </p>
                   </div>
                   <div>
                     <p className="section-label mb-1">You Pay</p>
-                    <p className="font-extrabold data-num text-base text-primary">${course.nett_payable.toLocaleString()}</p>
+                    <p className="font-extrabold data-num text-base text-primary">
+                      ${course.nett_payable.toLocaleString()}
+                    </p>
                   </div>
                 </div>
               </CardContent>

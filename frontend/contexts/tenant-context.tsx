@@ -34,16 +34,19 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const [tenantConfig, setTenantConfig] = useState<TenantConfig>(defaultConfig);
 
   useEffect(() => {
-    const mockTenantName = localStorage.getItem("tenantName") || "Global";
-    if (mockTenantName === "Example Corp") {
-      setTenantConfig({
-        name: "Example Corp",
-        logoUrl: "https://example.com/logo.png",
-        primaryColor: "#FF5722",
-        secondaryColor: "#607D8B",
-      });
-    } else {
-      setTenantConfig(defaultConfig);
+    // Only run on the client side
+    if (typeof window !== "undefined") {
+      const mockTenantName = localStorage.getItem("tenantName") || "Global";
+      if (mockTenantName === "Example Corp") {
+        setTimeout(() => {
+          setTenantConfig({
+            name: "Example Corp",
+            logoUrl: "https://example.com/logo.png",
+            primaryColor: "#FF5722",
+            secondaryColor: "#607D8B",
+          });
+        }, 0);
+      }
     }
   }, []);
 

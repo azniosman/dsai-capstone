@@ -7,17 +7,27 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
 
 const FALLBACK_ROLES = [
-  "Data Engineer", "Software Engineer", "Data Scientist", "Data Analyst",
-  "ML Engineer", "DevOps Engineer", "Cloud Architect", "Cybersecurity Analyst",
-  "Full Stack Developer", "Product Manager",
+  "Data Engineer",
+  "Software Engineer",
+  "Data Scientist",
+  "Data Analyst",
+  "ML Engineer",
+  "DevOps Engineer",
+  "Cloud Architect",
+  "Cybersecurity Analyst",
+  "Full Stack Developer",
+  "Product Manager",
 ];
 
 interface InterviewMessage {
@@ -40,12 +50,15 @@ export default function MockInterview() {
   const [questionNum, setQuestionNum] = useState(0);
 
   useEffect(() => {
-    api.get("/api/roles")
+    api
+      .get("/api/roles")
       .then((res) => {
         const titles = res.data.map((r: { title: string }) => r.title);
         if (titles.length > 0) setRoleOptions(titles);
       })
-      .catch((err) => { console.error(err); });
+      .catch((err) => {
+        console.error(err);
+      });
   }, []);
 
   const startInterview = async () => {
@@ -62,16 +75,23 @@ export default function MockInterview() {
         messages: [],
         difficulty,
       });
-      setMessages([{
-        role: "assistant",
-        content: res.data.reply,
-        gapTargeted: res.data.gap_targeted,
-        targetSkill: res.data.target_skill,
-      }]);
+      setMessages([
+        {
+          role: "assistant",
+          content: res.data.reply,
+          gapTargeted: res.data.gap_targeted,
+          targetSkill: res.data.target_skill,
+        },
+      ]);
       setQuestionNum(res.data.question_number);
     } catch (err) {
       console.error(err);
-      setMessages([{ role: "assistant", content: "Let's start! Tell me about yourself and your experience." }]);
+      setMessages([
+        {
+          role: "assistant",
+          content: "Let's start! Tell me about yourself and your experience.",
+        },
+      ]);
       setQuestionNum(1);
     } finally {
       setLoading(false);
@@ -93,19 +113,29 @@ export default function MockInterview() {
         messages: newMsgs,
         difficulty,
       });
-      setMessages([...newMsgs, {
-        role: "assistant",
-        content: res.data.reply,
-        gapTargeted: res.data.gap_targeted,
-        targetSkill: res.data.target_skill,
-      }]);
+      setMessages([
+        ...newMsgs,
+        {
+          role: "assistant",
+          content: res.data.reply,
+          gapTargeted: res.data.gap_targeted,
+          targetSkill: res.data.target_skill,
+        },
+      ]);
       setQuestionNum(res.data.question_number);
       if (res.data.feedback) setFeedback(res.data.feedback);
       if (res.data.is_complete) setComplete(true);
     } catch (err) {
       console.error(err);
       toast.error("Interview request failed. Please try again.");
-      setMessages([...newMsgs, { role: "assistant", content: "Sorry, there was a connection issue. Please try answering again." }]);
+      setMessages([
+        ...newMsgs,
+        {
+          role: "assistant",
+          content:
+            "Sorry, there was a connection issue. Please try answering again.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -115,7 +145,9 @@ export default function MockInterview() {
     <div className="max-w-2xl mx-auto space-y-5">
       <header>
         <p className="section-label mb-1">Practice</p>
-        <h1 className="text-2xl font-extrabold tracking-tight">Mock Interview</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          Mock Interview
+        </h1>
       </header>
 
       {!started ? (
@@ -123,10 +155,16 @@ export default function MockInterview() {
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center gap-2 mb-2">
               <HelpCircle className="h-4 w-4 text-primary" />
-              <p className="text-xs text-muted-foreground">Select a role and difficulty to begin a 5-question practice session.</p>
+              <p className="text-xs text-muted-foreground">
+                Select a role and difficulty to begin a 5-question practice
+                session.
+              </p>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase tracking-widest" style={{ letterSpacing: "0.08em" }}>
+              <Label
+                className="text-xs font-semibold uppercase tracking-widest"
+                style={{ letterSpacing: "0.08em" }}
+              >
                 Target Role
               </Label>
               <Select value={role} onValueChange={setRole}>
@@ -135,13 +173,18 @@ export default function MockInterview() {
                 </SelectTrigger>
                 <SelectContent>
                   {roleOptions.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase tracking-widest" style={{ letterSpacing: "0.08em" }}>
+              <Label
+                className="text-xs font-semibold uppercase tracking-widest"
+                style={{ letterSpacing: "0.08em" }}
+              >
                 Difficulty
               </Label>
               <Select value={difficulty} onValueChange={setDifficulty}>
@@ -166,18 +209,25 @@ export default function MockInterview() {
           <div className="flex gap-2 items-center">
             <Badge variant="accent">{role}</Badge>
             <Badge variant="outline">{difficulty}</Badge>
-            <Badge variant="data" className="data-num">Q{questionNum} / 5</Badge>
+            <Badge variant="data" className="data-num">
+              Q{questionNum} / 5
+            </Badge>
           </div>
 
           {/* Transcript */}
           <Card variant="elevated" className="max-h-[400px] overflow-auto">
             <CardContent className="p-4">
               {messages.map((msg, i) => (
-                <div key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`} className="mb-5 last:mb-0">
+                <div
+                  key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`}
+                  className="mb-5 last:mb-0"
+                >
                   <p className="section-label mb-1.5">
                     {msg.role === "assistant" ? "Interviewer" : "You"}
                   </p>
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                    {msg.content}
+                  </p>
                   {msg.gapTargeted && msg.targetSkill && (
                     <Badge variant="warning" className="mt-2">
                       Targets your gap: {msg.targetSkill}
@@ -185,7 +235,9 @@ export default function MockInterview() {
                   )}
                 </div>
               ))}
-              {loading && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+              {loading && (
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              )}
             </CardContent>
           </Card>
 
@@ -199,7 +251,13 @@ export default function MockInterview() {
           )}
 
           {complete ? (
-            <Button onClick={() => { setStarted(false); setMessages([]); }} className="w-full">
+            <Button
+              onClick={() => {
+                setStarted(false);
+                setMessages([]);
+              }}
+              className="w-full"
+            >
               Start New Interview
             </Button>
           ) : (
@@ -212,8 +270,16 @@ export default function MockInterview() {
                 disabled={loading}
                 className="flex-1"
               />
-              <Button onClick={sendAnswer} disabled={loading} className="min-w-[80px] self-end">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Answer"}
+              <Button
+                onClick={sendAnswer}
+                disabled={loading}
+                className="min-w-[80px] self-end"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Answer"
+                )}
               </Button>
             </div>
           )}

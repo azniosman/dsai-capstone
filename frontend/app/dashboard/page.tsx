@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { PromptInput } from "@/components/ui/prompt-input";
 import { AIResponse } from "@/components/ui/ai-response";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn, extractApiError } from "@/lib/utils";
 import api from "@/lib/api-client";
 import { SkillRadar } from "@/components/ui/skill-radar";
 
@@ -107,13 +108,15 @@ function ScoreBar({ score }: { score: number }) {
     score >= 70
       ? "bg-primary"
       : score >= 40
-        ? "bg-amber-500 dark:bg-amber-400"
+        ? "bg-amber-500"
         : "bg-destructive";
   return (
-    <div className="score-bar-track w-20">
-      <div
-        className={`score-bar-fill ${fill}`}
-        style={{ width: `${score}%` }}
+    <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
+      <motion.div
+        initial={{ width: 0 }}
+        animate={{ width: `${score}%` }}
+        transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+        className={`h-full ${fill} shadow-[0_0_10px_rgba(inherit,0.5)]`}
       />
     </div>
   );
@@ -123,39 +126,66 @@ function ScoreBar({ score }: { score: number }) {
 function Delta({ value }: { value: number }) {
   if (value > 0)
     return (
-      <span className="trend-up flex items-center gap-0.5">
-        <ArrowUp className="h-2.5 w-2.5" />
+      <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
+        <ArrowUp className="h-3 w-3" />
         {value}
       </span>
     );
   if (value < 0)
     return (
-      <span className="trend-down flex items-center gap-0.5">
-        <ArrowDown className="h-2.5 w-2.5" />
+      <span className="flex items-center gap-0.5 text-[10px] font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-md">
+        <ArrowDown className="h-3 w-3" />
         {Math.abs(value)}
       </span>
     );
   return (
-    <span className="text-muted-foreground text-[0.68rem]">
-      <Minus className="h-2.5 w-2.5 inline" />
+    <span className="text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-md">
+      <Minus className="h-3 w-3 inline" />
     </span>
   );
 }
 
 function KpiSkeleton() {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {[...Array(4)].map((_, i) => (
-        <Card key={i} variant="metric">
+        <Card
+          key={i}
+          className="rounded-[1.5rem] bg-card/40 border-border/40 overflow-hidden shadow-sm"
+        >
           <CardContent className="p-5">
-            <Skeleton className="h-2.5 w-20 mb-4" />
-            <Skeleton className="h-9 w-14 mb-2" />
-            <Skeleton className="h-2.5 w-16" />
+            <Skeleton className="h-3 w-24 mb-4" />
+            <Skeleton className="h-10 w-16 mb-2" />
+            <Skeleton className="h-3 w-20" />
           </CardContent>
         </Card>
       ))}
     </div>
   );
+}
+
+/** Animated Number Counter */
+function CountingNumber({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const duration = 1500; // ms
+    const increment = value / (duration / 16);
+
+    const animate = () => {
+      start += increment;
+      if (start < value) {
+        setDisplayValue(Math.ceil(start));
+        requestAnimationFrame(animate);
+      } else {
+        setDisplayValue(value);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, [value]);
+
+  return <span>{displayValue}</span>;
 }
 
 export default function Dashboard() {
@@ -225,13 +255,11 @@ export default function Dashboard() {
             }),
           );
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
         // Only show error toast if we don't already have cached data
         if (!cachedData) {
-          toast.error(
-            err.response?.data?.detail || "Failed to load dashboard data",
-          );
+          toast.error(extractApiError(err, "Failed to load dashboard data"));
         }
       } finally {
         setLoading(false);
@@ -267,16 +295,10 @@ export default function Dashboard() {
   // Readiness uses semantic status utilities (defined in globals.css)
   const readinessColor =
     readiness >= 70
-      ? "status-success"
+      ? "text-primary shadow-primary/20"
       : readiness >= 40
-        ? "status-warning"
-        : "status-error";
-  const readinessFill =
-    readiness >= 70
-      ? "bg-emerald-500 dark:bg-emerald-400"
-      : readiness >= 40
-        ? "bg-amber-500 dark:bg-amber-400"
-        : "bg-destructive";
+        ? "text-amber-500 shadow-amber-500/20"
+        : "text-destructive shadow-destructive/20";
 
   const firstName = summary?.name.split(" ")[0] ?? "";
 
@@ -291,7 +313,6 @@ export default function Dashboard() {
   const radarData = (() => {
     if (!summary || recs.length === 0) return [];
     const topRec = recs[0];
-    const userSkills = summary.skills.map((s) => s.toLowerCase());
 
     // We mock the required skills based on the missing skills + some user skills
     // Ideally this comes from a backend endpoint `gap_analysis` for a specific role
@@ -328,47 +349,66 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* ─── Page Header ─── */}
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-2">
             <span className="live-dot" />
-            <p className="section-label">Intelligence Dashboard</p>
+            <p className="section-label text-primary font-bold tracking-widest text-[10px]">
+              INTELLIGENCE DASHBOARD
+            </p>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight">
-            {loading ? "Loading..." : `Welcome back, ${firstName}.`}
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-1">
+            {loading ? "Welcome." : `Welcome back, ${firstName}.`}
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <p className="text-muted-foreground text-sm font-medium">
             Your career intelligence snapshot — updated in real time.
           </p>
         </div>
-        <Button size="sm" variant="outline" asChild className="shrink-0">
+        <Button
+          size="sm"
+          className="shrink-0 rounded-full shadow-md bg-foreground text-background hover:bg-foreground/90 font-semibold px-5 h-10 group"
+          asChild
+        >
           <Link href="/recommendations">
-            All Matches <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" />
+            All Matches{" "}
+            <ArrowUpRight className="ml-1.5 h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
           </Link>
         </Button>
       </header>
 
-      {/* ─── KPI Row ─── */}
+      {/* ─── KPI Row (Bento Grid Style) ─── */}
       {loading ? (
         <KpiSkeleton />
       ) : (
         summary && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Skills */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card variant="metric" className="hover-lift h-full">
-                <CardContent className="p-5">
-                  <p className="section-label mb-3">Skills Tracked</p>
-                  <div className="kpi-number">{summary.skills_count}</div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <p className="text-xs text-muted-foreground">
-                      Active in profile
+              <Card className="h-full rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-primary/10 transition-colors" />
+                <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
+                  <div>
+                    <div className="p-2 bg-primary/10 w-fit rounded-xl mb-4 text-primary ring-1 ring-primary/20">
+                      <Briefcase className="w-4 h-4" />
+                    </div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                      Skills Tracked
                     </p>
-                    <Delta value={summary.skills_delta} />
+                  </div>
+                  <div>
+                    <div className="text-4xl font-black tracking-tighter text-foreground mb-2 flex items-baseline">
+                      <CountingNumber value={summary.skills_count} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Delta value={summary.skills_delta} />
+                      <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+                        Active in profile
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -380,17 +420,27 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card variant="metric" className="hover-lift h-full">
-                <CardContent className="p-5">
-                  <p className="section-label mb-3">Job Matches</p>
-                  <div className="kpi-number-accent">
-                    {summary.recommendations_count}
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <p className="text-xs text-muted-foreground">
-                      Roles available
+              <Card className="h-full rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-primary/10 transition-colors" />
+                <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
+                  <div>
+                    <div className="p-2 bg-primary/10 w-fit rounded-xl mb-4 text-primary ring-1 ring-primary/20">
+                      <Target className="w-4 h-4" />
+                    </div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                      Job Matches
                     </p>
-                    <Delta value={summary.recommendations_delta} />
+                  </div>
+                  <div>
+                    <div className="text-4xl font-black tracking-tighter text-primary mb-2 flex items-baseline">
+                      <CountingNumber value={summary.recommendations_count} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Delta value={summary.recommendations_delta} />
+                      <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+                        Roles available
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -402,15 +452,28 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Card variant="metric" className="hover-lift h-full">
-                <CardContent className="p-5">
-                  <p className="section-label mb-3">Gaps Identified</p>
-                  <div className="kpi-number status-warning">
-                    {summary.gaps_identified}
+              <Card className="h-full rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
+                <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
+                  <div>
+                    <div className="p-2 bg-amber-500/10 w-fit rounded-xl mb-4 text-amber-500 ring-1 ring-amber-500/20">
+                      <BarChart3 className="w-4 h-4" />
+                    </div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                      Gaps Identified
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <p className="text-xs text-muted-foreground">To bridge</p>
-                    <Delta value={summary.gaps_delta} />
+                  <div>
+                    <div className="text-4xl font-black tracking-tighter text-amber-500 mb-2 flex items-baseline">
+                      <CountingNumber value={summary.gaps_identified} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {/* Negative delta is conceptually good here (less gaps), but UI logic remains standard for now */}
+                      <Delta value={summary.gaps_delta} />
+                      <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+                        To bridge
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -422,24 +485,29 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              <Card variant="kpi" className="hover-lift h-full">
-                <CardContent className="p-5">
-                  <p className="section-label mb-3">Career Readiness</p>
-                  <div className={`kpi-number-accent ${readinessColor}`}>
-                    {readiness}
-                    <span className="text-lg font-normal text-muted-foreground">
-                      %
-                    </span>
+              <Card className="h-full rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-transparent pointer-events-none -z-10 opacity-50" />
+                <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
+                  <div>
+                    <div className="p-2 bg-background w-fit rounded-xl mb-4 text-foreground ring-1 ring-border shadow-sm">
+                      <Zap className="w-4 h-4" />
+                    </div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                      Career Readiness
+                    </p>
                   </div>
-                  <div className="mt-3 score-bar-track w-full">
+                  <div>
                     <div
-                      className={`score-bar-fill ${readinessFill}`}
-                      style={{ width: `${readiness}%` }}
-                    />
+                      className={cn(
+                        "text-4xl font-black tracking-tighter mb-3 flex items-baseline drop-shadow-md",
+                        readinessColor,
+                      )}
+                    >
+                      <CountingNumber value={readiness} />
+                      <span className="text-xl font-bold ml-1">%</span>
+                    </div>
+                    <ScoreBar score={readiness} />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    Overall score
-                  </p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -504,25 +572,25 @@ export default function Dashboard() {
                 See all <ChevronRight className="h-3 w-3" />
               </Link>
             </div>
-            <Card variant="elevated">
+            <Card className="rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 overflow-hidden shadow-xl">
               <CardContent className="p-0">
                 {loading ? (
                   <div className="p-4 space-y-px">
                     {[...Array(4)].map((_, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between px-4 py-3.5 border-b border-border last:border-0"
+                        className="flex items-center justify-between px-5 py-4 border-b border-border/50 last:border-0"
                       >
-                        <div className="space-y-1.5">
-                          <Skeleton className="h-3.5 w-40" />
-                          <Skeleton className="h-2.5 w-24" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-48" />
+                          <Skeleton className="h-3 w-32" />
                         </div>
-                        <Skeleton className="h-5 w-20" />
+                        <Skeleton className="h-6 w-16 rounded-full" />
                       </div>
                     ))}
                   </div>
                 ) : recs.length > 0 ? (
-                  <div className="divide-y divide-border">
+                  <div className="divide-y divide-border/30">
                     {recs.map((rec, idx) => {
                       const score = Math.round(rec.match_score * 100);
                       const scoreVariant =
@@ -534,29 +602,39 @@ export default function Dashboard() {
                       return (
                         <div
                           key={rec.role_id}
-                          className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors duration-100 group"
+                          className="flex items-center justify-between px-6 py-4.5 hover:bg-muted/30 transition-all duration-300 group"
                         >
-                          <div className="flex items-center gap-4 min-w-0">
-                            <span className="text-xs font-mono text-muted-foreground/60 w-4 shrink-0 data-num">
-                              {String(idx + 1).padStart(2, "0")}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                          <div className="flex items-center gap-5 min-w-0 flex-1">
+                            <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center shrink-0 border border-border/50 text-xs font-bold text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/20 transition-colors">
+                              {idx + 1}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-bold text-sm truncate group-hover:text-primary transition-colors tracking-tight">
                                 {rec.title}
                               </div>
-                              <div className="text-xs text-muted-foreground mt-0.5">
+                              <div className="text-xs font-medium text-muted-foreground mt-0.5 mb-2 truncate">
                                 {rec.category}
                               </div>
-                              <ScoreBar score={score} />
+                              <div className="max-w-[150px]">
+                                <ScoreBar score={score} />
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-3 shrink-0 ml-4">
-                            <Badge variant={scoreVariant} className="data-num">
-                              {score}%
+                            <Badge
+                              variant={scoreVariant}
+                              className="px-2 py-0.5 rounded-md font-bold text-[10px] tracking-wider uppercase drop-shadow-sm"
+                            >
+                              {score}% Match
                             </Badge>
-                            <Button size="icon-sm" variant="ghost" asChild>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0"
+                              asChild
+                            >
                               <Link href="/recommendations">
-                                <ArrowUpRight className="h-3.5 w-3.5" />
+                                <ArrowUpRight className="h-4 w-4" />
                               </Link>
                             </Button>
                           </div>
@@ -565,20 +643,20 @@ export default function Dashboard() {
                     })}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-14 text-center px-6">
-                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-3">
-                      <Target className="h-5 w-5 text-muted-foreground/50" />
+                  <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                    <div className="h-16 w-16 rounded-3xl bg-muted/50 flex items-center justify-center mb-4 ring-1 ring-border shadow-inner">
+                      <Target className="h-8 w-8 text-muted-foreground/40" />
                     </div>
-                    <p className="text-sm font-semibold text-foreground">
+                    <p className="text-base font-bold text-foreground">
                       No matches yet
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Complete your profile to unlock job recommendations.
+                    <p className="text-sm font-medium text-muted-foreground mt-1.5 max-w-[250px]">
+                      Complete your profile to unlock precision job
+                      recommendations.
                     </p>
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="mt-4"
+                      className="mt-6 rounded-full px-6 shadow-md shadow-primary/20"
                       asChild
                     >
                       <Link href="/account">Build Profile</Link>
@@ -605,21 +683,26 @@ export default function Dashboard() {
           {/* Quick Actions */}
           <div>
             <p className="section-label mb-2.5">Quick Actions</p>
-            <Card variant="elevated">
+            <Card className="rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 overflow-hidden shadow-xl">
               <CardContent className="p-2">
-                <div className="grid grid-cols-2 gap-px">
+                <div className="grid grid-cols-2 gap-px bg-border/20">
                   {QUICK_ACTIONS.map((action) => (
                     <Link
                       key={action.href}
                       href={action.href}
-                      className="flex flex-col gap-2 p-3 rounded hover:bg-muted/40 transition-colors duration-100 group"
+                      className="flex flex-col gap-2 p-4 bg-background/50 hover:bg-muted/40 transition-colors duration-200 group"
                     >
-                      <action.icon className={`h-4 w-4 ${action.color}`} />
+                      <action.icon
+                        className={cn(
+                          "h-4 w-4 transition-transform group-hover:scale-110",
+                          action.color,
+                        )}
+                      />
                       <div>
-                        <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors leading-tight">
+                        <div className="text-xs font-bold text-foreground group-hover:text-primary transition-colors leading-tight">
                           {action.label}
                         </div>
-                        <div className="text-[0.65rem] text-muted-foreground leading-tight mt-0.5">
+                        <div className="text-[10px] font-medium text-muted-foreground leading-tight mt-1">
                           {action.desc}
                         </div>
                       </div>
@@ -631,29 +714,29 @@ export default function Dashboard() {
           </div>
 
           {/* Pro Insight */}
-          <Card variant="highlight">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Zap className="h-3.5 w-3.5 text-primary" />
+          <Card className="rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 overflow-hidden shadow-xl relative group">
+            <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-transparent to-transparent pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
+            <CardContent className="p-6 relative z-10">
+              <div className="flex items-center gap-2 mb-4">
+                <Zap className="h-4 w-4 text-primary animate-pulse" />
                 <span
                   className="text-primary font-bold uppercase"
-                  style={{ fontSize: "0.625rem", letterSpacing: "0.1em" }}
+                  style={{ fontSize: "0.65rem", letterSpacing: "0.15em" }}
                 >
                   Pro Insight
                 </span>
               </div>
-              <p className="text-sm font-semibold text-foreground mb-1 leading-snug">
+              <p className="text-sm font-bold text-foreground mb-1.5 leading-snug">
                 Add a portfolio project
               </p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <p className="text-xs font-medium text-muted-foreground leading-relaxed mb-5">
                 Profiles with projects get{" "}
-                <span className="text-foreground font-semibold">40% more</span>{" "}
-                recruiter visibility and higher match scores.
+                <span className="text-foreground font-bold">40% more</span>{" "}
+                recruiter visibility.
               </p>
               <Button
                 size="sm"
-                variant="accent"
-                className="mt-4 w-full"
+                className="w-full rounded-full shadow-md shadow-primary/20 bg-primary/10 text-primary hover:bg-primary/20 border-0"
                 asChild
               >
                 <Link href="/projects">
@@ -664,18 +747,18 @@ export default function Dashboard() {
           </Card>
 
           {/* Progress Teaser */}
-          <Card variant="inset">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
+          <Card className="rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 overflow-hidden shadow-xl">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-5">
                 <p className="section-label">Activity</p>
                 <Link
                   href="/progress"
-                  className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                  className="text-xs font-semibold text-primary hover:underline flex items-center gap-0.5"
                 >
                   Details <ChevronRight className="h-3 w-3" />
                 </Link>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {[
                   { label: "Profile completeness", value: profileCompleteness },
                   {
@@ -687,20 +770,15 @@ export default function Dashboard() {
                   { label: "Readiness score", value: readiness },
                 ].map((item) => (
                   <div key={item.label}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">
                         {item.label}
                       </span>
-                      <span className="text-xs font-semibold data-num">
+                      <span className="text-xs font-bold text-foreground">
                         {item.value}%
                       </span>
                     </div>
-                    <div className="score-bar-track w-full">
-                      <div
-                        className="score-bar-fill bg-primary"
-                        style={{ width: `${item.value}%` }}
-                      />
-                    </div>
+                    <ScoreBar score={item.value} />
                   </div>
                 ))}
               </div>

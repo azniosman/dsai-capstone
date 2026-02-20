@@ -38,9 +38,10 @@ export function DemoToggle() {
         });
         window.dispatchEvent(new Event("demo-mode-toggled"));
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       toast.error("Demo Toggle Failed", {
-        description: err.message || "Could not connect to the backend.",
+        description: error.message || "Could not connect to the backend.",
       });
     } finally {
       setLoading(false);

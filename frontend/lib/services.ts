@@ -30,7 +30,7 @@ export const services = {
   },
 
   // AI Coach (Chat)
-  sendChatMessage: async (messages: any[], profileId?: number) => {
+  sendChatMessage: async (messages: { role: string; content: string }[], profileId?: number) => {
     return api.post("/api/chat", { messages, profile_id: profileId });
   },
   

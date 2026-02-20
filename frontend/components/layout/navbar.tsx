@@ -5,21 +5,36 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
-  User, Briefcase, BarChart3, Route, FileText, MessageSquare, HelpCircle,
-  TrendingUp, GitCompare, Users, Wrench, Activity, LogIn, GraduationCap,
-  Menu, Settings, Sun, Moon, Sparkles, Command, Cpu
+  Briefcase,
+  BarChart3,
+  Route,
+  FileText,
+  MessageSquare,
+  HelpCircle,
+  GraduationCap,
+  Menu,
+  Sun,
+  Moon,
+  Command,
+  Cpu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
 } from "@/components/ui/sheet";
 import { useTenant } from "@/contexts/tenant-context";
-import api from "@/lib/api-client";
 
 const ThemeToggle = () => {
   const { theme, setTheme } = useTheme();
@@ -61,8 +76,10 @@ const NAV_SECTIONS = [
 
 function UserMenu() {
   const router = useRouter();
-  const userName = typeof window !== "undefined" ? localStorage.getItem("userName") : null;
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const userName =
+    typeof window !== "undefined" ? localStorage.getItem("userName") : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   if (!token) {
     return (
@@ -73,7 +90,12 @@ function UserMenu() {
   }
 
   const initials = userName
-    ? userName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    ? userName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
     : "U";
 
   const handleLogout = async () => {
@@ -104,7 +126,10 @@ function UserMenu() {
           Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+        <DropdownMenuItem
+          onClick={handleLogout}
+          className="text-destructive focus:text-destructive"
+        >
           Logout
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -126,7 +151,7 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="container mx-auto flex h-16 items-center px-4">
         {/* Mobile Menu */}
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -137,7 +162,9 @@ export default function Navbar() {
           </SheetTrigger>
           <SheetContent side="left" className="w-[280px] sm:w-[300px]">
             <SheetHeader>
-              <SheetTitle className="text-left text-lg font-bold">Menu</SheetTitle>
+              <SheetTitle className="text-left text-lg font-bold">
+                Menu
+              </SheetTitle>
             </SheetHeader>
             <div className="flex flex-col gap-4 py-4">
               {NAV_SECTIONS.map((section) => (
@@ -150,10 +177,11 @@ export default function Navbar() {
                       key={item.path}
                       href={item.path}
                       onClick={() => setSheetOpen(false)}
-                      className={`flex items-center gap-3 px-2 py-2 text-sm font-medium rounded-md transition-colors ${pathname === item.path
+                      className={`flex items-center gap-3 px-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                        pathname === item.path
                           ? "bg-accent text-accent-foreground"
                           : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                        }`}
+                      }`}
                     >
                       <item.icon className="h-4 w-4" />
                       {item.label}
@@ -168,13 +196,20 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="mr-8 flex items-center gap-2">
           {tenantConfig.logoUrl ? (
-            <img src={tenantConfig.logoUrl} alt={tenantConfig.name} className="h-8 w-auto" />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={tenantConfig.logoUrl}
+              alt={tenantConfig.name}
+              className="h-8 w-auto"
+            />
           ) : (
             <div className="flex items-center gap-2">
               <div className="h-6 w-6 rounded bg-primary flex items-center justify-center text-primary-foreground">
                 <Command className="h-4 w-4" />
               </div>
-              <span className="font-semibold text-sm tracking-tight">{tenantConfig.name}</span>
+              <span className="font-semibold text-sm tracking-tight">
+                {tenantConfig.name}
+              </span>
             </div>
           )}
         </Link>
@@ -188,8 +223,11 @@ export default function Navbar() {
               <Link
                 key={link.path}
                 href={link.path}
-                className={`transition-colors hover:text-foreground/80 ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"
-                  }`}
+                className={`transition-colors hover:text-foreground/80 ${
+                  isActive
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground"
+                }`}
               >
                 {link.label}
               </Link>

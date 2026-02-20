@@ -51,13 +51,21 @@ export default function Recommendations() {
   useEffect(() => {
     const profileId = localStorage.getItem("profileId");
     const token = localStorage.getItem("token");
-    setIsLoggedIn(!!token);
-    if (!profileId) { setLoading(false); return; }
-    setHasProfile(true);
+    setTimeout(() => {
+      setIsLoggedIn(!!token);
+      if (!profileId) {
+        setLoading(false);
+        return;
+      }
+      setHasProfile(true);
+    }, 0);
+    if (!profileId) return;
     api
       .post("/api/recommend", { profile_id: parseInt(profileId) })
       .then((res) => setRecs(res.data.recommendations))
-      .catch((err: unknown) => setError(extractApiError(err, "Failed to get recommendations")))
+      .catch((err: unknown) =>
+        setError(extractApiError(err, "Failed to get recommendations")),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -67,11 +75,17 @@ export default function Recommendations() {
 
       <header>
         <p className="section-label mb-1">Intelligence</p>
-        <h1 className="text-2xl font-extrabold tracking-tight">Recommended Roles</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          Recommended Roles
+        </h1>
       </header>
 
       {loading && <SkeletonCard count={3} />}
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {!loading && !error && !isLoggedIn && hasProfile && (
         <Card variant="highlight">
@@ -79,7 +93,10 @@ export default function Recommendations() {
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <p className="text-sm font-bold mb-0.5">Save your results</p>
-                <p className="text-xs text-muted-foreground">Create an account to save your profile and get updated recommendations.</p>
+                <p className="text-xs text-muted-foreground">
+                  Create an account to save your profile and get updated
+                  recommendations.
+                </p>
               </div>
               <Button
                 size="sm"
@@ -121,7 +138,11 @@ export default function Recommendations() {
                     </div>
                     <div className="flex gap-1.5 flex-wrap">
                       <Badge variant="secondary">{rec.category}</Badge>
-                      {rec.salary_range && <Badge variant="outline" className="data-num">{rec.salary_range}</Badge>}
+                      {rec.salary_range && (
+                        <Badge variant="outline" className="data-num">
+                          {rec.salary_range}
+                        </Badge>
+                      )}
                       {rec.career_switcher_bonus > 0 && (
                         <Badge variant="success">Career Switcher +</Badge>
                       )}
@@ -135,7 +156,9 @@ export default function Recommendations() {
                   <MatchScoreBar score={rec.rule_score} label="Profile Fit" />
                 </div>
 
-                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rec.rationale}</p>
+                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                  {rec.rationale}
+                </p>
 
                 {rec.matched_skills.length > 0 && (
                   <div className="mb-2">

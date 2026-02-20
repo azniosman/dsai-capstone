@@ -2,7 +2,12 @@
 
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 
 const SEVERITY_CLASSES: Record<string, string> = {
@@ -19,11 +24,6 @@ interface Gap {
   gap_severity: string;
   priority: string | number;
 }
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0 },
-};
 
 import { motion } from "framer-motion";
 

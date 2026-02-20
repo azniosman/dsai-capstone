@@ -18,16 +18,19 @@ interface Turn {
 }
 
 export default function VoiceCoachPage() {
-  const [status, setStatus] = useState<"connected" | "disconnected" | "error">("disconnected");
+  const [status, setStatus] = useState<"connected" | "disconnected" | "error">(
+    "disconnected",
+  );
   const [turns, setTurns] = useState<Turn[]>([]);
   const [processing, setProcessing] = useState(false);
   const clientRef = useRef<VoiceWebSocketClient | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const profileId = typeof window !== "undefined"
-    ? parseInt(localStorage.getItem("profileId") ?? "0", 10) || 0
-    : 0;
+  const profileId =
+    typeof window !== "undefined"
+      ? parseInt(localStorage.getItem("profileId") ?? "0", 10) || 0
+      : 0;
 
   // Connect WebSocket
   useEffect(() => {
@@ -41,7 +44,12 @@ export default function VoiceCoachPage() {
         setTurns((prev) => [
           ...prev,
           { role: "user", text: msg.transcript },
-          { role: "assistant", text: msg.response_text, audioB64: msg.audio_base64, audioFormat: msg.audio_format },
+          {
+            role: "assistant",
+            text: msg.response_text,
+            audioB64: msg.audio_base64,
+            audioFormat: msg.audio_format,
+          },
         ]);
         // Auto-play audio response
         if (msg.audio_base64 && audioRef.current) {
@@ -51,7 +59,10 @@ export default function VoiceCoachPage() {
         }
         setProcessing(false);
       } else if (msg.type === "error") {
-        setTurns((prev) => [...prev, { role: "assistant", text: `Error: ${msg.message}` }]);
+        setTurns((prev) => [
+          ...prev,
+          { role: "assistant", text: `Error: ${msg.message}` },
+        ]);
         setProcessing(false);
       }
     };
@@ -79,7 +90,10 @@ export default function VoiceCoachPage() {
     [profileId],
   );
 
-  const statusColor: Record<typeof status, "success" | "destructive" | "warning"> = {
+  const statusColor: Record<
+    typeof status,
+    "success" | "destructive" | "warning"
+  > = {
     connected: "success",
     disconnected: "outline" as never,
     error: "destructive",
@@ -95,8 +109,10 @@ export default function VoiceCoachPage() {
         />
         <Card variant="elevated" className="p-8 text-center">
           <p className="text-muted-foreground text-sm">
-            Voice Coach requires <code className="font-mono">NEXT_PUBLIC_VOICE_WS_URL</code> to be configured.
-            Deploy the WebSocket API Gateway and set the environment variable.
+            Voice Coach requires{" "}
+            <code className="font-mono">NEXT_PUBLIC_VOICE_WS_URL</code> to be
+            configured. Deploy the WebSocket API Gateway and set the environment
+            variable.
           </p>
         </Card>
       </div>
@@ -121,7 +137,8 @@ export default function VoiceCoachPage() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {turns.length === 0 && (
             <p className="text-center text-muted-foreground text-sm py-12">
-              Press <strong>Record</strong> and ask anything about your career journey.
+              Press <strong>Record</strong> and ask anything about your career
+              journey.
             </p>
           )}
           {turns.map((turn, i) => (
@@ -153,7 +170,7 @@ export default function VoiceCoachPage() {
           <audio ref={audioRef} className="hidden" />
           <VoiceInput
             onAudioReady={handleAudioReady}
-            disabled={!clientRef.current?.isConnected || processing || !profileId}
+            disabled={status !== "connected" || processing || !profileId}
           />
           {processing && (
             <span className="text-xs text-muted-foreground flex items-center gap-2">

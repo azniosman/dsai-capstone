@@ -7,8 +7,20 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  Legend,
 } from "recharts";
 import GapTable from "@/components/gap-table";
 import WorkflowStepper from "@/components/workflow-stepper";
@@ -19,10 +31,10 @@ import { extractApiError } from "@/lib/utils";
 
 // Gap severity colors — semantic palette, consistent with status utilities
 const GAP_COLORS: Record<string, string> = {
-  none:   "hsl(145 60% 36%)",  // green — no gap
-  low:    "hsl(220 80% 55%)",  // blue  — small gap
-  medium: "hsl(40 90% 45%)",   // amber — medium gap
-  high:   "hsl(5 78% 50%)",    // red   — critical gap
+  none: "hsl(145 60% 36%)", // green — no gap
+  low: "hsl(220 80% 55%)", // blue  — small gap
+  medium: "hsl(40 90% 45%)", // amber — medium gap
+  high: "hsl(5 78% 50%)", // red   — critical gap
 };
 
 // Recharts tooltip style — matches card bg/border in light mode
@@ -76,11 +88,21 @@ function SkillGapView({ gap }: { gap: RoleGap }) {
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">{gap.role_title}</span>
-          <Badge variant={score >= 70 ? "success" : score >= 40 ? "warning" : "destructive"} className="data-num">
+          <Badge
+            variant={
+              score >= 70 ? "success" : score >= 40 ? "warning" : "destructive"
+            }
+            className="data-num"
+          >
             {score}% Match
           </Badge>
         </div>
-        <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v)} size="sm">
+        <ToggleGroup
+          type="single"
+          value={chartType}
+          onValueChange={(v) => v && setChartType(v)}
+          size="sm"
+        >
           <ToggleGroupItem value="radar">Radar</ToggleGroupItem>
           <ToggleGroupItem value="bar">Bar</ToggleGroupItem>
         </ToggleGroup>
@@ -89,29 +111,69 @@ function SkillGapView({ gap }: { gap: RoleGap }) {
       {/* Chart */}
       <Card variant="data">
         <CardContent className="p-4">
-          <div className="h-[350px]" role="img" aria-label="Chart comparing your skill levels to required levels">
+          <div
+            className="h-[350px]"
+            role="img"
+            aria-label="Chart comparing your skill levels to required levels"
+          >
             <ResponsiveContainer>
               {chartType === "radar" ? (
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="#d9d4cc" />
-                  <PolarAngleAxis dataKey="skill" tick={{ fill: "#374151", fontSize: 11 }} />
-                  <PolarRadiusAxis domain={[0, 100]} tick={{ fill: "#6b7280", fontSize: 10 }} />
-                  <Radar name="Your Level" dataKey="Your Level" stroke="#00BFFF" fill="#00BFFF" fillOpacity={0.3} />
-                  <Radar name="Required" dataKey="Required" stroke="#e8562a" fill="#e8562a" fillOpacity={0.1} />
-                  <Legend wrapperStyle={{ color: "#374151", fontSize: "12px" }} />
+                  <PolarAngleAxis
+                    dataKey="skill"
+                    tick={{ fill: "#374151", fontSize: 11 }}
+                  />
+                  <PolarRadiusAxis
+                    domain={[0, 100]}
+                    tick={{ fill: "#6b7280", fontSize: 10 }}
+                  />
+                  <Radar
+                    name="Your Level"
+                    dataKey="Your Level"
+                    stroke="#00BFFF"
+                    fill="#00BFFF"
+                    fillOpacity={0.3}
+                  />
+                  <Radar
+                    name="Required"
+                    dataKey="Required"
+                    stroke="#e8562a"
+                    fill="#e8562a"
+                    fillOpacity={0.1}
+                  />
+                  <Legend
+                    wrapperStyle={{ color: "#374151", fontSize: "12px" }}
+                  />
                 </RadarChart>
               ) : (
-                <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
+                <BarChart
+                  data={chartData}
+                  layout="vertical"
+                  margin={{ left: 100 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
-                  <XAxis type="number" domain={[0, 1]} tick={{ fill: "#6b7280", fontSize: 11 }} />
-                  <YAxis type="category" dataKey="skill" width={100} tick={{ fill: "#374151", fontSize: 11 }} />
+                  <XAxis
+                    type="number"
+                    domain={[0, 1]}
+                    tick={{ fill: "#6b7280", fontSize: 11 }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="skill"
+                    width={100}
+                    tick={{ fill: "#374151", fontSize: 11 }}
+                  />
                   <Tooltip
                     formatter={(v) => `${Math.round(Number(v) * 100)}%`}
                     contentStyle={CHART_STYLE.contentStyle}
                   />
                   <Bar dataKey="level" name="Your Level" radius={[0, 3, 3, 0]}>
                     {chartData.map((entry) => (
-                      <Cell key={entry.skill} fill={GAP_COLORS[entry.severity]} />
+                      <Cell
+                        key={entry.skill}
+                        fill={GAP_COLORS[entry.severity]}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
@@ -137,20 +199,38 @@ export default function SkillGap() {
   useEffect(() => {
     const profileId = localStorage.getItem("profileId");
     if (!profileId) {
-      setHasProfile(false);
-      setLoading(false);
+      setTimeout(() => {
+        setHasProfile(false);
+        setLoading(false);
+      }, 0);
       return;
     }
-    setHasProfile(true);
+    setTimeout(() => setHasProfile(true), 0);
     api
       .get(`/api/skill-gap/${profileId}`)
       .then((res) => setGaps(res.data.gaps))
-      .catch((err: unknown) => setError(extractApiError(err, "Failed to load skill gaps")))
+      .catch((err: unknown) =>
+        setError(extractApiError(err, "Failed to load skill gaps")),
+      )
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div><WorkflowStepper /><SkeletonCard count={2} /></div>;
-  if (error) return <div><WorkflowStepper /><Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert></div>;
+  if (loading)
+    return (
+      <div>
+        <WorkflowStepper />
+        <SkeletonCard count={2} />
+      </div>
+    );
+  if (error)
+    return (
+      <div>
+        <WorkflowStepper />
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
 
   if (!hasProfile || gaps.length === 0) {
     return (
@@ -171,7 +251,9 @@ export default function SkillGap() {
 
       <header>
         <p className="section-label mb-1">Analysis</p>
-        <h1 className="text-2xl font-extrabold tracking-tight">Skill Gap Analysis</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          Skill Gap Analysis
+        </h1>
       </header>
 
       {/* Role selector (Custom Tabs implementation) */}
@@ -194,8 +276,15 @@ export default function SkillGap() {
 
         {/* Content Area */}
         {gaps.map((gap, i) => (
-          <div key={i} className={tab === String(i) ? "block animate-in fade-in slide-in-from-left-1 duration-300" : "hidden"}>
-             <SkillGapView gap={gap} />
+          <div
+            key={i}
+            className={
+              tab === String(i)
+                ? "block animate-in fade-in slide-in-from-left-1 duration-300"
+                : "hidden"
+            }
+          >
+            <SkillGapView gap={gap} />
           </div>
         ))}
       </div>

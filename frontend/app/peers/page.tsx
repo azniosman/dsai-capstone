@@ -25,7 +25,15 @@ interface PeerData {
   peer_insights: PeerInsight[];
 }
 
-function CompareBar({ yours, avg, label }: { yours: number; avg: number; label: string }) {
+function CompareBar({
+  yours,
+  avg,
+  label,
+}: {
+  yours: number;
+  avg: number;
+  label: string;
+}) {
   const max = Math.max(yours, avg, 1);
   const youPct = Math.min((yours / max) * 100, 100);
   const avgPct = Math.min((avg / max) * 100, 100);
@@ -36,8 +44,13 @@ function CompareBar({ yours, avg, label }: { yours: number; avg: number; label: 
       <div className="flex justify-between mb-1">
         <span className="section-label">{label}</span>
         <span className="text-xs text-muted-foreground data-num">
-          You: <span className={`font-bold ${ahead ? "text-primary" : "text-amber-500"}`}>{yours}</span>
-          {" "}· Avg: {avg}
+          You:{" "}
+          <span
+            className={`font-bold ${ahead ? "text-primary" : "text-amber-500"}`}
+          >
+            {yours}
+          </span>{" "}
+          · Avg: {avg}
         </span>
       </div>
       <div className="space-y-1">
@@ -48,7 +61,10 @@ function CompareBar({ yours, avg, label }: { yours: number; avg: number; label: 
           />
         </div>
         <div className="score-bar-track w-full">
-          <div className="score-bar-fill bg-muted-foreground/40" style={{ width: `${avgPct}%` }} />
+          <div
+            className="score-bar-fill bg-muted-foreground/40"
+            style={{ width: `${avgPct}%` }}
+          />
         </div>
       </div>
     </div>
@@ -60,17 +76,30 @@ export default function PeerComparison() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const profileId =
+    typeof window !== "undefined" ? localStorage.getItem("profileId") : null;
+
   useEffect(() => {
-    const profileId = localStorage.getItem("profileId");
-    if (!profileId) { setLoading(false); return; }
-    api.get(`/api/peer-comparison/${profileId}`)
+    if (!profileId) {
+      setTimeout(() => setLoading(false), 0);
+      return;
+    }
+    api
+      .get(`/api/peer-comparison/${profileId}`)
       .then((res) => setData(res.data))
-      .catch((err) => setError(err.response?.data?.detail || "Failed to load peer data"))
+      .catch((err) =>
+        setError(err.response?.data?.detail || "Failed to load peer data"),
+      )
       .finally(() => setLoading(false));
-  }, []);
+  }, [profileId]);
 
   if (loading) return <SkeletonCard count={3} />;
-  if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>;
+  if (error)
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
 
   if (!data) {
     return (
@@ -86,7 +115,9 @@ export default function PeerComparison() {
     <div className="space-y-5">
       <header>
         <p className="section-label mb-1">Benchmarking</p>
-        <h1 className="text-2xl font-extrabold tracking-tight">Peer Comparison</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          Peer Comparison
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Anonymised comparison with professionals targeting similar roles.
         </p>
@@ -98,11 +129,15 @@ export default function PeerComparison() {
           <p className="section-label mb-3">Your Profile</p>
           <div className="flex gap-6">
             <div>
-              <div className="kpi-number-accent" style={{ fontSize: "2rem" }}>{data.your_skills_count}</div>
+              <div className="kpi-number-accent" style={{ fontSize: "2rem" }}>
+                {data.your_skills_count}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">Skills</p>
             </div>
             <div>
-              <div className="kpi-number" style={{ fontSize: "2rem" }}>{data.your_experience}</div>
+              <div className="kpi-number" style={{ fontSize: "2rem" }}>
+                {data.your_experience}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">Years exp.</p>
             </div>
           </div>
@@ -113,7 +148,9 @@ export default function PeerComparison() {
         {data.peer_insights.map((peer) => (
           <Card key={peer.role_title} variant="elevated" className="h-full">
             <CardContent className="p-5">
-              <h2 className="font-bold text-sm mb-4 leading-tight">{peer.role_title}</h2>
+              <h2 className="font-bold text-sm mb-4 leading-tight">
+                {peer.role_title}
+              </h2>
 
               <div className="space-y-4 mb-4">
                 <CompareBar
@@ -131,20 +168,32 @@ export default function PeerComparison() {
               <p className="section-label mb-2">Most Common Peer Skills</p>
               <div className="flex flex-wrap gap-1 mb-4">
                 {peer.most_common_skills.map((s) => (
-                  <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
+                  <Badge key={s} variant="outline" className="text-xs">
+                    {s}
+                  </Badge>
                 ))}
               </div>
 
               <div className="border-t border-border pt-3 space-y-1">
                 <p className="text-xs text-muted-foreground">
-                  Typical education: <span className="text-foreground font-medium">{peer.most_common_education}</span>
+                  Typical education:{" "}
+                  <span className="text-foreground font-medium">
+                    {peer.most_common_education}
+                  </span>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  <span className="data-num font-semibold">{Math.round(peer.career_switcher_pct * 100)}%</span> are career switchers
+                  <span className="data-num font-semibold">
+                    {Math.round(peer.career_switcher_pct * 100)}%
+                  </span>{" "}
+                  are career switchers
                 </p>
                 {peer.total_peers > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Based on <span className="data-num font-semibold">{peer.total_peers}</span> similar profiles
+                    Based on{" "}
+                    <span className="data-num font-semibold">
+                      {peer.total_peers}
+                    </span>{" "}
+                    similar profiles
                   </p>
                 )}
               </div>
