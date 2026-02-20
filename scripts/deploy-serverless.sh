@@ -74,12 +74,14 @@ terraform apply \
 API_URL=$(terraform output -raw api_endpoint)
 CF_DOMAIN=$(terraform output -raw cloudfront_domain)
 S3_BUCKET=$(terraform output -raw s3_bucket_name)
+WS_URL=$(terraform output -raw websocket_endpoint)
 
 echo ""
 echo "Terraform outputs:"
 echo "  API endpoint:  ${API_URL}"
 echo "  Frontend URL:  https://${CF_DOMAIN}"
 echo "  S3 bucket:     ${S3_BUCKET}"
+echo "  WebSocket:     ${WS_URL}"
 
 # ── Step 4: Build and deploy frontend ─────────────────────────────────────────
 echo ""
@@ -89,10 +91,11 @@ cd "$(dirname "$0")/../frontend"
 cat > .env.production.local <<EOF
 NEXT_PUBLIC_API_URL=${API_URL}
 NEXT_PUBLIC_APP_URL=https://${CF_DOMAIN}
+NEXT_PUBLIC_VOICE_WS_URL=${WS_URL}
 EOF
 
 npm install --prefer-offline
-NEXT_PUBLIC_API_URL="${API_URL}" npm run build
+NEXT_OUTPUT=export NEXT_PUBLIC_API_URL="${API_URL}" NEXT_PUBLIC_VOICE_WS_URL="${WS_URL}" npm run build
 
 echo ""
 echo "Step 4/5 — Uploading frontend to S3..."
