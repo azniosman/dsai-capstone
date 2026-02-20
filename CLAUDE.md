@@ -18,26 +18,33 @@ SkillBridge — Job Recommendation & Skill Gap Analysis System for SCTP learners
 
 ## Serverless AWS Deployment
 
-```bash
-# Full automated deploy (ECR → Docker build → Terraform → S3 sync → CF invalidate)
-export TF_VAR_db_password="$(openssl rand -base64 24)"
-export TF_VAR_secret_key="$(openssl rand -hex 32)"
-bash scripts/deploy-serverless.sh dev
+The CI/CD workflow is at `.github/workflows/deploy-serverless.yml` — trigger via GitHub Actions → "Deploy Serverless Stack" → Run workflow.
 
-# Or step-by-step:
-cd terraform && terraform init
-terraform apply -target=module.ecr -auto-approve          # Step 1: create ECR
-bash scripts/build_and_push.sh dev us-east-1              # Step 2: push image
-terraform apply -var="lambda_image_uri=<ecr_url>" -auto-approve  # Step 3: full apply
+```bash
+# Quick redeploy (image + frontend only, no infra teardown — ~5 min)
+# Use after backend-only code changes. Also calls update-function-code for all 6 Lambda functions.
+gh workflow run deploy-serverless.yml -f environment=dev -f skip_terraform=true
+
+# Full deploy (clean-slate teardown + Terraform apply — ~35 min)
+# Required for infra changes (memory, VPC, DB, API Gateway, etc.)
+gh workflow run deploy-serverless.yml -f environment=dev
+
+# Get current API endpoint after deploy
+cd terraform && terraform output -raw api_endpoint
+
+# Run integration tests against live AWS (full_test.py has hardcoded localhost:8000)
+sed 's|http://localhost:8000|https://<api_endpoint>|' scripts/full_test.py | python3
 ```
 
 The serverless Terraform stack (`terraform/`) targets:
-- **Lambda** (container image from ECR) + **API Gateway HTTP API**
-- **RDS PostgreSQL db.t4g.micro** (private subnet, ~$13/month)
+- **Lambda** (container image from ECR, 3008 MB) + **API Gateway HTTP API**
+- **Aurora Serverless v2** (private subnet, ~$43/month)
 - **S3 + CloudFront** with OAC (frontend)
 - **Optional OpenSearch** (set `enable_opensearch=true`, adds ~$26/month)
 
-Cost tip: `terraform destroy -target='module.vpc.aws_nat_gateway.main'` to pause NAT Gateway ($32/month) between demos.
+Cost tip: `terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.aws_eip.nat'` to pause NAT Gateway ($32/month) between demos.
+
+**Full deploy strategy**: The clean-slate step deletes all non-ECR AWS resources before `terraform apply` recreates them. This means **API Gateway URL and S3 bucket name change** on every full deploy. Always read outputs after deploy. `skip_terraform=true` preserves existing infra and URLs.
 
 ## Build & Run Commands
 
@@ -150,7 +157,7 @@ auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resu
 
 Terraform modules in `terraform/modules/`: `vpc`, `database` (Aurora Serverless v2 + pgvector), `backend` (Lambda + API Gateway), `lambda_backend`, `api_gateway`, `frontend` (S3 + CloudFront), `s3_frontend`, `cloudfront`, `alb`, `ecr`, `ecs`, `rds`, `security_groups`, `storage`, `iam`, `opensearch`, `sagemaker`, `websocket`.
 
-CI/CD: `.github/workflows/deploy-serverless.yml` (currently disabled with `if: false`; deploys via OIDC to AWS ap-southeast-1 using Terraform + Lambda + S3).
+CI/CD: `.github/workflows/deploy-serverless.yml` — active, uses static IAM keys from GitHub environment secrets (`dev`/`prod`), targets `us-east-1`. See Serverless AWS Deployment section for usage.
 
 ### n8n Workflows
 
@@ -165,16 +172,36 @@ Automation workflows in `n8n/workflows/` (accessible at port 5678):
 - `backend/tests/` — pytest tests with SQLite in-memory fixtures; `conftest.py` provides `db_session`, `sample_profile`, `sample_role` fixtures
 - `tests/` — Integration/endpoint tests (top-level); e.g. `test_dashboard_endpoint.py`
 
+## Lambda Deployment Gotchas
+
+Critical non-obvious issues discovered in production:
+
+- **`Mangum(lifespan="off")` skips FastAPI startup events**: The `@app.lifespan` context manager (which calls `_seed_database()`, `_background_ml_warmup()`, etc.) never runs in Lambda. These are called **explicitly at module level** in `backend/lambda_handler.py` instead. If you add startup logic to `main.py`, also wire it in `lambda_handler.py`.
+
+- **Docker buildx + Lambda**: Always pass `--provenance=false` to `docker buildx build`. Without it, newer BuildKit adds SLSA attestations creating an OCI manifest list, which Lambda rejects with `InvalidParameterValueException: image manifest ... not supported`.
+
+- **`update-function-code` is not instant**: After calling `aws lambda update-function-code`, warm containers may still serve old code for 1–2 minutes. Wait before testing, or send a few requests to exhaust the warm pool.
+
+- **`skip_terraform=true` Lambda update**: The workflow explicitly calls `aws lambda update-function-code` for all 6 functions (`api`, `voice`, `rag-query`, `embed-gen`, `gap-analysis`, `resume-upload`) when `skip_terraform=true`. Without this, the new ECR image is pushed but Lambda keeps the old one.
+
+- **Lambda INIT timeout logging**: Lambda reports `INIT_REPORT Init Duration: 9999ms Phase: init Status: timeout` when module-level imports (PyTorch, spaCy) take >10s. This is a logging threshold only — execution continues. It does NOT mean the Lambda failed.
+
+- **Memory**: Lambda is configured to 3008 MB. Sentence Transformers + FAISS index use ~1 GB. Lower values (e.g. 1024 MB) cause OOM 503s on ML endpoints.
+
+- **Auth login is form-encoded**: `POST /api/auth/login` uses OAuth2 `application/x-www-form-urlencoded` with field `username` (not `email`), not JSON. Register requires `password_confirm` and `tenant_name` fields.
+
+- **`extract_skills()` fallback**: When Gemini quota is exhausted or key is absent, `resume_parser.extract_skills()` falls back to regex keyword-matching against the skill taxonomy (150+ skills). `POST /api/jd-match` will still work without a Gemini key.
+
 ## Key Design Decisions
 
 - **Hybrid scoring**: `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
 - **Skill levels**: 0 (missing), 0.5 (partial), 1.0 (strong)
 - **FAISS in-memory** for vector similarity search (rebuilt on startup)
-- **LLM fallback**: Gemini API when `GEMINI_API_KEY` is set, otherwise rule-based responses; `bedrock_service` provides an alternate path via AWS Bedrock
+- **LLM fallback**: Gemini API → rule-based responses (chat/interview); `bedrock_service` provides an alternate path via AWS Bedrock; `extract_skills()` falls back to taxonomy keyword scan when Gemini fails
 - **Auth is optional**: core features (profile, recommendations, skill gap) work without login
 - **Multi-tenancy**: all data models include `tenant_id`; a `Global` tenant is auto-created on startup
 - **Schema sync**: `_sync_schema()` in `main.py` auto-adds new model columns to existing DB tables (no manual migration needed for column additions)
-- **Startup warmup**: ML model, taxonomy FAISS index, and skill cache are pre-loaded during FastAPI lifespan to avoid cold-start latency
+- **Startup warmup**: ML model, taxonomy FAISS index, and skill cache are pre-loaded during FastAPI lifespan (local/Docker) and via a daemon thread started at module level in `lambda_handler.py` (Lambda)
 - **Recommendation cache**: in-memory TTL cache (300s) in `recommender.py`
 
 ## Security
