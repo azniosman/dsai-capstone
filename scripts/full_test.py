@@ -234,7 +234,13 @@ def test_chat():
         "messages": [{"role": "user", "content": "What high-growth roles match my Python and SQL skills?"}]
     })
     if r.status_code == 200:
-        reply = r.json().get("reply", "")
+        ct = r.headers.get("content-type", "")
+        if "text/event-stream" in ct or "text/plain" in ct:
+            # Streaming SSE response — skip the [ENGINE: ...] metadata line
+            lines = [l for l in r.text.splitlines() if l and not l.startswith("[ENGINE:")]
+            reply = " ".join(lines)
+        else:
+            reply = r.json().get("reply", "")
         report("POST /api/chat", len(reply) > 10, "Reply too short" if len(reply) <= 10 else "")
         print(f"    → Reply: {reply[:150]}...")
     else:
