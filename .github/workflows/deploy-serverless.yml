@@ -231,6 +231,28 @@ jobs:
 
           echo "IMAGE_URI=${ECR}:${IMAGE_TAG}" >> $GITHUB_ENV
 
+      # ── Step 2b: Update Lambda functions when skipping Terraform ────────────────
+      # When skip_terraform=true, Terraform doesn't run so Lambda still points to
+      # the old image URI. Explicitly call update-function-code for all functions.
+      - name: Update Lambda function code (skip_terraform path)
+        if: ${{ github.event.inputs.skip_terraform == 'true' }}
+        run: |
+          set -euo pipefail
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+          for FN in api voice rag-query embed-gen gap-analysis resume-upload; do
+            FNAME="${P}-${E}-${FN}"
+            if aws lambda get-function --function-name "$FNAME" &>/dev/null; then
+              echo "Updating ${FNAME}..."
+              aws lambda update-function-code \
+                --function-name "$FNAME" \
+                --image-uri "${{ env.IMAGE_URI }}" \
+                --output text --query 'FunctionName'
+            else
+              echo "  ${FNAME} not found — skipping"
+            fi
+          done
+
       # ── Step 3: Clean up AWS resources for clean-slate Terraform apply ─────────
       # Strategy: remove all non-ECR modules from Terraform state, then delete
       # their corresponding AWS resources so Terraform rebuilds everything fresh.
