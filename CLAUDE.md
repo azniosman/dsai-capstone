@@ -111,7 +111,7 @@ Backend settings are in `backend/app/config.py` using `pydantic_settings.BaseSet
 - `backend/app/limiter.py` — Rate limiting middleware via slowapi
 
 **Routers** (`backend/app/routers/`, all mounted under `/api`):
-auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resume_rewriter, upload, export, dashboard, market, compare, courses, progress, projects, peer, sso, api_keys, audit_logs, voice, rag, gap_analysis
+auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resume_rewriter, upload, export, dashboard, market, compare, courses, progress, projects, peer, sso, api_keys, audit_logs, voice, rag, gap_analysis, demo
 
 **Services** (`backend/app/services/`):
 `recommender` (hybrid scoring), `skill_matcher` (embedding similarity), `gap_analyzer`, `roadmap_generator`, `course_pathways`, `resume_parser`, `market_simulator`, `subsidy_calculator` (SkillsFuture/MCES), `audit_logger`, `bedrock_service` (AWS Bedrock LLM), `sagemaker_service` (SageMaker embeddings), `voice_service`, `dashboard_service`
@@ -170,6 +170,9 @@ Automation workflows in `n8n/workflows/` (accessible at port 5678):
 ### Tests
 
 - `backend/tests/` — pytest tests with SQLite in-memory fixtures; `conftest.py` provides `db_session`, `sample_profile`, `sample_role` fixtures
+  - `test_recommender.py`, `test_skill_matcher.py`, `test_skill_gap_logic.py` — core ML/scoring logic
+  - `test_resume_parser.py` — `extract_skills()` with Gemini mocked (tests both Gemini path and keyword fallback)
+  - `test_auth.py`, `test_api_integration.py`, `test_dashboard_history.py` — API layer
 - `tests/` — Integration/endpoint tests (top-level); e.g. `test_dashboard_endpoint.py`
 
 ## Lambda Deployment Gotchas
