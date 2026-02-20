@@ -35,7 +35,7 @@ resource "aws_s3_bucket_website_configuration" "web" {
   bucket = aws_s3_bucket.web.id
 
   index_document { suffix = "index.html" }
-  error_document { key    = "index.html" } # SPA 404 fallback
+  error_document { key = "index.html" } # SPA 404 fallback
 }
 
 # Public-read bucket policy — only created when CloudFront is disabled

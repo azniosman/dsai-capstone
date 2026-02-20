@@ -15,7 +15,7 @@ variable "lambda_function_name" {
 }
 
 variable "allowed_origins" {
-  type    = list(string)
-  default = ["*"]
+  type        = list(string)
+  default     = ["*"]
   description = "CORS allowed origins. Restrict to CloudFront domain in production."
 }

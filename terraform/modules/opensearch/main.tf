@@ -6,7 +6,7 @@ resource "aws_opensearch_domain" "main" {
 
   cluster_config {
     instance_type          = var.instance_type
-    instance_count         = 1    # Single node — no redundancy for demo
+    instance_count         = 1     # Single node — no redundancy for demo
     zone_awareness_enabled = false # Must be false for single-node
   }
 

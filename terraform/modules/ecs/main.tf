@@ -68,7 +68,7 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "DATABASE_URL", value = "postgresql://capstone:changeme@${var.db_endpoint}/capstone" }, # Sensitive
         { name = "SENTENCE_TRANSFORMER_MODEL", value = "all-MiniLM-L6-v2" }
       ]
-       logConfiguration = {
+      logConfiguration = {
         logDriver = "awslogs"
         options = {
           "awslogs-group"         = "/ecs/${var.project_name}-${var.environment}-backend"
@@ -153,7 +153,7 @@ resource "aws_ecs_task_definition" "n8n" {
         { name = "DB_POSTGRESDB_HOST", value = var.db_endpoint },
         { name = "DB_POSTGRESDB_PORT", value = "5432" },
         { name = "DB_POSTGRESDB_DATABASE", value = "n8n" },
-        { name = "DB_POSTGRESDB_USER", value = "capstone" }, # Sensitive
+        { name = "DB_POSTGRESDB_USER", value = "capstone" },     # Sensitive
         { name = "DB_POSTGRESDB_PASSWORD", value = "changeme" }, # Sensitive
         { name = "N8N_BASIC_AUTH_ACTIVE", value = "true" },
         { name = "N8N_BASIC_AUTH_USER", value = "admin" },

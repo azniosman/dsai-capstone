@@ -53,8 +53,8 @@ variable "lambda_image_uri" {
     Format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
     Run scripts/deploy-serverless.sh to build and push before first apply.
   EOT
-  type    = string
-  default = ""
+  type        = string
+  default     = ""
 }
 
 variable "enable_opensearch" {

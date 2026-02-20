@@ -59,7 +59,7 @@ resource "aws_lambda_function" "api" {
       # ML models (pre-baked into image; offline mode required in private subnet)
       SENTENCE_TRANSFORMER_MODEL = "all-MiniLM-L6-v2"
       HF_HUB_OFFLINE             = "1"
-      TRANSFORMERS_OFFLINE        = "1"
+      TRANSFORMERS_OFFLINE       = "1"
 
       LOG_LEVEL = "INFO"
     }

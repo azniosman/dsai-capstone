@@ -106,15 +106,15 @@ resource "aws_iam_policy" "skillbridge_lambda" {
         Resource = "*"
       },
       {
-        Sid    = "WebSocketManagement"
-        Effect = "Allow"
-        Action = ["execute-api:ManageConnections"]
+        Sid      = "WebSocketManagement"
+        Effect   = "Allow"
+        Action   = ["execute-api:ManageConnections"]
         Resource = "arn:aws:execute-api:*:*:*/@connections/*"
       },
       {
-        Sid    = "TranscribeS3Access"
-        Effect = "Allow"
-        Action = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
+        Sid      = "TranscribeS3Access"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
         Resource = "arn:aws:s3:::${var.project_name}-${var.environment}-uploads/voice-temp/*"
       },
     ]
