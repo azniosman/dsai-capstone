@@ -217,6 +217,7 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             -f backend/Dockerfile.lambda \
+            --provenance=false \
             --cache-from "type=local,src=/tmp/.buildx-cache" \
             --cache-to   "type=local,dest=/tmp/.buildx-cache-new,mode=max" \
             -t "${ECR}:${IMAGE_TAG}" \
