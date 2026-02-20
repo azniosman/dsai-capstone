@@ -80,3 +80,15 @@ variable "lambda_timeout_seconds" {
   type        = number
   default     = 29
 }
+
+variable "enable_sagemaker" {
+  description = "Enable SageMaker Serverless endpoint for sentence-transformer embeddings (adds ~$0 idle cost, pay-per-use)"
+  type        = bool
+  default     = false
+}
+
+variable "enable_websocket" {
+  description = "Enable WebSocket API Gateway for real-time voice coaching"
+  type        = bool
+  default     = true
+}

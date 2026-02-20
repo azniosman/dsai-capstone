@@ -1,11 +1,17 @@
 """File upload endpoint — extract text from PDF/DOCX resumes."""
 
 import io
+import logging
+from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.database import get_db
 
 router = APIRouter(tags=["upload"])
+logger = logging.getLogger(__name__)
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -19,6 +25,7 @@ ALLOWED_CONTENT_TYPES = {
 class UploadResponse(BaseModel):
     text: str
     skills: list[str]
+    embedding_id: Optional[int] = None
 
 
 def _extract_pdf(content: bytes) -> str:
@@ -34,20 +41,19 @@ def _extract_docx(content: bytes) -> str:
 
 
 @router.post("/upload-resume", response_model=UploadResponse)
-async def upload_resume(file: UploadFile = File(...)):
+async def upload_resume(
+    file: UploadFile = File(...),
+    profile_id: Optional[int] = Form(None),
+    user_id: Optional[int] = Form(None),
+    db: Session = Depends(get_db),
+):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
     # Relaxed MIME type check: trust extension if MIME is generic/binary
     if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
-        # If generic binary type, allow if extension is valid
-        if file.content_type in ["application/octet-stream", "application/x-www-form-urlencoded"]:
-             pass
-        else:
-             # Log warning but allow for now to be user-friendly? No, better warn.
-             # Actually, let's just log it and rely on extension check primarily for parsing
-             pass
-             # raise HTTPException(status_code=400, detail=f"Unsupported MIME type: {file.content_type}")
+        if file.content_type not in ["application/octet-stream", "application/x-www-form-urlencoded"]:
+            pass  # log only — rely on extension for parsing
 
     # Read with size limit
     chunks = []
@@ -76,4 +82,20 @@ async def upload_resume(file: UploadFile = File(...)):
     from app.services.resume_parser import extract_skills
     skills = extract_skills(text)
 
-    return UploadResponse(text=text, skills=skills)
+    # Store Titan embedding — non-fatal (skipped in local dev without Bedrock)
+    embedding_id: Optional[int] = None
+    try:
+        from app.services.rag_service import store_embedding
+        emb = store_embedding(
+            db,
+            text_content=text,
+            text_type="resume",
+            profile_id=profile_id,
+            user_id=user_id,
+            metadata={"filename": file.filename, "skills": skills[:20]},
+        )
+        embedding_id = emb.id
+    except Exception as e:
+        logger.warning("Resume embedding skipped (Bedrock unavailable in local dev): %s", e)
+
+    return UploadResponse(text=text, skills=skills, embedding_id=embedding_id)

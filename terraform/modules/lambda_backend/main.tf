@@ -69,3 +69,176 @@ resource "aws_lambda_function" "api" {
 
   tags = { Name = "${var.project_name}-${var.environment}-api" }
 }
+
+# ── Specialist Lambda Functions (same image, different CMD) ───────────────────
+
+locals {
+  specialist_env = {
+    ENVIRONMENT          = var.environment
+    AWS_REGION_ID        = var.aws_region
+    DB_SECRET_ARN        = var.db_secret_arn
+    POSTGRES_HOST        = var.db_host
+    POSTGRES_DB          = var.db_name
+    POSTGRES_USER        = var.db_username
+    POSTGRES_PORT        = "5432"
+    BEDROCK_MODEL_ID     = var.bedrock_model_id
+    SECRET_KEY           = var.secret_key
+    HF_HUB_OFFLINE       = "1"
+    TRANSFORMERS_OFFLINE = "1"
+    LOG_LEVEL            = "INFO"
+  }
+}
+
+# 1. Voice Coaching — WebSocket route handler
+resource "aws_cloudwatch_log_group" "voice" {
+  name              = "/aws/lambda/${var.project_name}-${var.environment}-voice"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function" "voice" {
+  function_name = "${var.project_name}-${var.environment}-voice"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 120
+  memory_size   = 512
+  architectures = ["x86_64"]
+
+  image_config {
+    command = ["lambdas.voice_coaching_handler.handler"]
+  }
+
+  vpc_config {
+    subnet_ids         = var.subnet_ids
+    security_group_ids = var.security_group_ids
+  }
+
+  environment {
+    variables = merge(local.specialist_env, {
+      VOICE_TRANSCRIBE_BUCKET = var.voice_transcribe_bucket
+    })
+  }
+
+  depends_on = [aws_cloudwatch_log_group.voice]
+  tags       = { Name = "${var.project_name}-${var.environment}-voice" }
+}
+
+# 2. RAG Query
+resource "aws_cloudwatch_log_group" "rag_query" {
+  name              = "/aws/lambda/${var.project_name}-${var.environment}-rag-query"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function" "rag_query" {
+  function_name = "${var.project_name}-${var.environment}-rag-query"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 30
+  memory_size   = 512
+  architectures = ["x86_64"]
+
+  image_config {
+    command = ["lambdas.rag_query_handler.handler"]
+  }
+
+  vpc_config {
+    subnet_ids         = var.subnet_ids
+    security_group_ids = var.security_group_ids
+  }
+
+  environment { variables = local.specialist_env }
+
+  depends_on = [aws_cloudwatch_log_group.rag_query]
+  tags       = { Name = "${var.project_name}-${var.environment}-rag-query" }
+}
+
+# 3. Embedding Generator
+resource "aws_cloudwatch_log_group" "embed_gen" {
+  name              = "/aws/lambda/${var.project_name}-${var.environment}-embed-gen"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function" "embed_gen" {
+  function_name = "${var.project_name}-${var.environment}-embed-gen"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 30
+  memory_size   = 512
+  architectures = ["x86_64"]
+
+  image_config {
+    command = ["lambdas.embedding_generator.handler"]
+  }
+
+  vpc_config {
+    subnet_ids         = var.subnet_ids
+    security_group_ids = var.security_group_ids
+  }
+
+  environment { variables = local.specialist_env }
+
+  depends_on = [aws_cloudwatch_log_group.embed_gen]
+  tags       = { Name = "${var.project_name}-${var.environment}-embed-gen" }
+}
+
+# 4. Gap Analysis
+resource "aws_cloudwatch_log_group" "gap_analysis" {
+  name              = "/aws/lambda/${var.project_name}-${var.environment}-gap-analysis"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function" "gap_analysis" {
+  function_name = "${var.project_name}-${var.environment}-gap-analysis"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 60
+  memory_size   = 512
+  architectures = ["x86_64"]
+
+  image_config {
+    command = ["lambdas.gap_analysis_handler.handler"]
+  }
+
+  vpc_config {
+    subnet_ids         = var.subnet_ids
+    security_group_ids = var.security_group_ids
+  }
+
+  environment { variables = local.specialist_env }
+
+  depends_on = [aws_cloudwatch_log_group.gap_analysis]
+  tags       = { Name = "${var.project_name}-${var.environment}-gap-analysis" }
+}
+
+# 5. Resume Upload (S3 trigger, higher memory for PDF parsing)
+resource "aws_cloudwatch_log_group" "resume_upload" {
+  name              = "/aws/lambda/${var.project_name}-${var.environment}-resume-upload"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function" "resume_upload" {
+  function_name = "${var.project_name}-${var.environment}-resume-upload"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 30
+  memory_size   = 1024
+  architectures = ["x86_64"]
+
+  image_config {
+    command = ["lambdas.resume_upload_handler.handler"]
+  }
+
+  vpc_config {
+    subnet_ids         = var.subnet_ids
+    security_group_ids = var.security_group_ids
+  }
+
+  environment { variables = local.specialist_env }
+
+  depends_on = [aws_cloudwatch_log_group.resume_upload]
+  tags       = { Name = "${var.project_name}-${var.environment}-resume-upload" }
+}

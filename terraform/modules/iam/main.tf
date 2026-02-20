@@ -105,6 +105,18 @@ resource "aws_iam_policy" "skillbridge_lambda" {
         ]
         Resource = "*"
       },
+      {
+        Sid    = "WebSocketManagement"
+        Effect = "Allow"
+        Action = ["execute-api:ManageConnections"]
+        Resource = "arn:aws:execute-api:*:*:*/@connections/*"
+      },
+      {
+        Sid    = "TranscribeS3Access"
+        Effect = "Allow"
+        Action = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
+        Resource = "arn:aws:s3:::${var.project_name}-${var.environment}-uploads/voice-temp/*"
+      },
     ]
   })
 }
@@ -145,4 +157,28 @@ resource "aws_iam_role_policy_attachment" "opensearch" {
   count      = var.enable_opensearch ? 1 : 0
   role       = aws_iam_role.lambda_exec.name
   policy_arn = aws_iam_policy.opensearch[0].arn
+}
+
+# ── SageMaker Execution Role (conditional) ────────────────────────────────────
+
+resource "aws_iam_role" "sagemaker_execution" {
+  count = var.enable_sagemaker ? 1 : 0
+  name  = "${var.project_name}-${var.environment}-sagemaker-exec"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "sagemaker.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = { Name = "${var.project_name}-${var.environment}-sagemaker-role" }
+}
+
+resource "aws_iam_role_policy_attachment" "sagemaker_full" {
+  count      = var.enable_sagemaker ? 1 : 0
+  role       = aws_iam_role.sagemaker_execution[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
 }

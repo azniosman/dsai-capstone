@@ -19,3 +19,8 @@ variable "enable_opensearch" {
   type    = bool
   default = false
 }
+
+variable "enable_sagemaker" {
+  type    = bool
+  default = false
+}

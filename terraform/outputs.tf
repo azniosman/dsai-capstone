@@ -58,6 +58,16 @@ output "opensearch_endpoint" {
   value       = var.enable_opensearch ? "https://${module.opensearch[0].opensearch_endpoint}" : "disabled"
 }
 
+output "websocket_endpoint" {
+  description = "WebSocket API endpoint for voice coaching (wss://... or 'disabled')"
+  value       = var.enable_websocket ? module.websocket[0].websocket_endpoint : "disabled"
+}
+
+output "sagemaker_endpoint_name" {
+  description = "SageMaker serverless endpoint name (empty if enable_sagemaker = false)"
+  value       = var.enable_sagemaker ? module.sagemaker[0].endpoint_name : "disabled"
+}
+
 output "deploy_summary" {
   description = "Quick deployment summary"
   value = {

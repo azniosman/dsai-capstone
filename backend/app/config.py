@@ -67,6 +67,13 @@ class Settings(BaseSettings):
     aws_region: str = "ap-southeast-1"
     bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 
+    # Titan embeddings (pgvector RAG — 1536-dim)
+    titan_embed_model_id: str = "amazon.titan-embed-text-v1"
+    embedding_dim: int = 1536
+
+    # Voice / Transcribe staging bucket
+    voice_transcribe_bucket: str = ""
+
     model_config = {
         "env_file": str(_env_file), 
         "extra": "ignore",

@@ -47,9 +47,10 @@ RUN pip install --no-cache-dir --prefer-binary \
     "sentence-transformers==2.2.2" \
     "huggingface-hub<0.25.0"
 
-# 4. Project Requirements: Install remaining dependencies
+# 4. Project Requirements: Install remaining dependencies (includes pgvector>=0.3.0)
 COPY backend/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
-RUN pip install --no-cache-dir --prefer-binary -r ${LAMBDA_TASK_ROOT}/requirements.txt
+RUN pip install --no-cache-dir --prefer-binary -r ${LAMBDA_TASK_ROOT}/requirements.txt && \
+    pip install --no-cache-dir "pgvector>=0.3.0"
 
 # ===== Pre-download Models =====
 
@@ -66,5 +67,6 @@ ENV TRANSFORMERS_OFFLINE=1
 COPY backend/app/ ${LAMBDA_TASK_ROOT}/app/
 COPY backend/lambda_handler.py ${LAMBDA_TASK_ROOT}/
 COPY data/seed/ ${LAMBDA_TASK_ROOT}/seed_data/
+COPY lambdas/ ${LAMBDA_TASK_ROOT}/lambdas/
 
 CMD ["lambda_handler.handler"]

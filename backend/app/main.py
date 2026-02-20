@@ -20,7 +20,7 @@ from app.routers import (
     auth, profile, recommend, skill_gap, upskilling,
     upload, jd_match, progress, chat, interview,
     market, compare, peer, projects, export, courses, sso, api_keys, audit_logs,
-    resume_rewriter, dashboard,
+    resume_rewriter, dashboard, rag, gap_analysis,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -125,8 +125,19 @@ def _sync_schema():
                         logger.warning("Schema sync failed for %s.%s: %s", table.name, col.name, e)
 
 
+def _init_pgvector():
+    """Enable pgvector extension if available (PostgreSQL only; skipped on SQLite)."""
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        logger.info("pgvector extension enabled")
+    except Exception as e:
+        logger.warning("pgvector extension not available (local dev without PostgreSQL?): %s", e)
+
+
 def _seed_database():
     """Create tables and seed reference data if empty."""
+    _init_pgvector()
     Base.metadata.create_all(bind=engine)
 
     # Ensure the Global tenant exists BEFORE _sync_schema runs,
@@ -341,6 +352,10 @@ app.include_router(api_keys.router, prefix="/api")
 app.include_router(audit_logs.router, prefix="/api")
 app.include_router(resume_rewriter.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+
+# RAG & AI Analysis
+app.include_router(rag.router, prefix="/api")
+app.include_router(gap_analysis.router, prefix="/api")
 
 # Voice & AI
 from app.routers import voice

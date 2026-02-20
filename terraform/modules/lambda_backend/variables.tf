@@ -75,3 +75,9 @@ variable "opensearch_url" {
   type    = string
   default = ""
 }
+
+variable "voice_transcribe_bucket" {
+  type        = string
+  default     = ""
+  description = "S3 bucket name for Transcribe staging (voice pipeline)"
+}

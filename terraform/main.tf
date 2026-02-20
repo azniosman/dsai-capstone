@@ -66,6 +66,7 @@ module "iam" {
   aws_region        = var.aws_region
   db_secret_arn     = module.rds.db_secret_arn
   enable_opensearch = var.enable_opensearch
+  enable_sagemaker  = var.enable_sagemaker
 }
 
 # 6. Lambda Backend — container image from ECR, runs in VPC private subnets
@@ -95,6 +96,32 @@ module "lambda_backend" {
   opensearch_url   = var.enable_opensearch ? "https://${module.opensearch[0].opensearch_endpoint}" : ""
 
   depends_on = [module.rds, module.iam]
+}
+
+# 11. WebSocket API — voice coaching (conditional)
+module "websocket" {
+  count  = var.enable_websocket ? 1 : 0
+  source = "./modules/websocket"
+
+  project_name               = var.project_name
+  environment                = var.environment
+  voice_lambda_arn           = module.lambda_backend.voice_lambda_arn
+  voice_lambda_function_name = module.lambda_backend.voice_lambda_function_name
+
+  depends_on = [module.lambda_backend]
+}
+
+# 12. SageMaker Serverless — sentence-transformers (conditional)
+module "sagemaker" {
+  count  = var.enable_sagemaker ? 1 : 0
+  source = "./modules/sagemaker"
+
+  project_name       = var.project_name
+  environment        = var.environment
+  aws_region         = var.aws_region
+  sagemaker_role_arn = module.iam.sagemaker_role_arn
+
+  depends_on = [module.iam]
 }
 
 # 7. API Gateway — HTTP API (v2) with CORS, throttling, and CloudWatch logging

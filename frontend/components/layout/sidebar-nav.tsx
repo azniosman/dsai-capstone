@@ -8,7 +8,7 @@ import {
     Cpu, Briefcase, BarChart3, Route, FileText, MessageSquare,
     HelpCircle, GraduationCap, TrendingUp, GitCompare, Users,
     Activity, Settings, Sun, Moon, ChevronLeft, ChevronRight,
-    Command, LogOut
+    Command, LogOut, Mic
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -34,6 +34,7 @@ const NAV_SECTIONS = [
         items: [
             { label: "JD Match", path: "/jd-match", icon: FileText },
             { label: "Career Coach", path: "/chat", icon: MessageSquare },
+            { label: "Voice Coach", path: "/voice-coach", icon: Mic },
             { label: "Interview Prep", path: "/interview", icon: HelpCircle },
             { label: "Courses", path: "/courses", icon: GraduationCap },
         ],
