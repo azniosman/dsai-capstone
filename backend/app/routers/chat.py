@@ -184,10 +184,37 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
 
     system_prompt = _build_system_prompt(profile, recommendations, skill_gaps, roadmap_courses, market_insights, pathways)
 
-    # Try Bedrock - fall back to Gemini - fall back to Rules
+    # Engine priority: Gemini (if configured) → Bedrock → HTTP 503
     # Note: invoke_model (blocking) is used instead of invoke_model_with_stream because
     # API Gateway + Lambda buffers the full response regardless; streaming connections
     # get cut by the 29s API GW integration timeout before the response completes.
+    # Gemini is tried first because Bedrock requires explicit model access to be enabled
+    # in the AWS console (Bedrock → Model access) before it can be used.
+    if settings.gemini_api_key:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=settings.gemini_api_key)
+
+            history = []
+            for msg in payload.messages[:-1]:
+                role = "user" if msg.role == "user" else "model"
+                history.append({"role": role, "parts": [msg.content]})
+
+            model = genai.GenerativeModel(
+                model_name=settings.gemini_model,
+                system_instruction=system_prompt
+            )
+            chat = model.start_chat(history=history)
+            response = chat.send_message(payload.messages[-1].content)
+
+            def gemini_stream():
+                yield f'[ENGINE: Google Gemini ({settings.gemini_model})]\n'
+                yield response.text
+
+            return StreamingResponse(gemini_stream(), media_type="text/event-stream")
+        except Exception as e_gemini:
+            logging.error(f"Gemini API error: {e_gemini}")
+
     try:
         from app.services.bedrock_service import bedrock_service
 
@@ -205,33 +232,7 @@ def career_chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depend
     except Exception as e_bedrock:
         logging.error(f"Bedrock API error: {e_bedrock}")
 
-        # Fallback to Gemini if configured
-        if settings.gemini_api_key:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=settings.gemini_api_key)
-
-                history = []
-                for msg in payload.messages[:-1]:
-                    role = "user" if msg.role == "user" else "model"
-                    history.append({"role": role, "parts": [msg.content]})
-
-                model = genai.GenerativeModel(
-                    model_name=settings.gemini_model,
-                    system_instruction=system_prompt
-                )
-                chat = model.start_chat(history=history)
-                response = chat.send_message(payload.messages[-1].content)
-
-                def gemini_stream():
-                    yield f'[ENGINE: Google Gemini ({settings.gemini_model})]\n'
-                    yield response.text
-
-                return StreamingResponse(gemini_stream(), media_type="text/event-stream")
-            except Exception as e_gemini:
-                logging.error(f"Gemini API error: {e_gemini}")
-
-        raise HTTPException(
-            status_code=503,
-            detail="AI service unavailable. Both Bedrock and Gemini failed. Please try again shortly."
-        )
+    raise HTTPException(
+        status_code=503,
+        detail="AI service unavailable. Please try again shortly."
+    )
