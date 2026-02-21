@@ -28,7 +28,7 @@ import { AIResponse } from "@/components/ui/ai-response";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, extractApiError } from "@/lib/utils";
 import api from "@/lib/api-client";
-import { SkillRadar } from "@/components/ui/skill-radar";
+import { SkillRadar, type SkillRadarMetrics } from "@/components/ui/skill-radar";
 
 import { toast } from "sonner";
 
@@ -53,9 +53,15 @@ interface Recommendation {
   role_id: number;
   title: string;
   category: string;
+  salary_range?: string;
   match_score: number;
+  content_score: number;
+  rule_score: number;
+  skill_match_quality: string;
+  career_switcher_bonus: number;
   matched_skills: string[];
   missing_skills: string[];
+  rationale: string;
 }
 
 const QUICK_ACTIONS = [
@@ -670,17 +676,32 @@ export default function Dashboard() {
           </div>
 
           {/* Skill Radar Chart — updates on role hover */}
-          {recs.length > 0 && radarData.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <SkillRadar
-                data={radarData}
-                roleName={(recs[hoveredRecIdx] ?? recs[0]).title}
-              />
-            </motion.div>
-          )}
+          {recs.length > 0 && radarData.length > 0 && (() => {
+            const activeRec = recs[hoveredRecIdx] ?? recs[0];
+            const radarMetrics: SkillRadarMetrics = {
+              match_score: activeRec.match_score,
+              content_score: activeRec.content_score ?? 0,
+              rule_score: activeRec.rule_score ?? 0,
+              career_switcher_bonus: activeRec.career_switcher_bonus ?? 0,
+              skill_match_quality: activeRec.skill_match_quality ?? "developing",
+              matched_count: activeRec.matched_skills.length,
+              missing_count: activeRec.missing_skills.length,
+              rationale: activeRec.rationale ?? "",
+              salary_range: activeRec.salary_range,
+            };
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <SkillRadar
+                  data={radarData}
+                  roleName={activeRec.title}
+                  metrics={radarMetrics}
+                />
+              </motion.div>
+            );
+          })()}
         </div>
 
         {/* Right Column — 1/3 */}
