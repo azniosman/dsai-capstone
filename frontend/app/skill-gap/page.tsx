@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +66,12 @@ interface RoleGap {
 
 function SkillGapView({ gap }: { gap: RoleGap }) {
   const [chartType, setChartType] = useState("radar");
+  const [hoveredSkill, setHoveredSkill] = useState<string | null>(null);
   const score = Math.round(gap.match_score * 100);
+
+  const handleHoverSkill = useCallback((skill: string | null) => {
+    setHoveredSkill(skill);
+  }, []);
 
   const chartData = gap.gaps.map((g) => ({
     skill: g.skill,
@@ -168,11 +173,24 @@ function SkillGapView({ gap }: { gap: RoleGap }) {
                     formatter={(v) => `${Math.round(Number(v) * 100)}%`}
                     contentStyle={CHART_STYLE.contentStyle}
                   />
-                  <Bar dataKey="level" name="Your Level" radius={[0, 3, 3, 0]}>
+                  <Bar
+                    dataKey="level"
+                    name="Your Level"
+                    radius={[0, 3, 3, 0]}
+                    onMouseEnter={(_: unknown, index: number) => handleHoverSkill(chartData[index]?.skill ?? null)}
+                    onMouseLeave={() => handleHoverSkill(null)}
+                  >
                     {chartData.map((entry) => (
                       <Cell
                         key={entry.skill}
                         fill={GAP_COLORS[entry.severity]}
+                        opacity={
+                          hoveredSkill === null || hoveredSkill === entry.skill
+                            ? 1
+                            : 0.35
+                        }
+                        strokeWidth={hoveredSkill === entry.skill ? 2 : 0}
+                        stroke={hoveredSkill === entry.skill ? "#fff" : "none"}
                       />
                     ))}
                   </Bar>
@@ -183,7 +201,11 @@ function SkillGapView({ gap }: { gap: RoleGap }) {
         </CardContent>
       </Card>
 
-      <GapTable gaps={gap.gaps} />
+      <GapTable
+        gaps={gap.gaps}
+        hoveredSkill={hoveredSkill}
+        onHoverSkill={handleHoverSkill}
+      />
     </div>
   );
 }

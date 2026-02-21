@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 const SEVERITY_CLASSES: Record<string, string> = {
   none: "bg-green-100 text-green-800 hover:bg-green-100",
@@ -25,9 +26,15 @@ interface Gap {
   priority: string | number;
 }
 
+interface Props {
+  gaps: Gap[];
+  hoveredSkill?: string | null;
+  onHoverSkill?: (skill: string | null) => void;
+}
+
 import { motion } from "framer-motion";
 
-export default function GapTable({ gaps }: { gaps: Gap[] }) {
+export default function GapTable({ gaps, hoveredSkill, onHoverSkill }: Props) {
   return (
     <div className="border rounded-lg overflow-x-auto">
       <Table>
@@ -41,27 +48,39 @@ export default function GapTable({ gaps }: { gaps: Gap[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {gaps.map((gap, index) => (
-            <motion.tr
-              key={gap.skill}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
-            >
-              <TableCell className="font-medium">{gap.skill}</TableCell>
-              <TableCell>
-                <Badge variant="outline">{gap.required_level}</Badge>
-              </TableCell>
-              <TableCell>{gap.user_level_label}</TableCell>
-              <TableCell>
-                <Badge className={SEVERITY_CLASSES[gap.gap_severity] || ""}>
-                  {gap.gap_severity}
-                </Badge>
-              </TableCell>
-              <TableCell>{gap.priority}</TableCell>
-            </motion.tr>
-          ))}
+          {gaps.map((gap, index) => {
+            const isActive = hoveredSkill === gap.skill;
+            return (
+              <motion.tr
+                key={gap.skill}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className={cn(
+                  "border-b transition-colors data-[state=selected]:bg-muted cursor-default",
+                  isActive
+                    ? "bg-primary/10"
+                    : "hover:bg-muted/50",
+                )}
+                onMouseEnter={() => onHoverSkill?.(gap.skill)}
+                onMouseLeave={() => onHoverSkill?.(null)}
+              >
+                <TableCell className={cn("font-medium transition-colors", isActive && "text-primary font-bold")}>
+                  {gap.skill}
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">{gap.required_level}</Badge>
+                </TableCell>
+                <TableCell>{gap.user_level_label}</TableCell>
+                <TableCell>
+                  <Badge className={SEVERITY_CLASSES[gap.gap_severity] || ""}>
+                    {gap.gap_severity}
+                  </Badge>
+                </TableCell>
+                <TableCell>{gap.priority}</TableCell>
+              </motion.tr>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

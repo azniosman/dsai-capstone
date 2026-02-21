@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -54,6 +54,7 @@ interface Recommendation {
   title: string;
   category: string;
   match_score: number;
+  matched_skills: string[];
   missing_skills: string[];
 }
 
@@ -196,6 +197,7 @@ export default function Dashboard() {
   const [promptResponse, setPromptResponse] = useState<string | null>(null);
   const [engine, setEngine] = useState<string | null>(null);
   const [recs, setRecs] = useState<Recommendation[]>([]);
+  const [hoveredRecIdx, setHoveredRecIdx] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -309,42 +311,35 @@ export default function Dashboard() {
       (summary.skills_count > 0 ? 25 : 0)
     : 0;
 
-  // Generate radar data based on the top recommendation
-  const radarData = (() => {
+  // Deterministic level offset from skill string (avoids Math.random re-renders)
+  const deterministicOffset = (skill: string) =>
+    skill.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 2;
+
+  // Radar data for whichever role is currently hovered — deterministic, no Math.random
+  const radarData = useMemo(() => {
     if (!summary || recs.length === 0) return [];
-    const topRec = recs[0];
+    const rec = recs[hoveredRecIdx] ?? recs[0];
+    const shorten = (s: string) => (s.length > 14 ? s.slice(0, 14) + "…" : s);
 
-    // We mock the required skills based on the missing skills + some user skills
-    // Ideally this comes from a backend endpoint `gap_analysis` for a specific role
-    const data: Array<{
-      skill: string;
-      userLevel: number;
-      requiredLevel: number;
-    }> = [];
+    const missingPoints = rec.missing_skills.slice(0, 3).map((skill) => ({
+      skill: shorten(skill),
+      userLevel: 1 + deterministicOffset(skill),   // 1 or 2
+      requiredLevel: 4 + deterministicOffset(skill), // 4 or 5
+    }));
 
-    // Add up to 3 missing skills with 0-2 user level, 4-5 required
-    topRec.missing_skills.slice(0, 3).forEach((skill) => {
-      data.push({
-        skill: skill,
-        userLevel: Math.floor(Math.random() * 2) + 1, // 1 or 2
-        requiredLevel: Math.floor(Math.random() * 2) + 4, // 4 or 5
-      });
-    });
+    const matchedSource = rec.matched_skills?.length
+      ? rec.matched_skills
+      : summary.skills.filter((s) => !rec.missing_skills.includes(s));
 
-    // Add up to 3 possessed skills with 3-5 user level, 3-5 required
-    const presentSkills = summary.skills
-      .filter((s) => !topRec.missing_skills.includes(s))
-      .slice(0, 3);
-    presentSkills.forEach((skill) => {
-      data.push({
-        skill: skill,
-        userLevel: Math.floor(Math.random() * 2) + 3, // 3 - 4
-        requiredLevel: Math.floor(Math.random() * 2) + 3, // 3 - 4
-      });
-    });
+    const matchedPoints = matchedSource.slice(0, 3).map((skill) => ({
+      skill: shorten(skill),
+      userLevel: 3 + deterministicOffset(skill),    // 3 or 4
+      requiredLevel: 3 + deterministicOffset(skill), // 3 or 4
+    }));
 
-    return data;
-  })();
+    return [...missingPoints, ...matchedPoints];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary, recs, hoveredRecIdx]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -599,10 +594,17 @@ export default function Dashboard() {
                           : score >= 40
                             ? "warning"
                             : "secondary";
+                      const isActive = hoveredRecIdx === idx;
                       return (
                         <div
                           key={rec.role_id}
-                          className="flex items-center justify-between px-6 py-4.5 hover:bg-muted/30 transition-all duration-300 group"
+                          onMouseEnter={() => setHoveredRecIdx(idx)}
+                          className={cn(
+                            "flex items-center justify-between px-6 py-4.5 transition-all duration-200 group cursor-pointer border-l-[3px]",
+                            isActive
+                              ? "bg-primary/5 border-primary"
+                              : "border-transparent hover:bg-muted/30",
+                          )}
                         >
                           <div className="flex items-center gap-5 min-w-0 flex-1">
                             <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center shrink-0 border border-border/50 text-xs font-bold text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/20 transition-colors">
@@ -667,13 +669,16 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Skill Radar Chart */}
+          {/* Skill Radar Chart — updates on role hover */}
           {recs.length > 0 && radarData.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <SkillRadar data={radarData} roleName={recs[0].title} />
+              <SkillRadar
+                data={radarData}
+                roleName={(recs[hoveredRecIdx] ?? recs[0]).title}
+              />
             </motion.div>
           )}
         </div>

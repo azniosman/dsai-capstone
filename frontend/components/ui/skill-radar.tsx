@@ -17,6 +17,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Radar as RadarIcon, Sparkles } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface SkillData {
   skill: string;
@@ -85,9 +86,20 @@ export function SkillRadar({ data, roleName }: SkillRadarProps) {
           </div>
           Skill Match Analysis
         </CardTitle>
-        <CardDescription className="text-xs font-medium mt-1.5">
+        <CardDescription className="text-xs font-medium mt-1.5 flex items-center gap-1">
           Your profile vs{" "}
-          <span className="text-foreground font-bold">{roleName}</span>
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={roleName}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+              className="text-foreground font-bold ml-0.5"
+            >
+              {roleName}
+            </motion.span>
+          </AnimatePresence>
         </CardDescription>
       </CardHeader>
 
