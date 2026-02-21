@@ -15,7 +15,7 @@ class BedrockService:
         # Use configurable model ID from settings (defaults to Claude 3.5 Sonnet v2)
         self.model_id = getattr(
             settings, 'bedrock_model_id',
-            "anthropic.claude-3-5-sonnet-20241022-v2:0"
+            "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
         )
 
     def invoke_model(self, system_prompt: str, messages: list, temperature: float = 0.7) -> str:

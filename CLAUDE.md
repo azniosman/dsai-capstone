@@ -95,7 +95,7 @@ Backend settings are in `backend/app/config.py` using `pydantic_settings.BaseSet
 - `SENTENCE_TRANSFORMER_MODEL` — ML model name (default `all-MiniLM-L6-v2`)
 - `NEXT_PUBLIC_API_URL` — frontend env var pointing to backend (default `http://localhost:8000`)
 - `AWS_REGION` — AWS region (default `ap-southeast-1`)
-- `BEDROCK_MODEL_ID` — AWS Bedrock model (default `anthropic.claude-3-5-sonnet-20241022-v2:0`)
+- `BEDROCK_MODEL_ID` — AWS Bedrock model (default `us.anthropic.claude-3-5-sonnet-20241022-v2:0` — must use cross-region inference profile ID, not direct model ID)
 - `SAGEMAKER_EMBEDDING_ENDPOINT` — optional SageMaker embeddings endpoint name
 - `OPENSEARCH_HOST`, `OPENSEARCH_USERNAME`, `OPENSEARCH_PASSWORD` — optional OpenSearch for enterprise deployment
 
