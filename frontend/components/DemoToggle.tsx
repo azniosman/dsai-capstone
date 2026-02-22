@@ -50,7 +50,7 @@ export function DemoToggle() {
   };
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 flex flex-col-reverse items-start gap-2">
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col-reverse items-end gap-2">
       {/* Trigger Button */}
       <motion.button
         whileHover={{ scale: 1.05 }}
@@ -76,7 +76,7 @@ export function DemoToggle() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="bg-card/90 backdrop-blur-xl border border-border/50 rounded-2xl p-4 shadow-xl w-64 origin-bottom-left"
+            className="bg-card/90 backdrop-blur-xl border border-border/50 rounded-2xl p-4 shadow-xl w-64 origin-bottom-right"
           >
             <div className="mb-3">
               <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
