@@ -136,6 +136,11 @@ auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resu
 - `frontend/contexts/tenant-context.tsx` — Multi-tenant theming context; injects CSS custom properties per tenant
 - `frontend/middleware.ts` — Security headers (CSP, X-Frame-Options, Permissions-Policy)
 
+**Extended component props (non-obvious):**
+- `SkillRadar` (`components/ui/skill-radar.tsx`) — accepts optional `metrics?: SkillRadarMetrics` (exported type). When provided, renders a KPI summary row, animated score breakdown bars (showing the 0.55/0.25/0.20 formula), skill tally, and AI rationale below the radar chart.
+- `GapTable` (`components/gap-table.tsx`) — accepts `hoveredSkill?: string | null` and `onHoverSkill?: (skill: string | null) => void` for bidirectional hover sync between the table and Recharts bar charts (pass `onMouseEnter`/`onMouseLeave` on `<Bar>` using index to look up skill).
+- `AIResponse` (`components/ui/ai-response.tsx`) — accepts `streaming?: boolean`, `content?: string`, `model?: string`. Shows bot avatar + hover actions (copy, regenerate, thumbs). Use `streaming={false}` for static display.
+
 ### Data
 
 - `data/seed/` — `skills_taxonomy.json` (~150+ skills, categories: programming, cloud, data, security, etc.), `job_roles.json` (SGD salary benchmarks), `sctp_courses.json` (SkillsFuture SCTP courses with subsidy fields)
@@ -195,12 +200,26 @@ Critical non-obvious issues discovered in production:
 
 - **`extract_skills()` fallback**: When Gemini quota is exhausted or key is absent, `resume_parser.extract_skills()` falls back to regex keyword-matching against the skill taxonomy (150+ skills). `POST /api/jd-match` will still work without a Gemini key.
 
+- **`POST /api/chat` returns SSE, not JSON**: The response is `text/event-stream`. axios delivers the full body as a raw string in `res.data`. Reading `res.data.reply` always returns `undefined`. Correct parsing pattern:
+  ```typescript
+  if (typeof res.data === "string") {
+    const lines = res.data.split("\n");
+    const engineLine = lines.find((l) => l.startsWith("[ENGINE:"));
+    const reply = lines.filter((l) => !l.startsWith("[ENGINE:")).join("\n").trim();
+  }
+  ```
+  The first line is optionally `[ENGINE: Google Gemini (gemini-2.0-flash)]` or `[ENGINE: AWS Bedrock (Claude 3.5 Sonnet)]`.
+
+- **Bedrock requires console opt-in**: AWS accounts must explicitly enable model access in the Bedrock console (Bedrock → Model access → request Anthropic Claude 3.5 Sonnet v2) before any API call works. IAM permissions alone are not sufficient. A missing opt-in returns `ValidationException: Operation not allowed`.
+
+- **`trailingSlash: true` breaks S3 routing**: Never set `trailingSlash: true` in `next.config.ts` when `NEXT_OUTPUT=export`. It changes output from flat `login.html` to nested `login/index.html`. The S3 sync pass-3 copies flat HTML to extension-less keys (e.g. `login.html` → `login`) so CloudFront can serve `/login` — this breaks if files are nested.
+
 ## Key Design Decisions
 
 - **Hybrid scoring**: `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
 - **Skill levels**: 0 (missing), 0.5 (partial), 1.0 (strong)
 - **FAISS in-memory** for vector similarity search (rebuilt on startup)
-- **LLM fallback**: Gemini API → rule-based responses (chat/interview); `bedrock_service` provides an alternate path via AWS Bedrock; `extract_skills()` falls back to taxonomy keyword scan when Gemini fails
+- **LLM fallback chain**: Gemini API (primary) → AWS Bedrock Claude 3.5 Sonnet (fallback) → HTTP 503 (no local/rule-based fallback — it was intentionally removed). `extract_skills()` independently falls back to taxonomy keyword scan when Gemini fails
 - **Auth is optional**: core features (profile, recommendations, skill gap) work without login
 - **Multi-tenancy**: all data models include `tenant_id`; a `Global` tenant is auto-created on startup
 - **Schema sync**: `_sync_schema()` in `main.py` auto-adds new model columns to existing DB tables (no manual migration needed for column additions)
