@@ -206,12 +206,26 @@ export default function ProfileWizard() {
       if (isUpdate && profileId) {
         await api.patch(`/api/profile/${profileId}`, payload);
         toast.success("Profile updated!");
+        router.push("/recommendations");
       } else {
         const res = await api.post("/api/profile", payload);
-        localStorage.setItem("profileId", res.data.id);
-        toast.success("Profile created!");
+        const newProfileId = res.data.id;
+        localStorage.setItem("profileId", String(newProfileId));
+
+        const isAuthenticated = !!localStorage.getItem("token");
+        if (isAuthenticated) {
+          toast.success("Profile created!");
+          router.push("/recommendations");
+        } else {
+          // Visitor hasn't signed up yet — send them to register, which will
+          // link this profile to their new account. After login they land on
+          // /recommendations.
+          toast.success("Profile saved! Create your free account to view your recommendations.");
+          router.push(
+            `/login?tab=register&profileId=${newProfileId}&redirect=/recommendations`
+          );
+        }
       }
-      router.push("/recommendations");
     } catch (err: unknown) {
       console.error(err);
       const msg = extractApiError(err, "Failed to save profile.");

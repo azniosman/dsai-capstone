@@ -124,7 +124,8 @@ function LoginForm() {
         /* No linked profile */
       }
       toast.success(`Welcome back, ${me.data.name}!`);
-      router.push("/dashboard");
+      const redirect = searchParams.get("redirect");
+      router.push(redirect || "/dashboard");
     } catch (err: unknown) {
       setError(extractApiError(err, "Login failed"));
     } finally {
@@ -320,7 +321,9 @@ function LoginForm() {
             <p className="text-sm text-muted-foreground mt-1">
               {tab === "login"
                 ? "Welcome back. Enter your credentials to continue."
-                : "Start your career acceleration journey."}
+                : searchParams.get("profileId")
+                  ? "Your profile is ready. Create a free account to unlock your personalised recommendations."
+                  : "Start your career acceleration journey."}
             </p>
           </header>
 
