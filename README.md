@@ -6,7 +6,7 @@ SkillBridge is a serverless, full-stack AI platform that helps SCTP learners and
 
 ![Overview](misc/images/aioverview.png)
 
-> **Live demo:** See [Capstone-Demo.md](Capstone-Demo.md) · **Enterprise roadmap:** See [Enterprise-Technical_Roadmap.md](Enterprise-Technical_Roadmap.md)
+**Enterprise Roadmap:** See [Enterprise-Technical_Roadmap.md](Enterprise-Technical_Roadmap.md)
 
 ---
 
