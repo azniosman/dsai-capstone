@@ -1,6 +1,6 @@
 # SkillBridge
 
-**Production-Grade AI Career Intelligence Platform for Singapore's SCTP Learners & Career Switchers**
+**AI-Powered Career Intelligence Platform for Singapore's SCTP Learners & Career Switchers**
 
 SkillBridge is a serverless, full-stack AI platform that helps SCTP learners and mid-career professionals navigate Singapore's evolving tech job market. It combines a Retrieval-Augmented Generation (RAG) pipeline, hybrid skill matching, and an interactive AI career coach — all grounded in real SkillsFuture course data, SSG salary benchmarks, and a live market simulator.
 
