@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -15,8 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import SkeletonCard from "@/components/skeleton-card";
+import SkeletonCard from "@/components/ui/skeleton-card";
 import api from "@/lib/api-client";
+import { useModalStore } from "@/store/modalStore";
 
 interface Course {
   id: number;
@@ -34,7 +36,29 @@ interface Course {
   nett_payable: number;
 }
 
+/** Normalise backend camelCase fields (NestJS/MikroORM) to the snake_case shape this page uses. */
+function normalizeCourse(raw: any): Course {
+  const fee = raw.course_fee ?? raw.courseFee ?? 0;
+  const subsidyPct = raw.subsidy_percent ?? raw.subsidyPercent ?? 70;
+  return {
+    id: raw.id,
+    title: raw.title,
+    provider: raw.provider,
+    duration_weeks: raw.duration_weeks ?? raw.durationWeeks ?? 0,
+    level: raw.level ?? "intermediate",
+    mces_eligible: raw.mces_eligible ?? raw.mcesEligible ?? false,
+    certification: raw.certification,
+    skills_taught: raw.skills_taught ?? raw.skillsTaught ?? [],
+    course_fee: fee,
+    subsidy_percent: subsidyPct,
+    subsidy_amount: raw.subsidy_amount ?? Math.round((fee * subsidyPct) / 100),
+    sfc_applicable: raw.sfc_applicable ?? raw.skillsfutureCreditAmount ?? 0,
+    nett_payable: raw.nett_payable ?? raw.nettFeeAfterSubsidy ?? 0,
+  };
+}
+
 export default function CourseBrowser() {
+  const { openModal } = useModalStore();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,13 +82,16 @@ export default function CourseBrowser() {
           params,
           signal: controller.signal,
         });
-        setCourses(res.data.courses);
-        if (providers.length === 0 && res.data.courses.length > 0) {
-          const uniqueProviders = [
-            ...new Set(res.data.courses.map((c: Course) => c.provider)),
-          ].sort() as string[];
-          setProviders(uniqueProviders);
-        }
+        // Backend returns SCTPCourse[] directly with camelCase fields — normalize to snake_case
+        const rawList = Array.isArray(res.data) ? res.data : (res.data?.courses ?? []);
+        const courseList: Course[] = rawList.map(normalizeCourse);
+        setCourses(courseList);
+        setProviders((prev) => {
+          if (prev.length === 0 && courseList.length > 0) {
+            return [...new Set(courseList.map((c: Course) => c.provider))].sort() as string[];
+          }
+          return prev;
+        });
       } catch (err) {
         if (!controller.signal.aborted) {
           console.error(err);
@@ -76,7 +103,7 @@ export default function CourseBrowser() {
     };
     fetchCourses();
     return () => controller.abort();
-  }, [provider, level, mcesOnly, providers.length]);
+  }, [provider, level, mcesOnly]);
 
   const filtered = skillSearch
     ? courses.filter((c) =>
@@ -103,7 +130,7 @@ export default function CourseBrowser() {
       <Card variant="data">
         <CardContent className="p-4">
           <div className="flex gap-4 flex-wrap items-end">
-            <Select value={provider} onValueChange={setProvider}>
+            <Select value={provider} onValueChange={(v) => setProvider(v === "all" ? "" : v)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Providers" />
               </SelectTrigger>
@@ -117,7 +144,7 @@ export default function CourseBrowser() {
               </SelectContent>
             </Select>
 
-            <Select value={level} onValueChange={setLevel}>
+            <Select value={level} onValueChange={(v) => setLevel(v === "all" ? "" : v)}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="All Levels" />
               </SelectTrigger>
@@ -146,6 +173,16 @@ export default function CourseBrowser() {
               onChange={(e) => setSkillSearch(e.target.value)}
               className="w-[200px]"
             />
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openModal("skillsFutureCourses")}
+              className="ml-auto"
+            >
+              <Search className="h-3.5 w-3.5 mr-1.5" />
+              Search SkillsFuture
+            </Button>
           </div>
         </CardContent>
       </Card>
