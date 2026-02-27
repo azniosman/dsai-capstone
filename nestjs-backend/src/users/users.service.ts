@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import * as bcrypt from 'bcrypt';
@@ -22,13 +26,21 @@ export class UsersService {
     return this.userRepository.findOne({ id }, { populate: ['tenant'] });
   }
 
-  async createUser(payload: { email: string; hashedPassword: string; name: string; tenantName: string; role?: any }): Promise<User> {
+  async createUser(payload: {
+    email: string;
+    hashedPassword: string;
+    name: string;
+    tenantName: string;
+    role?: any;
+  }): Promise<User> {
     const existing = await this.findByEmail(payload.email);
     if (existing) {
       throw new BadRequestException('User with that email already exists');
     }
 
-    let tenant = await this.tenantRepository.findOne({ name: payload.tenantName });
+    let tenant = await this.tenantRepository.findOne({
+      name: payload.tenantName,
+    });
     if (!tenant) {
       tenant = this.tenantRepository.create({ name: payload.tenantName });
       await this.tenantRepository.getEntityManager().persistAndFlush(tenant);
@@ -46,8 +58,14 @@ export class UsersService {
     return user;
   }
 
-  async updateUser(id: number, payload: { name?: string; email?: string }): Promise<User> {
-    const user = await this.userRepository.findOne({ id }, { populate: ['tenant'] });
+  async updateUser(
+    id: number,
+    payload: { name?: string; email?: string },
+  ): Promise<User> {
+    const user = await this.userRepository.findOne(
+      { id },
+      { populate: ['tenant'] },
+    );
     if (!user) throw new NotFoundException('User not found');
 
     if (payload.name !== undefined) user.name = payload.name;
@@ -63,7 +81,11 @@ export class UsersService {
     return user;
   }
 
-  async changePassword(id: number, currentPassword: string, newPassword: string): Promise<void> {
+  async changePassword(
+    id: number,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
     const user = await this.userRepository.findOne({ id });
     if (!user) throw new NotFoundException('User not found');
 

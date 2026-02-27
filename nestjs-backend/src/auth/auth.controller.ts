@@ -1,4 +1,16 @@
-import { Controller, Post, Body, UseGuards, Request, Get, HttpCode, HttpStatus, Patch, Delete, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Patch,
+  Delete,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -23,7 +35,9 @@ export class AuthController {
 
   @Post('register')
   async register(@Body() registerDto: RegisterDto): Promise<any> {
-    const hashedPassword = await this.authService.hashPassword(registerDto.password);
+    const hashedPassword = await this.authService.hashPassword(
+      registerDto.password,
+    );
     const user = await this.usersService.createUser({
       email: registerDto.email,
       hashedPassword,
@@ -31,7 +45,7 @@ export class AuthController {
       tenantName: registerDto.tenantName,
       role: registerDto.role,
     });
-    
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { hashedPassword: _, ...result } = user;
     return result;
@@ -52,7 +66,10 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('me')
-  async updateMe(@Request() req: any, @Body() body: { name?: string; email?: string }) {
+  async updateMe(
+    @Request() req: any,
+    @Body() body: { name?: string; email?: string },
+  ) {
     const user = await this.usersService.updateUser(req.user.id, body);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { hashedPassword: _, ...result } = user as any;
@@ -66,7 +83,11 @@ export class AuthController {
     @Request() req: any,
     @Body() body: { current_password: string; new_password: string },
   ) {
-    await this.usersService.changePassword(req.user.id, body.current_password, body.new_password);
+    await this.usersService.changePassword(
+      req.user.id,
+      body.current_password,
+      body.new_password,
+    );
     return { message: 'Password changed successfully' };
   }
 
@@ -96,7 +117,8 @@ export class AuthController {
     let payload: any;
     try {
       payload = this.jwtService.verify(token, {
-        secret: this.configService.get<string>('JWT_SECRET') ?? 'default_secret',
+        secret:
+          this.configService.get<string>('JWT_SECRET') ?? 'default_secret',
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');

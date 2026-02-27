@@ -12,9 +12,10 @@ export interface Response<T> {
 }
 
 @Injectable()
-export class TransformInterceptor<T>
-  implements NestInterceptor<T, Response<T>>
-{
+export class TransformInterceptor<T> implements NestInterceptor<
+  T,
+  Response<T>
+> {
   intercept(
     context: ExecutionContext,
     next: CallHandler,
@@ -25,7 +26,7 @@ export class TransformInterceptor<T>
     return next.handle().pipe(
       map((originalData) => {
         // If data is already wrapped in a specific format or stream, return as is
-        // FastAPI sometimes returns raw arrays or models. 
+        // FastAPI sometimes returns raw arrays or models.
         // We'll return just the original data to keep frontend compatibility for now,
         // but can wrap in standard { data } object if needed globally.
         return originalData;

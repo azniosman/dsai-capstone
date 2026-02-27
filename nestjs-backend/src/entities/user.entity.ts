@@ -1,4 +1,12 @@
-import { Entity, PrimaryKey, Property, Enum, ManyToOne, Rel, OptionalProps } from '@mikro-orm/core';
+import {
+  Entity,
+  PrimaryKey,
+  Property,
+  Enum,
+  ManyToOne,
+  Rel,
+  OptionalProps,
+} from '@mikro-orm/core';
 import { Role } from '@app/common/enums/role.enum';
 import { Tenant } from './tenant.entity';
 

@@ -39,14 +39,25 @@ describe('ProfileService', () => {
       // Arrange
       const inputUserId = 1;
       const inputTenantId = 1;
-      const expectedProfile = { id: 1, name: 'Test User', education: 'BSc', yearsExperience: 2 };
+      const expectedProfile = {
+        id: 1,
+        name: 'Test User',
+        education: 'BSc',
+        yearsExperience: 2,
+      };
       mockProfileRepository.findOne.mockResolvedValue(expectedProfile);
 
       // Act
-      const actualProfile = await service.getMyProfile(inputUserId, inputTenantId);
+      const actualProfile = await service.getMyProfile(
+        inputUserId,
+        inputTenantId,
+      );
 
       // Assert
-      expect(mockProfileRepository.findOne).toHaveBeenCalledWith({ user: inputUserId, tenant: inputTenantId });
+      expect(mockProfileRepository.findOne).toHaveBeenCalledWith({
+        user: inputUserId,
+        tenant: inputTenantId,
+      });
       expect(actualProfile).toEqual(expectedProfile);
     });
 
@@ -57,9 +68,9 @@ describe('ProfileService', () => {
       mockProfileRepository.findOne.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.getMyProfile(inputUserId, inputTenantId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.getMyProfile(inputUserId, inputTenantId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

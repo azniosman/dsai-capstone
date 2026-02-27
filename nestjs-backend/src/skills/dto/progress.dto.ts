@@ -1,4 +1,11 @@
-import { IsString, IsNumber, Min, Max, IsInt, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  Min,
+  Max,
+  IsInt,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateProgressDto {
   @IsOptional()

@@ -1,4 +1,10 @@
-import { IsString, IsBoolean, IsInt, IsOptional, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsArray,
+} from 'class-validator';
 
 export class CourseQueryDto {
   @IsOptional() @IsString() skill?: string;

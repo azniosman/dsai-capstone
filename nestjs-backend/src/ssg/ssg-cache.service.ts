@@ -60,7 +60,10 @@ export class SsgCacheService implements OnModuleInit {
     return entry.value as unknown as T;
   }
 
-  async set<T extends Record<string, unknown>>(key: string, value: T): Promise<void> {
+  async set<T extends Record<string, unknown>>(
+    key: string,
+    value: T,
+  ): Promise<void> {
     const expiresAt = new Date(Date.now() + this.ttlSeconds * 1000);
 
     const existing = await this.cacheRepo.findOne({ cacheKey: key });
@@ -90,7 +93,9 @@ export class SsgCacheService implements OnModuleInit {
       const fork = this.em.fork();
       fork.remove(entries);
       await fork.flush();
-      this.logger.log(`Invalidated ${entries.length} cache entries for prefix "${keyPrefix}"`);
+      this.logger.log(
+        `Invalidated ${entries.length} cache entries for prefix "${keyPrefix}"`,
+      );
     }
   }
 }

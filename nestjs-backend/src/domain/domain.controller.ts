@@ -1,6 +1,18 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { DomainService } from './domain.service';
-import { CourseQueryDto, SubsidyRequestDto, PathwayRequestDto } from './dto/domain.dto';
+import {
+  CourseQueryDto,
+  SubsidyRequestDto,
+  PathwayRequestDto,
+} from './dto/domain.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
@@ -37,6 +49,9 @@ export class DomainController {
   @UseGuards(JwtAuthGuard)
   @Get('dashboard/summary')
   getDashboardSummary(@Request() req: any) {
-    return this.domainService.getDashboardSummary(req.user.id, req.user.tenant.id);
+    return this.domainService.getDashboardSummary(
+      req.user.id,
+      req.user.tenant.id,
+    );
   }
 }

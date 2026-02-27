@@ -46,17 +46,27 @@ describe('AuthService', () => {
         hashedPassword: 'hashed_password',
         isActive: true,
       };
-      
+
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       // Act
-      const actualResult = await authService.validateUser(inputEmail, inputPass);
+      const actualResult = await authService.validateUser(
+        inputEmail,
+        inputPass,
+      );
 
       // Assert
       expect(mockUsersService.findByEmail).toHaveBeenCalledWith(inputEmail);
-      expect(bcrypt.compare).toHaveBeenCalledWith(inputPass, mockUser.hashedPassword);
-      expect(actualResult).toEqual({ id: 1, email: inputEmail, isActive: true });
+      expect(bcrypt.compare).toHaveBeenCalledWith(
+        inputPass,
+        mockUser.hashedPassword,
+      );
+      expect(actualResult).toEqual({
+        id: 1,
+        email: inputEmail,
+        isActive: true,
+      });
     });
 
     it('should throw UnauthorizedException if user account is deactivated', async () => {
@@ -69,14 +79,14 @@ describe('AuthService', () => {
         hashedPassword: 'hashed_password',
         isActive: false, // Deactivated
       };
-      
+
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       // Act & Assert
-      await expect(authService.validateUser(inputEmail, inputPass)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        authService.validateUser(inputEmail, inputPass),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should return null if password does not match', async () => {
@@ -89,12 +99,15 @@ describe('AuthService', () => {
         hashedPassword: 'hashed_password',
         isActive: true,
       };
-      
+
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       // Act
-      const actualResult = await authService.validateUser(inputEmail, inputPass);
+      const actualResult = await authService.validateUser(
+        inputEmail,
+        inputPass,
+      );
 
       // Assert
       expect(actualResult).toBeNull();

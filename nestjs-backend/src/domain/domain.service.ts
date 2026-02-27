@@ -29,7 +29,9 @@ export class DomainService {
     profile: UserProfile,
     role: JobRole,
   ): { score: number; missing: string[] } {
-    const profileSkills = new Set((profile.skills ?? []).map((s) => s.toLowerCase()));
+    const profileSkills = new Set(
+      (profile.skills ?? []).map((s) => s.toLowerCase()),
+    );
     let matched = 0;
     const missing: string[] = [];
 
@@ -42,8 +44,10 @@ export class DomainService {
     }
 
     const contentScore = matched / Math.max(role.requiredSkills.length, 1);
-    const ruleScore = (profile.yearsExperience ?? 0) >= role.minExperienceYears ? 1.0 : 0.5;
-    const careerBonus = profile.isCareerSwitcher && role.careerSwitcherFriendly ? 1.0 : 0.0;
+    const ruleScore =
+      (profile.yearsExperience ?? 0) >= role.minExperienceYears ? 1.0 : 0.5;
+    const careerBonus =
+      profile.isCareerSwitcher && role.careerSwitcherFriendly ? 1.0 : 0.0;
     const score = 0.55 * contentScore + 0.25 * ruleScore + 0.2 * careerBonus;
 
     return { score, missing };
@@ -78,7 +82,8 @@ export class DomainService {
     const where: any = { tenant: tenantId };
     if (query.provider) where.provider = query.provider;
     if (query.level) where.level = query.level;
-    if (query.mcesEligible !== undefined) where.mcesEligible = query.mcesEligible;
+    if (query.mcesEligible !== undefined)
+      where.mcesEligible = query.mcesEligible;
 
     const courses = await this.courseRepository.find(where);
     let filtered = courses;
@@ -86,7 +91,9 @@ export class DomainService {
     if (query.skill) {
       const s = query.skill.toLowerCase();
       filtered = courses.filter((c) =>
-        (c.skillsTaught || []).some((taught) => taught.toLowerCase().includes(s)),
+        (c.skillsTaught || []).some((taught) =>
+          taught.toLowerCase().includes(s),
+        ),
       );
     }
 
@@ -176,7 +183,9 @@ export class DomainService {
       .map((e) => e[0])
       .slice(0, 10);
 
-    const sortedSectors = [...insights].sort((a, b) => (b.yoyGrowthPct || 0) - (a.yoyGrowthPct || 0));
+    const sortedSectors = [...insights].sort(
+      (a, b) => (b.yoyGrowthPct || 0) - (a.yoyGrowthPct || 0),
+    );
     const highestDemand = sortedSectors.slice(0, 3).map((s) => s.roleCategory);
 
     return {

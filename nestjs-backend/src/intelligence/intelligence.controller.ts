@@ -1,6 +1,19 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { IntelligenceService } from './intelligence.service';
-import { ChatRequestDto, RecommendRequestDto, JdMatchDto, RewriteBulletDto } from './dto/intelligence.dto';
+import {
+  ChatRequestDto,
+  RecommendRequestDto,
+  JdMatchDto,
+  RewriteBulletDto,
+} from './dto/intelligence.dto';
 import { InterviewRequestDto } from './dto/interview.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
@@ -23,9 +36,15 @@ export class IntelligenceController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Post('recommend')
-  async recommendRoles(@Request() req: any, @Body() payload: RecommendRequestDto) {
+  async recommendRoles(
+    @Request() req: any,
+    @Body() payload: RecommendRequestDto,
+  ) {
     const tenantId = req.user ? req.user.tenant.id : 1;
-    const recommendations = await this.intelligenceService.getRecommendations(payload, tenantId);
+    const recommendations = await this.intelligenceService.getRecommendations(
+      payload,
+      tenantId,
+    );
     return {
       profile_id: payload.profile_id ?? payload.profileId,
       recommendations,
@@ -34,9 +53,15 @@ export class IntelligenceController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get('skill-gap/:profileId')
-  async getSkillGap(@Request() req: any, @Param('profileId') profileId: string) {
+  async getSkillGap(
+    @Request() req: any,
+    @Param('profileId') profileId: string,
+  ) {
     const tenantId = req.user ? req.user.tenant.id : 1;
-    const gaps = await this.intelligenceService.getSkillGap(+profileId, tenantId);
+    const gaps = await this.intelligenceService.getSkillGap(
+      +profileId,
+      tenantId,
+    );
     return {
       profile_id: +profileId,
       gaps,
@@ -58,14 +83,20 @@ export class IntelligenceController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get('peer-comparison/:profileId')
-  async getPeerComparison(@Request() req: any, @Param('profileId') profileId: string) {
+  async getPeerComparison(
+    @Request() req: any,
+    @Param('profileId') profileId: string,
+  ) {
     const tenantId = req.user ? req.user.tenant.id : 1;
     return this.intelligenceService.getPeerComparison(+profileId, tenantId);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get('project-suggestions/:profileId')
-  async getProjectSuggestions(@Request() req: any, @Param('profileId') profileId: string) {
+  async getProjectSuggestions(
+    @Request() req: any,
+    @Param('profileId') profileId: string,
+  ) {
     const tenantId = req.user ? req.user.tenant.id : 1;
     return this.intelligenceService.getProjectSuggestions(+profileId, tenantId);
   }
@@ -85,6 +116,9 @@ export class IntelligenceController {
   @UseGuards(OptionalJwtAuthGuard)
   @Post('resume-rewriter')
   async rewriteBullet(@Request() req: any, @Body() payload: RewriteBulletDto) {
-    return this.intelligenceService.rewriteBullet(payload.target_role, payload.bullet_point);
+    return this.intelligenceService.rewriteBullet(
+      payload.target_role,
+      payload.bullet_point,
+    );
   }
 }

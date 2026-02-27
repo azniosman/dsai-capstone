@@ -1,4 +1,10 @@
-import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class InterviewRequestDto {
   @IsOptional()

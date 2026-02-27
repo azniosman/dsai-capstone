@@ -97,9 +97,7 @@ export class SsgClientService implements OnModuleInit {
    */
   async get<T>(path: string, query?: Record<string, string>): Promise<T> {
     const token = await this.getToken();
-    const qs = query
-      ? '?' + new URLSearchParams(query).toString()
-      : '';
+    const qs = query ? '?' + new URLSearchParams(query).toString() : '';
     const url = `${this.baseUrl}${path}${qs}`;
 
     try {

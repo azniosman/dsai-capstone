@@ -31,7 +31,9 @@ export class SsgService {
 
   // ─── Courses ──────────────────────────────────────────────────
 
-  async searchCourses(query: CourseSearchQueryDto): Promise<PaginatedSsgCoursesResponse> {
+  async searchCourses(
+    query: CourseSearchQueryDto,
+  ): Promise<PaginatedSsgCoursesResponse> {
     const cacheKey = `courses:${query.keyword ?? ''}:${query.skill ?? ''}:${query.limit ?? 20}:${query.offset ?? 0}`;
 
     // 1. Try cache
@@ -47,10 +49,15 @@ export class SsgService {
         const raw = await this.client.get<any>('/courses/courseRuns', {
           ...(query.keyword ? { keyword: query.keyword } : {}),
           pageSize: String(query.limit ?? 20),
-          pageIndex: String(Math.floor((query.offset ?? 0) / (query.limit ?? 20)) + 1),
+          pageIndex: String(
+            Math.floor((query.offset ?? 0) / (query.limit ?? 20)) + 1,
+          ),
         });
 
-        const courses = this.mapSsgCourseRuns(raw?.data ?? raw?.courseRuns ?? [], 'live');
+        const courses = this.mapSsgCourseRuns(
+          raw?.data ?? raw?.courseRuns ?? [],
+          'live',
+        );
         const result: PaginatedSsgCoursesResponse = {
           data: courses,
           total: raw?.total ?? courses.length,
@@ -60,13 +67,15 @@ export class SsgService {
         };
 
         // Store in cache (fire-and-forget)
-        this.cache.set(cacheKey, result as unknown as Record<string, unknown>).catch((e) =>
-          this.logger.warn(`Cache write failed: ${e.message}`),
-        );
+        this.cache
+          .set(cacheKey, result as unknown as Record<string, unknown>)
+          .catch((e) => this.logger.warn(`Cache write failed: ${e.message}`));
 
         return result;
       } catch (err: any) {
-        this.logger.warn(`SSG API error, falling back to seeded data: ${err.message}`);
+        this.logger.warn(
+          `SSG API error, falling back to seeded data: ${err.message}`,
+        );
       }
     }
 
@@ -74,7 +83,9 @@ export class SsgService {
     return this.searchSeeded(query);
   }
 
-  async getCourseByReference(referenceNumber: string): Promise<SsgCourse | null> {
+  async getCourseByReference(
+    referenceNumber: string,
+  ): Promise<SsgCourse | null> {
     const cacheKey = `course:${referenceNumber}`;
 
     const cached = await this.cache.get<SsgCourse>(cacheKey);
@@ -87,10 +98,14 @@ export class SsgService {
         );
         const course = this.mapSingleCourseRun(raw, 'live');
 
-        this.cache.set(cacheKey, course as unknown as Record<string, unknown>).catch(() => {});
+        this.cache
+          .set(cacheKey, course as unknown as Record<string, unknown>)
+          .catch(() => {});
         return course;
       } catch (err: any) {
-        this.logger.warn(`SSG API error for course ${referenceNumber}: ${err.message}`);
+        this.logger.warn(
+          `SSG API error for course ${referenceNumber}: ${err.message}`,
+        );
       }
     }
 
@@ -123,7 +138,9 @@ export class SsgService {
           tsc: r.technicalSkillsAndCompetencies ?? r.tsc,
         }));
 
-        this.cache.set(cacheKey, roles as unknown as Record<string, unknown>).catch(() => {});
+        this.cache
+          .set(cacheKey, roles as unknown as Record<string, unknown>)
+          .catch(() => {});
         return roles;
       } catch (err: any) {
         this.logger.warn(`SSG job roles API error: ${err.message}`);
@@ -139,7 +156,7 @@ export class SsgService {
     skills: string[],
     targetRole?: string,
   ): Promise<SsgRecommendedCourse[]> {
-    const keyword = targetRole ?? (skills[0] ?? '');
+    const keyword = targetRole ?? skills[0] ?? '';
     const result = await this.searchCourses({ keyword, limit: 50, offset: 0 });
 
     // Score each course by skill overlap
@@ -153,7 +170,9 @@ export class SsgService {
           .join(' ')
           .toLowerCase();
 
-        const matched = skills.filter((s) => courseTags.includes(s.toLowerCase()));
+        const matched = skills.filter((s) =>
+          courseTags.includes(s.toLowerCase()),
+        );
         const relevanceScore = matched.length / Math.max(skills.length, 1);
 
         return { ...course, matchedSkills: matched, relevanceScore };
@@ -165,17 +184,26 @@ export class SsgService {
 
   // ─── Seeded fallback helpers ──────────────────────────────────
 
-  private async searchSeeded(query: CourseSearchQueryDto): Promise<PaginatedSsgCoursesResponse> {
+  private async searchSeeded(
+    query: CourseSearchQueryDto,
+  ): Promise<PaginatedSsgCoursesResponse> {
     const all = await this.courseRepo.findAll();
 
     const keyword = (query.keyword ?? '').toLowerCase();
     const skill = (query.skill ?? '').toLowerCase();
 
     const filtered = all.filter((c) => {
-      if (keyword && !c.title.toLowerCase().includes(keyword) && !c.provider.toLowerCase().includes(keyword)) {
+      if (
+        keyword &&
+        !c.title.toLowerCase().includes(keyword) &&
+        !c.provider.toLowerCase().includes(keyword)
+      ) {
         return false;
       }
-      if (skill && !c.skillsTaught.some((s) => s.toLowerCase().includes(skill))) {
+      if (
+        skill &&
+        !c.skillsTaught.some((s) => s.toLowerCase().includes(skill))
+      ) {
         return false;
       }
       return true;
@@ -196,7 +224,10 @@ export class SsgService {
 
   // ─── Data mappers ─────────────────────────────────────────────
 
-  private mapSsgCourseRuns(runs: any[], source: 'live' | 'cached'): SsgCourse[] {
+  private mapSsgCourseRuns(
+    runs: any[],
+    source: 'live' | 'cached',
+  ): SsgCourse[] {
     return runs.map((r) => this.mapSingleCourseRun(r, source));
   }
 
@@ -219,8 +250,7 @@ export class SsgService {
       totalCostOfTrainingPerTrainee:
         run?.courseFee?.totalCostOfTrainingPerTrainee ??
         r?.totalCostOfTrainingPerTrainee,
-      subsidisedFee:
-        run?.courseFee?.subsidisedFeeAmount ?? r?.subsidisedFee,
+      subsidisedFee: run?.courseFee?.subsidisedFeeAmount ?? r?.subsidisedFee,
       skillsFrameworkSkillCodes:
         course?.skillsFramework?.map((s: any) => s.skillCode ?? s) ?? [],
       objectives: course?.objective ?? r?.objectives,
@@ -250,7 +280,9 @@ export class SsgService {
       skillsFrameworkSkillCodes: c.skillsTaught,
       objectives: undefined,
       modeOfTraining: undefined,
-      totalTrainingDurationHour: c.durationWeeks ? c.durationWeeks * 40 : undefined,
+      totalTrainingDurationHour: c.durationWeeks
+        ? c.durationWeeks * 40
+        : undefined,
       url: c.url,
       source,
     };

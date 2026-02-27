@@ -1,11 +1,27 @@
-import { Entity, PrimaryKey, Property, ManyToOne, OneToMany, Collection, Rel, OptionalProps } from '@mikro-orm/core';
+import {
+  Entity,
+  PrimaryKey,
+  Property,
+  ManyToOne,
+  OneToMany,
+  Collection,
+  Rel,
+  OptionalProps,
+} from '@mikro-orm/core';
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';
 import { ProfileSnapshot } from './profile-snapshot.entity';
 
 @Entity({ tableName: 'user_profiles' })
 export class UserProfile {
-  [OptionalProps]?: 'createdAt' | 'yearsExperience' | 'skills' | 'isCareerSwitcher' | 'email' | 'phone' | 'location';
+  [OptionalProps]?:
+    | 'createdAt'
+    | 'yearsExperience'
+    | 'skills'
+    | 'isCareerSwitcher'
+    | 'email'
+    | 'phone'
+    | 'location';
 
   @PrimaryKey()
   id!: number;
@@ -49,6 +65,6 @@ export class UserProfile {
   @Property({ type: 'datetime', defaultRaw: 'CURRENT_TIMESTAMP' })
   createdAt: Date = new Date();
 
-  @OneToMany(() => ProfileSnapshot, snapshot => snapshot.profile)
+  @OneToMany(() => ProfileSnapshot, (snapshot) => snapshot.profile)
   snapshots = new Collection<ProfileSnapshot>(this);
 }

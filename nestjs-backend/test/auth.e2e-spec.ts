@@ -18,9 +18,17 @@ const mockGuard = {
 describe('AuthController (e2e)', () => {
   let app: INestApplication;
   const mockAuthService = {
-    login: jest.fn(() => ({ access_token: 'test_token', refresh_token: 'test_refresh', token_type: 'bearer' })),
+    login: jest.fn(() => ({
+      access_token: 'test_token',
+      refresh_token: 'test_refresh',
+      token_type: 'bearer',
+    })),
     hashPassword: jest.fn(() => 'hashed_pw'),
-    validateUser: jest.fn(() => ({ id: 1, email: 'test@test.com', tenant: { id: 1 } })),
+    validateUser: jest.fn(() => ({
+      id: 1,
+      email: 'test@test.com',
+      tenant: { id: 1 },
+    })),
   };
   const mockUsersService = {
     create: jest.fn(() => ({ id: 1, email: 'test@test.com' })),
@@ -34,8 +42,10 @@ describe('AuthController (e2e)', () => {
         { provide: UsersService, useValue: mockUsersService },
       ],
     })
-      .overrideGuard(LocalAuthGuard).useValue(mockGuard)
-      .overrideGuard(JwtAuthGuard).useValue(mockGuard)
+      .overrideGuard(LocalAuthGuard)
+      .useValue(mockGuard)
+      .overrideGuard(JwtAuthGuard)
+      .useValue(mockGuard)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -47,17 +57,21 @@ describe('AuthController (e2e)', () => {
   });
 
   it('/auth/admin/test (GET)', () => {
-    return request(app.getHttpServer() as any)
+    return request(app.getHttpServer())
       .get('/auth/admin/test')
       .expect(200)
       .expect({ status: 'Auth Controller OK' });
   });
 
   it('/auth/login (POST)', () => {
-    return request(app.getHttpServer() as any)
+    return request(app.getHttpServer())
       .post('/auth/login')
       .send({ username: 'test@test.com', password: 'password123' })
       .expect(200)
-      .expect({ access_token: 'test_token', refresh_token: 'test_refresh', token_type: 'bearer' });
+      .expect({
+        access_token: 'test_token',
+        refresh_token: 'test_refresh',
+        token_type: 'bearer',
+      });
   });
 });

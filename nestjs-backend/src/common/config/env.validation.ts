@@ -1,5 +1,11 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  validateSync,
+} from 'class-validator';
 
 export enum Environment {
   Development = 'development',
@@ -53,18 +59,29 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   readonly GEMINI_MODEL?: string;
+
+  // AWS Bedrock — optional fallback LLM provider
+  @IsString()
+  @IsOptional()
+  readonly AWS_REGION?: string;
+
+  @IsString()
+  @IsOptional()
+  readonly BEDROCK_MODEL_ID?: string;
 }
 
 export function validate(config: Record<string, unknown>) {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,
   });
-  
-  const errors = validateSync(validatedConfig, { skipMissingProperties: false });
+
+  const errors = validateSync(validatedConfig, {
+    skipMissingProperties: false,
+  });
 
   if (errors.length > 0) {
     throw new Error(errors.toString());
   }
-  
+
   return validatedConfig;
 }

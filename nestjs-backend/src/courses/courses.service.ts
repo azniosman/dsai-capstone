@@ -15,9 +15,12 @@ export class CoursesService {
   }
 
   async calculateSubsidy(payload: any, tenantId: number) {
-    const course = await this.courseRepository.findOne({ id: payload.course_id, tenant: tenantId });
+    const course = await this.courseRepository.findOne({
+      id: payload.course_id,
+      tenant: tenantId,
+    });
     if (!course) throw new NotFoundException('Course not found');
-    
+
     const courseFee = course.courseFee;
     const subsidyPct = 0.7;
     const subsidyAmount = courseFee * subsidyPct;

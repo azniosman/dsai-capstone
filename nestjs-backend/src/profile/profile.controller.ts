@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  Request,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -22,10 +33,17 @@ export class ProfileController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Post()
-  createProfile(@Request() req: any, @Body() createProfileDto: CreateProfileDto) {
+  createProfile(
+    @Request() req: any,
+    @Body() createProfileDto: CreateProfileDto,
+  ) {
     const userId = req.user ? req.user.id : null;
     const tenantId = req.user ? req.user.tenant.id : 1; // Default global tenant ID is 1
-    return this.profileService.createProfile(userId, tenantId, createProfileDto);
+    return this.profileService.createProfile(
+      userId,
+      tenantId,
+      createProfileDto,
+    );
   }
 
   @Post('parse-resume')
@@ -39,15 +57,30 @@ export class ProfileController {
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   getProfile(@Request() req: any, @Param('id') id: string) {
-    return this.profileService.getProfileById(+id, req.user.id, req.user.tenant.id);
+    return this.profileService.getProfileById(
+      +id,
+      req.user.id,
+      req.user.tenant.id,
+    );
   }
 
   @UseGuards(OptionalJwtAuthGuard)
   @Patch(':id')
-  updateProfile(@Request() req: any, @Param('id') id: string, @Body() updateProfileDto: UpdateProfileDto) {
+  updateProfile(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
     if (!req.user) {
-      throw new UnauthorizedException('Authentication required to update profile');
+      throw new UnauthorizedException(
+        'Authentication required to update profile',
+      );
     }
-    return this.profileService.updateProfile(+id, req.user.id, req.user.tenant.id, updateProfileDto);
+    return this.profileService.updateProfile(
+      +id,
+      req.user.id,
+      req.user.tenant.id,
+      updateProfileDto,
+    );
   }
 }

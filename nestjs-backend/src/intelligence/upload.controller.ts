@@ -1,11 +1,11 @@
-import { 
-  Controller, 
-  Post, 
-  UseInterceptors, 
-  UploadedFile, 
+import {
+  Controller,
+  Post,
+  UseInterceptors,
+  UploadedFile,
   BadRequestException,
   Request,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { IntelligenceService } from './intelligence.service';
@@ -27,12 +27,14 @@ export class UploadController {
     try {
       // 1. Extract text from PDF/DOCX
       const text = await ResumeParser.extractText(file.buffer, file.mimetype);
-      
+
       // 2. Parse text into structured data
       return this.intelligenceService.parseResume(text);
     } catch (error: any) {
       console.error('Resume upload/parse error:', error);
-      throw new BadRequestException(`Failed to process resume: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to process resume: ${error.message}`,
+      );
     }
   }
 }

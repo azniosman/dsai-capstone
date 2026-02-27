@@ -16,8 +16,12 @@ export class UpskillingController {
   @Get(':profileId')
   async getUpskilling(
     @Request() req: any,
-    @Param('profileId') profileId: string
+    @Param('profileId') profileId: string,
   ): Promise<RoadmapDataDto> {
-    return this.upskillingService.getUpskilling(+profileId, req.user.tenant.id, req.user.id);
+    return this.upskillingService.getUpskilling(
+      +profileId,
+      req.user.tenant.id,
+      req.user.id,
+    );
   }
 }

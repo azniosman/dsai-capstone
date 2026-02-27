@@ -6,9 +6,9 @@ import { TransformInterceptor } from '@app/common/interceptors/transform.interce
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   app.setGlobalPrefix('api');
-  
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -17,7 +17,7 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  
+
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
 

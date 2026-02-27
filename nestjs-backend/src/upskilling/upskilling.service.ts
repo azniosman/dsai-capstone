@@ -5,8 +5,13 @@ import { SCTPCourse } from '../entities/sctp-course.entity';
 import { UserProfile } from '../entities/user-profile.entity';
 import { JobRole } from '../entities/job-role.entity';
 import { RoadmapDataDto, RoadmapItem } from './dto/upskilling.dto';
+import { LlmService } from '../intelligence/llm.service';
 
-const LEVEL_ORDER: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2 };
+const LEVEL_ORDER: Record<string, number> = {
+  beginner: 0,
+  intermediate: 1,
+  advanced: 2,
+};
 
 @Injectable()
 export class UpskillingService {
@@ -17,22 +22,31 @@ export class UpskillingService {
     private readonly profileRepository: EntityRepository<UserProfile>,
     @InjectRepository(JobRole)
     private readonly roleRepository: EntityRepository<JobRole>,
+    private readonly llmService: LlmService,
   ) {}
 
   // Same scoring formula as IntelligenceService
   private scoreRole(profile: UserProfile, role: JobRole): number {
-    const profileSkills = new Set((profile.skills ?? []).map((s) => s.toLowerCase()));
+    const profileSkills = new Set(
+      (profile.skills ?? []).map((s) => s.toLowerCase()),
+    );
     let matched = 0;
     for (const req of role.requiredSkills) {
       if (profileSkills.has(req.toLowerCase())) matched++;
     }
     const contentScore = matched / Math.max(role.requiredSkills.length, 1);
-    const ruleScore = (profile.yearsExperience ?? 0) >= role.minExperienceYears ? 1.0 : 0.5;
-    const careerBonus = profile.isCareerSwitcher && role.careerSwitcherFriendly ? 1.0 : 0.0;
+    const ruleScore =
+      (profile.yearsExperience ?? 0) >= role.minExperienceYears ? 1.0 : 0.5;
+    const careerBonus =
+      profile.isCareerSwitcher && role.careerSwitcherFriendly ? 1.0 : 0.0;
     return 0.55 * contentScore + 0.25 * ruleScore + 0.2 * careerBonus;
   }
 
-  async getUpskilling(profileId: number, tenantId: number, userId: number): Promise<RoadmapDataDto> {
+  async getUpskilling(
+    profileId: number,
+    tenantId: number,
+    userId: number,
+  ): Promise<RoadmapDataDto> {
     const profile = await this.profileRepository.findOne({
       id: profileId,
       tenant: tenantId,
@@ -51,7 +65,9 @@ export class UpskillingService {
 
     const missingSkills: Set<string> = new Set();
     if (topRole) {
-      const profileSkillsLower = new Set((profile.skills ?? []).map((s) => s.toLowerCase()));
+      const profileSkillsLower = new Set(
+        (profile.skills ?? []).map((s) => s.toLowerCase()),
+      );
       for (const req of topRole.role.requiredSkills) {
         if (!profileSkillsLower.has(req.toLowerCase())) {
           missingSkills.add(req.toLowerCase());
@@ -115,7 +131,10 @@ export class UpskillingService {
       totalCost += course.courseFee;
       totalAfterSubsidy += course.nettFeeAfterSubsidy;
       if (course.skillsfutureEligible) {
-        sfApplicable += Math.min(course.skillsfutureCreditAmount, course.nettFeeAfterSubsidy);
+        sfApplicable += Math.min(
+          course.skillsfutureCreditAmount,
+          course.nettFeeAfterSubsidy,
+        );
       }
 
       return item;
@@ -123,11 +142,23 @@ export class UpskillingService {
 
     const targetRoleTitle = topRole?.role.title ?? 'your target role';
     const gapCount = missingSkills.size;
-    const narrative =
+    const templateNarrative =
       `Based on your profile, the best-matched role is ${targetRoleTitle}. ` +
       `You have ${gapCount} skill gap${gapCount !== 1 ? 's' : ''} to bridge. ` +
       `This roadmap prioritises courses that directly address those gaps, ` +
       `then adds complementary skills to round out your readiness.`;
+
+    let narrative = templateNarrative;
+    try {
+      narrative = await this.llmService.generateRoadmapNarrative(
+        profile.skills ?? [],
+        targetRoleTitle,
+        gapCount,
+        selected.map((c) => c.title),
+      );
+    } catch {
+      // Keep template narrative on LLM failure
+    }
 
     return {
       total_weeks: totalWeeks,

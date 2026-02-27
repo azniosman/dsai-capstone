@@ -23,12 +23,12 @@ describe('ProfileController (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [ProfileController],
-      providers: [
-        { provide: ProfileService, useValue: mockProfileService },
-      ],
+      providers: [{ provide: ProfileService, useValue: mockProfileService }],
     })
-      .overrideGuard(JwtAuthGuard).useValue(mockGuard)
-      .overrideGuard(OptionalJwtAuthGuard).useValue(mockGuard)
+      .overrideGuard(JwtAuthGuard)
+      .useValue(mockGuard)
+      .overrideGuard(OptionalJwtAuthGuard)
+      .useValue(mockGuard)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -40,14 +40,14 @@ describe('ProfileController (e2e)', () => {
   });
 
   it('/profile/admin/test (GET)', () => {
-    return request(app.getHttpServer() as any)
+    return request(app.getHttpServer())
       .get('/profile/admin/test')
       .expect(200)
       .expect({ status: 'Profile Controller OK' });
   });
 
   it('/profile/me (GET)', () => {
-    return request(app.getHttpServer() as any)
+    return request(app.getHttpServer())
       .get('/profile/me')
       .expect(200)
       .expect({ id: 1, name: 'Alice' });

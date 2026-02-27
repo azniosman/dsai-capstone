@@ -9,7 +9,15 @@ import { JobRole } from '@app/entities/job-role.entity';
 import { SkillProgress } from '@app/entities/skill-progress.entity';
 
 @Module({
-  imports: [MikroOrmModule.forFeature([SCTPCourse, MarketInsight, UserProfile, JobRole, SkillProgress])],
+  imports: [
+    MikroOrmModule.forFeature([
+      SCTPCourse,
+      MarketInsight,
+      UserProfile,
+      JobRole,
+      SkillProgress,
+    ]),
+  ],
   controllers: [DomainController],
   providers: [DomainService],
 })

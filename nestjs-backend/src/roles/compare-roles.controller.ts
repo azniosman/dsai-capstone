@@ -11,6 +11,10 @@ export class CompareRolesController {
   @Post()
   compare(@Request() req: any, @Body() dto: CompareRolesDto) {
     const tenantId = req.user ? req.user.tenant.id : 1;
-    return this.rolesService.compareRoles(dto.profile_id, dto.role_ids, tenantId);
+    return this.rolesService.compareRoles(
+      dto.profile_id,
+      dto.role_ids,
+      tenantId,
+    );
   }
 }

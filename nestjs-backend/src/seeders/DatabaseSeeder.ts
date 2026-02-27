@@ -18,7 +18,8 @@ export const MARKET_INSIGHTS_DATA = [
     hiringVolume: 450,
     trendingSkills: ['React', 'NestJS', 'TypeScript', 'SQL', 'AWS'],
     forecast2026: 'Bullish',
-    outlook: 'Continued demand for full-stack engineers with focus on security and scalability.',
+    outlook:
+      'Continued demand for full-stack engineers with focus on security and scalability.',
   },
   {
     roleCategory: 'HealthTech',
@@ -28,7 +29,8 @@ export const MARKET_INSIGHTS_DATA = [
     hiringVolume: 320,
     trendingSkills: ['Python', 'PyTorch', 'SQL', 'Docker', 'AWS'],
     forecast2026: 'Strong',
-    outlook: 'Surge in AI-driven diagnostics and personalized medicine requirements.',
+    outlook:
+      'Surge in AI-driven diagnostics and personalized medicine requirements.',
   },
   {
     roleCategory: 'E-commerce',
@@ -38,7 +40,8 @@ export const MARKET_INSIGHTS_DATA = [
     hiringVolume: 380,
     trendingSkills: ['Python', 'SQL', 'Machine Learning', 'React', 'Node.js'],
     forecast2026: 'Stable',
-    outlook: 'Steady growth driven by personalisation and recommendation engine investments.',
+    outlook:
+      'Steady growth driven by personalisation and recommendation engine investments.',
   },
   {
     roleCategory: 'Cybersecurity',
@@ -46,9 +49,16 @@ export const MARKET_INSIGHTS_DATA = [
     avgSalarySgd: 10500,
     yoyGrowthPct: 22,
     hiringVolume: 280,
-    trendingSkills: ['SIEM', 'Network Security', 'Python', 'Incident Response', 'Cloud Security'],
+    trendingSkills: [
+      'SIEM',
+      'Network Security',
+      'Python',
+      'Incident Response',
+      'Cloud Security',
+    ],
     forecast2026: 'Strong',
-    outlook: 'Critical talent shortage; MAS regulations driving compliance hiring across all sectors.',
+    outlook:
+      'Critical talent shortage; MAS regulations driving compliance hiring across all sectors.',
   },
   {
     roleCategory: 'Cloud Computing',
@@ -58,7 +68,8 @@ export const MARKET_INSIGHTS_DATA = [
     hiringVolume: 410,
     trendingSkills: ['AWS', 'Kubernetes', 'Terraform', 'Docker', 'Python'],
     forecast2026: 'Bullish',
-    outlook: 'Digital transformation mandates across government and enterprise driving cloud adoption.',
+    outlook:
+      'Digital transformation mandates across government and enterprise driving cloud adoption.',
   },
   {
     roleCategory: 'Data & Analytics',
@@ -68,7 +79,8 @@ export const MARKET_INSIGHTS_DATA = [
     hiringVolume: 520,
     trendingSkills: ['Python', 'SQL', 'Spark', 'dbt', 'Snowflake'],
     forecast2026: 'Bullish',
-    outlook: 'Data-driven decision making becoming standard; GenAI integration accelerating demand.',
+    outlook:
+      'Data-driven decision making becoming standard; GenAI integration accelerating demand.',
   },
   {
     roleCategory: 'Software Engineering',
@@ -78,7 +90,8 @@ export const MARKET_INSIGHTS_DATA = [
     hiringVolume: 680,
     trendingSkills: ['TypeScript', 'React', 'Node.js', 'Docker', 'AWS'],
     forecast2026: 'Stable',
-    outlook: 'Consistent baseline demand; AI tooling raising productivity expectations for individuals.',
+    outlook:
+      'Consistent baseline demand; AI tooling raising productivity expectations for individuals.',
   },
 ];
 

@@ -30,7 +30,11 @@ export class MarketInsight {
   @Property({ nullable: true })
   outlook?: string;
 
-  @Property({ type: 'datetime', onUpdate: () => new Date(), defaultRaw: 'CURRENT_TIMESTAMP' })
+  @Property({
+    type: 'datetime',
+    onUpdate: () => new Date(),
+    defaultRaw: 'CURRENT_TIMESTAMP',
+  })
   updatedAt: Date = new Date();
 
   @ManyToOne(() => Tenant, { nullable: true, index: true })

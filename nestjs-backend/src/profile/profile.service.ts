@@ -33,7 +33,8 @@ export class ProfileService {
     const normalizedPayload = {
       ...payload,
       yearsExperience: payload.years_experience ?? payload.yearsExperience ?? 0,
-      isCareerSwitcher: payload.is_career_switcher ?? payload.isCareerSwitcher ?? false,
+      isCareerSwitcher:
+        payload.is_career_switcher ?? payload.isCareerSwitcher ?? false,
     };
 
     // Remove the snake_case keys after mapping

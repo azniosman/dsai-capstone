@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { JobRole } from '@app/entities/job-role.entity';
@@ -21,8 +25,14 @@ export class RolesService {
     const profile = await this.profileRepository.findOne({ id: profileId });
     if (!profile) throw new NotFoundException('Profile not found');
 
-    const roles = await this.rolesRepository.find({ id: { $in: roleIds }, tenant: tenantId });
-    if (roles.length < 2) throw new BadRequestException('At least 2 valid roles required for comparison');
+    const roles = await this.rolesRepository.find({
+      id: { $in: roleIds },
+      tenant: tenantId,
+    });
+    if (roles.length < 2)
+      throw new BadRequestException(
+        'At least 2 valid roles required for comparison',
+      );
 
     const normalize = (arr: string[]) => arr.map((s) => s.toLowerCase().trim());
     const profileSkills = new Set(normalize(profile.skills || []));
@@ -48,7 +58,9 @@ export class RolesService {
       const otherSkills = new Set(
         roleSkillSets.flatMap((other, j) => (j !== i ? other.all : [])),
       );
-      uniqueSkillsPerRole[rs.role.title] = rs.all.filter((s) => !otherSkills.has(s));
+      uniqueSkillsPerRole[rs.role.title] = rs.all.filter(
+        (s) => !otherSkills.has(s),
+      );
     });
 
     const comparedRoles = roleSkillSets.map((rs) => {

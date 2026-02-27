@@ -9,10 +9,7 @@ import { UserProfile } from '@app/entities/user-profile.entity';
 import { JobRole } from '@app/entities/job-role.entity';
 
 @Module({
-  imports: [
-    ConfigModule,
-    MikroOrmModule.forFeature([UserProfile, JobRole]),
-  ],
+  imports: [ConfigModule, MikroOrmModule.forFeature([UserProfile, JobRole])],
   controllers: [IntelligenceController, UploadController],
   providers: [IntelligenceService, LlmService],
   exports: [IntelligenceService, LlmService],

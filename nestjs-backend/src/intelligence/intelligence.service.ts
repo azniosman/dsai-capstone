@@ -22,8 +22,17 @@ export class IntelligenceService {
   private scoreRole(
     profile: UserProfile,
     role: JobRole,
-  ): { score: number; contentScore: number; ruleScore: number; careerBonus: number; matched: string[]; missing: string[] } {
-    const profileSkills = new Set((profile.skills ?? []).map((s) => s.toLowerCase()));
+  ): {
+    score: number;
+    contentScore: number;
+    ruleScore: number;
+    careerBonus: number;
+    matched: string[];
+    missing: string[];
+  } {
+    const profileSkills = new Set(
+      (profile.skills ?? []).map((s) => s.toLowerCase()),
+    );
     const matched: string[] = [];
     const missing: string[] = [];
 
@@ -35,9 +44,12 @@ export class IntelligenceService {
       }
     }
 
-    const contentScore = matched.length / Math.max(role.requiredSkills.length, 1);
-    const ruleScore = (profile.yearsExperience ?? 0) >= role.minExperienceYears ? 1.0 : 0.5;
-    const careerBonus = profile.isCareerSwitcher && role.careerSwitcherFriendly ? 1.0 : 0.0;
+    const contentScore =
+      matched.length / Math.max(role.requiredSkills.length, 1);
+    const ruleScore =
+      (profile.yearsExperience ?? 0) >= role.minExperienceYears ? 1.0 : 0.5;
+    const careerBonus =
+      profile.isCareerSwitcher && role.careerSwitcherFriendly ? 1.0 : 0.0;
     const score = 0.55 * contentScore + 0.25 * ruleScore + 0.2 * careerBonus;
 
     return { score, contentScore, ruleScore, careerBonus, matched, missing };
@@ -51,23 +63,35 @@ export class IntelligenceService {
     matchedCount: number,
     missingCount: number,
   ): string {
-    const pct = Math.round((0.55 * contentScore + 0.25 * ruleScore + 0.2 * careerBonus) * 100);
+    const pct = Math.round(
+      (0.55 * contentScore + 0.25 * ruleScore + 0.2 * careerBonus) * 100,
+    );
     const parts: string[] = [];
     parts.push(
       `You match ${matchedCount} of ${matchedCount + missingCount} required skills (${Math.round(contentScore * 100)}% skill coverage).`,
     );
     if (ruleScore >= 1.0) {
-      parts.push(`Your experience level meets the minimum requirement for this role.`);
+      parts.push(
+        `Your experience level meets the minimum requirement for this role.`,
+      );
     } else {
-      parts.push(`You are slightly below the recommended experience level — consider entry-level positions or upskilling first.`);
+      parts.push(
+        `You are slightly below the recommended experience level — consider entry-level positions or upskilling first.`,
+      );
     }
     if (careerBonus > 0) {
-      parts.push(`This role is career-switcher friendly, boosting your overall fit score.`);
+      parts.push(
+        `This role is career-switcher friendly, boosting your overall fit score.`,
+      );
     }
     if (missingCount === 0) {
-      parts.push(`You have all required skills — focus on preferred skills to stand out.`);
+      parts.push(
+        `You have all required skills — focus on preferred skills to stand out.`,
+      );
     } else if (missingCount <= 2) {
-      parts.push(`With ${missingCount} skill${missingCount > 1 ? 's' : ''} to bridge, you are close to full readiness.`);
+      parts.push(
+        `With ${missingCount} skill${missingCount > 1 ? 's' : ''} to bridge, you are close to full readiness.`,
+      );
     }
     parts.push(`Overall fit: ${pct}%.`);
     return parts.join(' ');
@@ -83,7 +107,10 @@ export class IntelligenceService {
     const profileId = payload.profile_id ?? payload.profileId;
     let profileContext = '';
     if (profileId) {
-      const profile = await this.profileRepository.findOne({ id: profileId, tenant: tenantId });
+      const profile = await this.profileRepository.findOne({
+        id: profileId,
+        tenant: tenantId,
+      });
       if (profile) {
         profileContext = `Name: ${profile.name}, Skills: ${(profile.skills ?? []).join(', ')}, Experience: ${profile.yearsExperience ?? 0} years, Career switcher: ${profile.isCareerSwitcher}.`;
       }
@@ -102,7 +129,10 @@ export class IntelligenceService {
     };
   }
 
-  async getRecommendations(payload: RecommendRequestDto, tenantId: number): Promise<any> {
+  async getRecommendations(
+    payload: RecommendRequestDto,
+    tenantId: number,
+  ): Promise<any> {
     const profileId = payload.profile_id ?? payload.profileId;
     const profile = await this.profileRepository.findOne({
       id: profileId,
@@ -116,7 +146,14 @@ export class IntelligenceService {
     const roles = await this.roleRepository.find({ tenant: tenantId });
     const scored = roles
       .map((role) => {
-        const { score, contentScore, ruleScore, careerBonus, matched, missing } = this.scoreRole(profile, role);
+        const {
+          score,
+          contentScore,
+          ruleScore,
+          careerBonus,
+          matched,
+          missing,
+        } = this.scoreRole(profile, role);
         return {
           role_id: role.id,
           title: role.title,
@@ -130,11 +167,38 @@ export class IntelligenceService {
           career_switcher_friendly: role.careerSwitcherFriendly,
           missing_skills: missing,
           matched_skills: matched,
-          rationale: this.buildRationale(role, contentScore, ruleScore, careerBonus, matched.length, missing.length),
+          rationale: this.buildRationale(
+            role,
+            contentScore,
+            ruleScore,
+            careerBonus,
+            matched.length,
+            missing.length,
+          ),
         };
       })
       .sort((a, b) => b.match_score - a.match_score)
       .slice(0, 10);
+
+    // Enhance top 3 with LLM-generated rationale (non-blocking)
+    try {
+      const top3 = scored.slice(0, 3);
+      const profileSummary = `Skills: ${(profile.skills ?? []).join(', ')}. Experience: ${profile.yearsExperience ?? 0} years. Career switcher: ${profile.isCareerSwitcher}.`;
+      const aiRationales = await this.llmService.generateRationale(
+        profileSummary,
+        top3.map((r) => ({
+          title: r.title,
+          matchScore: r.match_score,
+          matched: r.matched_skills,
+          missing: r.missing_skills,
+        })),
+      );
+      for (let i = 0; i < Math.min(aiRationales.length, top3.length); i++) {
+        scored[i].rationale = aiRationales[i];
+      }
+    } catch {
+      // Keep template rationales on LLM failure
+    }
 
     return scored;
   }
@@ -157,8 +221,10 @@ export class IntelligenceService {
 
     const SEV_ORDER: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
-    return top3.map(({ role, score }) => {
-      const profileSkillsLower = new Set((profile.skills ?? []).map((s) => s.toLowerCase()));
+    const results = top3.map(({ role, score }) => {
+      const profileSkillsLower = new Set(
+        (profile.skills ?? []).map((s) => s.toLowerCase()),
+      );
 
       const allGaps = [
         ...role.requiredSkills
@@ -171,6 +237,7 @@ export class IntelligenceService {
               user_level: 0,
               user_level_label: 'Missing',
               priority: idx < 3 ? 'high' : 'medium',
+              ai_advice: '',
             };
           })
           .filter(Boolean),
@@ -184,6 +251,7 @@ export class IntelligenceService {
               user_level: 0,
               user_level_label: 'Missing',
               priority: 'low',
+              ai_advice: '',
             };
           })
           .filter(Boolean),
@@ -191,7 +259,10 @@ export class IntelligenceService {
 
       // Sort by severity descending, show top 5
       const gaps = allGaps
-        .sort((a, b) => (SEV_ORDER[b.gap_severity] ?? 0) - (SEV_ORDER[a.gap_severity] ?? 0))
+        .sort(
+          (a, b) =>
+            (SEV_ORDER[b.gap_severity] ?? 0) - (SEV_ORDER[a.gap_severity] ?? 0),
+        )
         .slice(0, 5);
 
       return {
@@ -200,33 +271,78 @@ export class IntelligenceService {
         gaps,
       };
     });
+
+    // Enhance gaps with LLM-generated advice (non-blocking)
+    try {
+      for (const entry of results) {
+        if (entry.gaps.length === 0) continue;
+        const advice = await this.llmService.generateSkillGapAdvice(
+          entry.role_title,
+          entry.gaps.map((g: any) => ({
+            skill: g.skill,
+            gap_severity: g.gap_severity,
+          })),
+        );
+        for (let i = 0; i < Math.min(advice.length, entry.gaps.length); i++) {
+          entry.gaps[i].ai_advice = advice[i];
+        }
+      }
+    } catch {
+      // Keep empty ai_advice on LLM failure
+    }
+
+    return results;
   }
 
   async parseResume(text: string): Promise<any> {
-    const skills = ResumeParser.extractSkills(text);
+    // Try LLM-powered parsing first, fall back to regex
+    try {
+      const llmResult = await this.llmService.parseResume(text);
+      return {
+        ...llmResult,
+        raw_text_preview: text.substring(0, 500),
+      };
+    } catch {
+      // Regex fallback
+      const skills = ResumeParser.extractSkills(text);
+      const emailMatch = text.match(
+        /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/,
+      );
+      const phoneMatch = text.match(
+        /[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}/,
+      );
+      const nameMatch = text.match(/^([A-Z][a-z]+ [A-Z][a-z]+)/m);
 
-    const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-    const phoneMatch = text.match(/[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}/);
-    const nameMatch = text.match(/^([A-Z][a-z]+ [A-Z][a-z]+)/m);
-
-    return {
-      name: nameMatch ? nameMatch[1] : 'Extracted User',
-      email: emailMatch ? emailMatch[0] : '',
-      phone: phoneMatch ? phoneMatch[0] : '',
-      skills,
-      experience_years: text.includes('years') ? 5 : 0,
-      raw_text_preview: text.substring(0, 500),
-    };
+      return {
+        name: nameMatch ? nameMatch[1] : 'Extracted User',
+        email: emailMatch ? emailMatch[0] : '',
+        phone: phoneMatch ? phoneMatch[0] : '',
+        skills,
+        experience_years: text.includes('years') ? 5 : 0,
+        raw_text_preview: text.substring(0, 500),
+      };
+    }
   }
 
-  async mockInterview(payload: InterviewRequestDto, tenantId: number): Promise<any> {
+  async mockInterview(
+    payload: InterviewRequestDto,
+    tenantId: number,
+  ): Promise<any> {
     const questionNum = Math.floor(payload.messages.length / 2) + 1;
     const isComplete = questionNum > 5;
 
-    const roles = await this.roleRepository.find({ tenant: tenantId, title: payload.role_title });
+    const roles = await this.roleRepository.find({
+      tenant: tenantId,
+      title: payload.role_title,
+    });
     const targetRole = roles[0];
-    const requiredSkills = targetRole?.requiredSkills ?? ['Communication', 'Problem Solving', 'Technical Skills'];
-    const targetSkill = requiredSkills[(questionNum - 1) % requiredSkills.length];
+    const requiredSkills = targetRole?.requiredSkills ?? [
+      'Communication',
+      'Problem Solving',
+      'Technical Skills',
+    ];
+    const targetSkill =
+      requiredSkills[(questionNum - 1) % requiredSkills.length];
 
     const result = await this.llmService.generateInterviewQuestion(
       payload.role_title,
@@ -267,7 +383,9 @@ export class IntelligenceService {
     const peerInsights = top3.map(({ role }) => {
       const relevantPeers = otherProfiles.filter((p) =>
         (p.skills ?? []).some((s) =>
-          role.requiredSkills.some((req) => req.toLowerCase() === s.toLowerCase()),
+          role.requiredSkills.some(
+            (req) => req.toLowerCase() === s.toLowerCase(),
+          ),
         ),
       );
 
@@ -275,14 +393,22 @@ export class IntelligenceService {
       const avgSkillsCount =
         totalPeers > 0
           ? parseFloat(
-              (relevantPeers.reduce((sum, p) => sum + (p.skills?.length ?? 0), 0) / totalPeers).toFixed(1),
+              (
+                relevantPeers.reduce(
+                  (sum, p) => sum + (p.skills?.length ?? 0),
+                  0,
+                ) / totalPeers
+              ).toFixed(1),
             )
           : role.requiredSkills.length;
       const avgExperienceYears =
         totalPeers > 0
           ? parseFloat(
               (
-                relevantPeers.reduce((sum, p) => sum + (p.yearsExperience ?? 0), 0) / totalPeers
+                relevantPeers.reduce(
+                  (sum, p) => sum + (p.yearsExperience ?? 0),
+                  0,
+                ) / totalPeers
               ).toFixed(1),
             )
           : role.minExperienceYears;
@@ -290,7 +416,8 @@ export class IntelligenceService {
         totalPeers > 0
           ? parseFloat(
               (
-                (relevantPeers.filter((p) => p.isCareerSwitcher).length / totalPeers) *
+                (relevantPeers.filter((p) => p.isCareerSwitcher).length /
+                  totalPeers) *
                 100
               ).toFixed(1),
             )
@@ -342,7 +469,10 @@ export class IntelligenceService {
     };
   }
 
-  async getProjectSuggestions(profileId: number, tenantId: number): Promise<any> {
+  async getProjectSuggestions(
+    profileId: number,
+    tenantId: number,
+  ): Promise<any> {
     const profile = await this.profileRepository.findOne({
       id: profileId,
       tenant: tenantId,
@@ -446,7 +576,13 @@ export class IntelligenceService {
         estimated_hours: 18,
         description:
           'Build a fully typed REST API with NestJS, PostgreSQL, and Swagger documentation — deploy to Railway or Fly.io.',
-        technologies: ['TypeScript', 'NestJS', 'PostgreSQL', 'Swagger', 'Docker'],
+        technologies: [
+          'TypeScript',
+          'NestJS',
+          'PostgreSQL',
+          'Swagger',
+          'Docker',
+        ],
         learning_outcomes: [
           'DTO validation and OpenAPI generation',
           'JWT authentication patterns',
@@ -480,7 +616,13 @@ export class IntelligenceService {
         estimated_hours: 30,
         description:
           'Ingest a live data stream from Kafka, process it with Spark Structured Streaming, and write results to a PostgreSQL warehouse.',
-        technologies: ['Apache Kafka', 'Spark', 'Python', 'PostgreSQL', 'Docker Compose'],
+        technologies: [
+          'Apache Kafka',
+          'Spark',
+          'Python',
+          'PostgreSQL',
+          'Docker Compose',
+        ],
         learning_outcomes: [
           'Streaming vs batch processing trade-offs',
           'Exactly-once semantics',
@@ -497,7 +639,13 @@ export class IntelligenceService {
         estimated_hours: 20,
         description:
           'Set up an ELK-based SIEM on a local VM, ingest system and firewall logs, and build detection rules for common attack patterns.',
-        technologies: ['Elasticsearch', 'Kibana', 'Logstash', 'Metasploit', 'Linux'],
+        technologies: [
+          'Elasticsearch',
+          'Kibana',
+          'Logstash',
+          'Metasploit',
+          'Linux',
+        ],
         learning_outcomes: [
           'Log normalisation and correlation rules',
           'Attack pattern recognition',
@@ -548,7 +696,12 @@ export class IntelligenceService {
         estimated_hours: 18,
         description:
           'Fine-tune a small BERT model on Singapore finance news headlines to classify sentiment, and expose it via a FastAPI endpoint.',
-        technologies: ['Python', 'HuggingFace Transformers', 'FastAPI', 'Docker'],
+        technologies: [
+          'Python',
+          'HuggingFace Transformers',
+          'FastAPI',
+          'Docker',
+        ],
         learning_outcomes: [
           'Transfer learning and fine-tuning',
           'Model serving with FastAPI',
@@ -583,7 +736,11 @@ export class IntelligenceService {
         description:
           'Set up a personal blog with Next.js and MDX to document your learning journey and SCTP course notes.',
         technologies: ['Next.js', 'MDX', 'Tailwind CSS', 'Vercel'],
-        learning_outcomes: ['Static site generation', 'Markdown authoring', 'Basic deployment pipeline'],
+        learning_outcomes: [
+          'Static site generation',
+          'Markdown authoring',
+          'Basic deployment pipeline',
+        ],
       });
     }
 
@@ -592,8 +749,22 @@ export class IntelligenceService {
 
   async getMarketInsights(_tenantId: number): Promise<any> {
     return {
-      top_skills_overall: ['Python', 'SQL', 'GenAI', 'TypeScript', 'AWS', 'Docker', 'Kubernetes'],
-      highest_demand_sectors: ['FinTech', 'HealthTech', 'E-commerce', 'Cybersecurity', 'Cloud Computing'],
+      top_skills_overall: [
+        'Python',
+        'SQL',
+        'GenAI',
+        'TypeScript',
+        'AWS',
+        'Docker',
+        'Kubernetes',
+      ],
+      highest_demand_sectors: [
+        'FinTech',
+        'HealthTech',
+        'E-commerce',
+        'Cybersecurity',
+        'Cloud Computing',
+      ],
       last_updated: new Date().toLocaleDateString('en-SG', {
         day: 'numeric',
         month: 'short',
@@ -608,7 +779,8 @@ export class IntelligenceService {
           hiring_volume: 450,
           trending_skills: ['React', 'NestJS', 'TypeScript'],
           forecast_2026: 'Bullish',
-          outlook: 'Continued demand for full-stack engineers with focus on security and scalability.',
+          outlook:
+            'Continued demand for full-stack engineers with focus on security and scalability.',
         },
         {
           role_category: 'HealthTech',
@@ -618,7 +790,8 @@ export class IntelligenceService {
           hiring_volume: 320,
           trending_skills: ['Python', 'PyTorch', 'SQL'],
           forecast_2026: 'Strong',
-          outlook: 'Surge in AI-driven diagnostics and personalized medicine requirements.',
+          outlook:
+            'Surge in AI-driven diagnostics and personalized medicine requirements.',
         },
         {
           role_category: 'E-commerce',
@@ -628,7 +801,8 @@ export class IntelligenceService {
           hiring_volume: 380,
           trending_skills: ['Python', 'SQL', 'Machine Learning'],
           forecast_2026: 'Stable',
-          outlook: 'Steady growth driven by personalisation and recommendation engine investments.',
+          outlook:
+            'Steady growth driven by personalisation and recommendation engine investments.',
         },
         {
           role_category: 'Cybersecurity',
@@ -638,7 +812,8 @@ export class IntelligenceService {
           hiring_volume: 280,
           trending_skills: ['SIEM', 'Network Security', 'Python'],
           forecast_2026: 'Strong',
-          outlook: 'Critical talent shortage; MAS regulations driving compliance hiring across all sectors.',
+          outlook:
+            'Critical talent shortage; MAS regulations driving compliance hiring across all sectors.',
         },
         {
           role_category: 'Cloud Computing',
@@ -648,7 +823,8 @@ export class IntelligenceService {
           hiring_volume: 410,
           trending_skills: ['AWS', 'Kubernetes', 'Terraform'],
           forecast_2026: 'Bullish',
-          outlook: 'Digital transformation mandates across government and enterprise driving cloud adoption.',
+          outlook:
+            'Digital transformation mandates across government and enterprise driving cloud adoption.',
         },
         {
           role_category: 'Data & Analytics',
@@ -658,7 +834,8 @@ export class IntelligenceService {
           hiring_volume: 520,
           trending_skills: ['Python', 'SQL', 'Spark'],
           forecast_2026: 'Bullish',
-          outlook: 'Data-driven decision making becoming standard; GenAI integration accelerating demand.',
+          outlook:
+            'Data-driven decision making becoming standard; GenAI integration accelerating demand.',
         },
         {
           role_category: 'Software Engineering',
@@ -668,7 +845,8 @@ export class IntelligenceService {
           hiring_volume: 680,
           trending_skills: ['TypeScript', 'React', 'Node.js'],
           forecast_2026: 'Stable',
-          outlook: 'Consistent baseline demand; AI tooling raising productivity expectations.',
+          outlook:
+            'Consistent baseline demand; AI tooling raising productivity expectations.',
         },
       ],
     };
@@ -680,7 +858,10 @@ export class IntelligenceService {
     jobTitle: string | undefined,
     tenantId: number,
   ): Promise<any> {
-    const profile = await this.profileRepository.findOne({ id: profileId, tenant: tenantId });
+    const profile = await this.profileRepository.findOne({
+      id: profileId,
+      tenant: tenantId,
+    });
     if (!profile) {
       throw new NotFoundException('Profile not found');
     }
@@ -691,16 +872,26 @@ export class IntelligenceService {
     let gapSkills: string[];
 
     try {
-      const result = await this.llmService.analyzeJobDescription(jobDescription, profileSkills);
+      const result = await this.llmService.analyzeJobDescription(
+        jobDescription,
+        profileSkills,
+      );
       extractedSkills = result.extracted_skills;
       matchScore = result.match_score;
       gapSkills = result.gaps;
     } catch {
       extractedSkills = ResumeParser.extractSkills(jobDescription);
       const profileSet = new Set(profileSkills.map((s) => s.toLowerCase()));
-      const matched = extractedSkills.filter((s) => profileSet.has(s.toLowerCase()));
-      matchScore = extractedSkills.length > 0 ? matched.length / extractedSkills.length : 0;
-      gapSkills = extractedSkills.filter((s) => !profileSet.has(s.toLowerCase()));
+      const matched = extractedSkills.filter((s) =>
+        profileSet.has(s.toLowerCase()),
+      );
+      matchScore =
+        extractedSkills.length > 0
+          ? matched.length / extractedSkills.length
+          : 0;
+      gapSkills = extractedSkills.filter(
+        (s) => !profileSet.has(s.toLowerCase()),
+      );
     }
 
     const gaps = gapSkills.map((skill, idx) => ({
@@ -722,7 +913,10 @@ export class IntelligenceService {
 
   async rewriteBullet(targetRole: string, bulletPoint: string): Promise<any> {
     try {
-      const result = await this.llmService.rewriteBullet(targetRole, bulletPoint);
+      const result = await this.llmService.rewriteBullet(
+        targetRole,
+        bulletPoint,
+      );
       return {
         original: bulletPoint,
         ...result,

@@ -1,4 +1,10 @@
-import { Entity, PrimaryKey, Property, Collection, OneToMany } from '@mikro-orm/core';
+import {
+  Entity,
+  PrimaryKey,
+  Property,
+  Collection,
+  OneToMany,
+} from '@mikro-orm/core';
 import { User } from './user.entity';
 
 @Entity({ tableName: 'tenants' })
@@ -9,6 +15,6 @@ export class Tenant {
   @Property({ unique: true, index: true })
   name!: string;
 
-  @OneToMany(() => User, user => user.tenant)
+  @OneToMany(() => User, (user) => user.tenant)
   users = new Collection<User>(this);
 }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { SkillProgress } from '@app/entities/skill-progress.entity';
@@ -91,10 +95,13 @@ export class SkillsService {
     tenantId: number,
     userId: number,
   ): Promise<SkillProgress> {
-    const entry = await this.progressRepository.findOne({
-      id: entryId,
-      tenant: tenantId,
-    }, { populate: ['profile'] });
+    const entry = await this.progressRepository.findOne(
+      {
+        id: entryId,
+        tenant: tenantId,
+      },
+      { populate: ['profile'] },
+    );
 
     if (!entry) {
       throw new NotFoundException('Progress entry not found');
@@ -134,10 +141,13 @@ export class SkillsService {
     tenantId: number,
     userId: number,
   ): Promise<void> {
-    const entry = await this.progressRepository.findOne({
-      id: entryId,
-      tenant: tenantId,
-    }, { populate: ['profile'] });
+    const entry = await this.progressRepository.findOne(
+      {
+        id: entryId,
+        tenant: tenantId,
+      },
+      { populate: ['profile'] },
+    );
 
     if (!entry) {
       throw new NotFoundException('Progress entry not found');
@@ -149,7 +159,11 @@ export class SkillsService {
 
     await this.progressRepository.getEntityManager().removeAndFlush(entry);
   }
-  async getProgressTimeline(profileId: number, tenantId: number, userId: number) {
+  async getProgressTimeline(
+    profileId: number,
+    tenantId: number,
+    userId: number,
+  ) {
     const profile = await this.profileRepository.findOne({
       id: profileId,
       tenant: tenantId,
@@ -174,7 +188,10 @@ export class SkillsService {
   }
 
   async getPeerComparison(profileId: number, tenantId: number) {
-    const profile = await this.profileRepository.findOne({ id: profileId, tenant: tenantId });
+    const profile = await this.profileRepository.findOne({
+      id: profileId,
+      tenant: tenantId,
+    });
     if (!profile) {
       throw new NotFoundException('Profile not found');
     }
@@ -185,16 +202,19 @@ export class SkillsService {
     });
 
     const userSkillsCount = profile.skills?.length || 0;
-    const avgSkillsCount = others.length > 0
-      ? others.reduce((acc, p) => acc + (p.skills?.length || 0), 0) / others.length
-      : userSkillsCount;
+    const avgSkillsCount =
+      others.length > 0
+        ? others.reduce((acc, p) => acc + (p.skills?.length || 0), 0) /
+          others.length
+        : userSkillsCount;
 
     // Real percentile: percentage of peers with fewer skills than the user
     const percentile =
       others.length > 0
         ? parseFloat(
             (
-              (others.filter((p) => (p.skills?.length ?? 0) < userSkillsCount).length /
+              (others.filter((p) => (p.skills?.length ?? 0) < userSkillsCount)
+                .length /
                 others.length) *
               100
             ).toFixed(1),
@@ -217,7 +237,8 @@ export class SkillsService {
       user_skills_count: userSkillsCount,
       avg_skills_count: parseFloat(avgSkillsCount.toFixed(1)),
       percentile,
-      top_skills: topSkills.length > 0 ? topSkills : ['Python', 'SQL', 'Communication'],
+      top_skills:
+        topSkills.length > 0 ? topSkills : ['Python', 'SQL', 'Communication'],
     };
   }
 }

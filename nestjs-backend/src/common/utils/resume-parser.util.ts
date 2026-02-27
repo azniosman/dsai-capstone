@@ -12,9 +12,12 @@ export class ResumeParser {
     if (mimeType === 'application/pdf') {
       const data = await pdf(buffer);
       return data.text;
-    } 
-    
-    if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    }
+
+    if (
+      mimeType ===
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ) {
       const result = await mammoth.extractRawText({ buffer });
       return result.value;
     }
@@ -28,15 +31,30 @@ export class ResumeParser {
    */
   static extractSkills(text: string): string[] {
     const commonSkills = [
-      'Python', 'JavaScript', 'TypeScript', 'React', 'Node.js', 'NestJS', 
-      'SQL', 'PostgreSQL', 'Docker', 'AWS', 'Azure', 'Machine Learning',
-      'Data Analysis', 'Project Management', 'Agile', 'Java', 'Go', 'Rust'
+      'Python',
+      'JavaScript',
+      'TypeScript',
+      'React',
+      'Node.js',
+      'NestJS',
+      'SQL',
+      'PostgreSQL',
+      'Docker',
+      'AWS',
+      'Azure',
+      'Machine Learning',
+      'Data Analysis',
+      'Project Management',
+      'Agile',
+      'Java',
+      'Go',
+      'Rust',
     ];
-    
+
     const results = new Set<string>();
     const lowerText = text.toLowerCase();
-    
-    commonSkills.forEach(skill => {
+
+    commonSkills.forEach((skill) => {
       if (lowerText.includes(skill.toLowerCase())) {
         results.add(skill);
       }
