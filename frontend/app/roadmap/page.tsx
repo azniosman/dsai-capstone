@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Route, GraduationCap } from "lucide-react";
+import { Download, Route, GraduationCap, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import RoadmapTimeline from "@/components/roadmap-timeline";
-import WorkflowStepper from "@/components/workflow-stepper";
-import EmptyState from "@/components/empty-state";
-import SkeletonCard from "@/components/skeleton-card";
+import RoadmapTimeline from "@/components/roadmap/roadmap-timeline";
+import WorkflowStepper from "@/components/ui/workflow-stepper";
+import EmptyState from "@/components/ui/empty-state";
+import SkeletonCard from "@/components/ui/skeleton-card";
 import api from "@/lib/api-client";
 
 interface RoadmapData {
@@ -16,6 +16,7 @@ interface RoadmapData {
   total_cost: number;
   total_after_subsidy: number;
   total_skillsfuture_applicable: number;
+  narrative?: string;
   roadmap: Array<{
     week_start: number;
     week_end: number;
@@ -104,6 +105,25 @@ export default function Roadmap() {
           Export PDF
         </Button>
       </div>
+
+      {/* AI Narrative */}
+      {data.narrative && (
+        <Card variant="highlight">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-primary mb-1">
+                  Your Personalised Roadmap
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {data.narrative}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

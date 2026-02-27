@@ -139,13 +139,14 @@ function LoginForm() {
     setError(null);
     const profileId = searchParams.get("profileId");
     try {
+      // Backend RegisterDto expects camelCase with forbidNonWhitelisted:true
       await api.post("/api/auth/register", {
         email: form.email,
         password: form.password,
-        password_confirm: form.password_confirm,
+        passwordConfirm: form.password_confirm,
         name: form.name,
-        tenant_name: "Global",
-        profile_id: profileId ? parseInt(profileId) : undefined,
+        tenantName: "Global",
+        profileId: profileId ? parseInt(profileId) : undefined,
       });
       toast.success("Account created! Please log in.");
       setTab("login");

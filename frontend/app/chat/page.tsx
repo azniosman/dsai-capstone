@@ -1,205 +1,160 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Bot, User, Send } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { Bot, MessageSquare, Sparkles, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import api from "@/lib/api-client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { useModalStore } from "@/store/modalStore";
 
-const SUGGESTED_PROMPTS = [
+const FEATURES = [
+  {
+    icon: Bot,
+    title: "Senior career advisor",
+    description:
+      "Backed by Google Gemini — trained on Singapore's tech job market and SCTP programme.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Conversational flow",
+    description:
+      "Ask follow-up questions naturally. The coach remembers the full conversation context.",
+  },
+  {
+    icon: GraduationCap,
+    title: "SkillsFuture guidance",
+    description:
+      "Get advice on SCTP courses, subsidy eligibility, and SkillsFuture Credit usage.",
+  },
+  {
+    icon: Sparkles,
+    title: "Personalised to you",
+    description:
+      "Build a profile so the coach can tailor advice to your skills, goals, and experience.",
+  },
+];
+
+const SAMPLE_PROMPTS = [
   "What high-growth roles match my skills?",
   "Which SCTP courses should I take first?",
   "What salary can I expect as a career switcher?",
   "How do I use my SkillsFuture Credits?",
-  "Help me prepare for tech interviews",
-  "What are the top skills in demand for 2026?",
 ];
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
-
-function TypingIndicator() {
-  return (
-    <div className="flex gap-1 items-center p-3">
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="w-2 h-2 rounded-full bg-muted-foreground animate-typing-dot"
-          style={{ animationDelay: `${i * 0.2}s` }}
-        />
-      ))}
-    </div>
-  );
-}
-
-export default function CareerChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content:
-        "Hi! I'm SkillBridge AI, your Senior Career Advisor specialising in Singapore's tech market. Ask me about job roles, skill gaps, SCTP courses, subsidies, or career transition strategies.",
-    },
-  ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [engine, setEngine] = useState<string | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+export default function CareerChatPage() {
+  const { openModal } = useModalStore();
+  const [hasProfile, setHasProfile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const send = async (text?: string) => {
-    const msg = text || input.trim();
-    if (!msg || loading) return;
-    const userMsg: Message = { role: "user", content: msg };
-    const newMsgs = [...messages, userMsg];
-    setMessages(newMsgs);
-    setInput("");
-    setLoading(true);
-
-    try {
-      const profileId = localStorage.getItem("profileId");
-      const res = await api.post("/api/chat", {
-        profile_id: profileId ? parseInt(profileId) : null,
-        messages: newMsgs.map((m) => ({ role: m.role, content: m.content })),
-      });
-
-      // Backend returns text/event-stream (SSE). First line is [ENGINE: ...] metadata;
-      // remaining lines are the reply text.
-      let reply: string;
-      let engineName: string | null = null;
-      if (typeof res.data === "string") {
-        const lines = res.data.split("\n");
-        const engineLine = lines.find((l: string) => l.startsWith("[ENGINE:"));
-        if (engineLine) {
-          engineName = engineLine.replace(/^\[ENGINE:\s*/, "").replace(/\]$/, "").trim();
-        }
-        reply = lines
-          .filter((l: string) => !l.startsWith("[ENGINE:"))
-          .join("\n")
-          .trim();
-      } else {
-        reply = res.data.reply ?? "";
-        engineName = res.data.engine ?? null;
-      }
-
-      setMessages([...newMsgs, { role: "assistant", content: reply }]);
-      if (engineName) setEngine(engineName);
-    } catch (err) {
-      console.error(err);
-      setMessages([
-        ...newMsgs,
-        {
-          role: "assistant",
-          content: "Sorry, I encountered an error. Please try again.",
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setTimeout(() => {
+      setMounted(true);
+      setHasProfile(!!localStorage.getItem("profileId"));
+    }, 0);
+  }, []);
 
   return (
-    <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
-      <header className="mb-4 flex justify-between items-end">
-        <div>
-          <p className="section-label mb-1">AI Advisor</p>
-          <h1 className="text-2xl font-extrabold tracking-tight">
-            Career Coach
-          </h1>
-        </div>
-        {engine && (
-          <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1.5 opacity-70">
-            <span className="live-dot !w-1.5 !h-1.5" />
-            {engine}
-          </div>
-        )}
+    <div className="max-w-2xl mx-auto space-y-8">
+      {/* Header */}
+      <header>
+        <p className="section-label mb-1">AI Advisor</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">Career Coach</h1>
+        <p className="text-sm text-muted-foreground mt-1.5">
+          Chat with an AI career advisor specialising in Singapore&apos;s tech
+          market. Get personalised guidance on roles, skills, and SCTP courses.
+        </p>
       </header>
 
-      {/* Message thread */}
-      <Card variant="elevated" className="flex-1 overflow-auto mb-3">
-        <CardContent className="p-4">
-          {messages.map((msg, i) => (
-            <div
-              key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`}
-              className={`flex gap-2.5 mb-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+      {/* Profile notice */}
+      {mounted && !hasProfile && (
+        <Alert>
+          <AlertDescription className="flex items-center justify-between gap-4 flex-wrap">
+            <span>
+              Build a profile so the coach can tailor its advice to your goals
+              and experience.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openModal("profile")}
             >
-              {msg.role === "assistant" && (
-                <Avatar className="h-7 w-7 shrink-0">
-                  <AvatarFallback className="bg-primary text-primary-foreground rounded">
-                    <Bot className="h-3.5 w-3.5" />
-                  </AvatarFallback>
-                </Avatar>
-              )}
+              Build Profile
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* CTA card */}
+      <Card variant="elevated" className="overflow-hidden">
+        <CardContent className="p-0">
+          {/* Visual header strip */}
+          <div className="relative bg-primary/5 border-b border-border/40 px-8 py-10 flex flex-col items-center gap-5">
+            {/* Animated bot orb */}
+            <div className="relative flex items-center justify-center">
+              <span className="absolute inset-0 rounded-full bg-primary/10 animate-ping" />
+              <span className="absolute inset-2 rounded-full bg-primary/8" />
+              <div className="relative z-10 w-20 h-20 rounded-full bg-background border border-border/60 shadow-lg flex items-center justify-center">
+                <Bot className="h-9 w-9 text-primary" />
+              </div>
+            </div>
+
+            <div className="text-center">
+              <p className="font-bold text-base">Ask me anything</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Opens a focused chat window — no page navigation needed.
+              </p>
+            </div>
+
+            <Button
+              size="xl"
+              className="gap-2.5 px-8"
+              onClick={() => openModal("aiChat")}
+            >
+              <MessageSquare className="h-5 w-5" />
+              Start Chat Session
+            </Button>
+          </div>
+
+          {/* Feature grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-border/30">
+            {FEATURES.map(({ icon: Icon, title, description }) => (
               <div
-                className={`px-3.5 py-2.5 rounded max-w-[78%] text-sm whitespace-pre-wrap leading-relaxed ${
-                  msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-foreground border border-border"
-                }`}
+                key={title}
+                className="flex items-start gap-3 p-5 bg-card"
               >
-                {msg.content}
+                <div className="mt-0.5 p-2 rounded-lg bg-primary/8 text-primary shrink-0">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    {description}
+                  </p>
+                </div>
               </div>
-              {msg.role === "user" && (
-                <Avatar className="h-7 w-7 shrink-0">
-                  <AvatarFallback className="bg-secondary text-secondary-foreground rounded">
-                    <User className="h-3.5 w-3.5" />
-                  </AvatarFallback>
-                </Avatar>
-              )}
-            </div>
-          ))}
-          {loading && (
-            <div className="flex gap-2.5 mb-4">
-              <Avatar className="h-7 w-7 shrink-0">
-                <AvatarFallback className="bg-primary text-primary-foreground rounded">
-                  <Bot className="h-3.5 w-3.5" />
-                </AvatarFallback>
-              </Avatar>
-              <div className="bg-secondary border border-border rounded">
-                <TypingIndicator />
-              </div>
-            </div>
-          )}
-          <div ref={endRef} />
+            ))}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Suggested prompts — shown only at start */}
-      {messages.length <= 1 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {SUGGESTED_PROMPTS.map((prompt) => (
+      {/* Sample prompts */}
+      <div className="space-y-2.5 pb-4">
+        <p className="text-xs font-semibold text-foreground/70">
+          Try asking about
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {SAMPLE_PROMPTS.map((prompt) => (
             <Badge
               key={prompt}
               variant="accent"
-              className="cursor-pointer hover:bg-primary/20 text-xs"
-              onClick={() => send(prompt)}
+              className="cursor-pointer text-xs"
+              onClick={() => openModal("aiChat")}
             >
               {prompt}
             </Badge>
           ))}
         </div>
-      )}
-
-      {/* Input row */}
-      <div className="flex gap-2">
-        <Input
-          placeholder="Ask about careers, skills, SCTP courses..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          disabled={loading}
-          className="flex-1"
-        />
-        <Button onClick={() => send()} disabled={loading} size="icon">
-          <Send className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   );

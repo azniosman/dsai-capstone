@@ -1,20 +1,49 @@
 #!/bin/bash
 
-# Deploy script for DSAI Capstone
+# SkillBridge Deployment Automation Script
+# Standards: Google Technical Writing Style Guide
 
 set -e
 
-echo "Starting deployment..."
+# Configuration
+PROJECT_ROOT=$(pwd)
+DB_HEALTH_WAIT=30
 
-# 1. Pull latest changes (if using git)
-# git pull origin main
+echo "🚀 Starting SkillBridge deployment cycle..."
 
-# 2. Build and start containers
-echo "Building and starting containers..."
+# 1. Environment Validation
+echo "🔍 Validating environment..."
+if [ ! -f "nestjs-backend/.env" ]; then
+  echo "⚠️  Warning: nestjs-backend/.env not found. Creating from template if available..."
+  # You could add logic here to copy from .env.example
+fi
+
+# 2. Infrastructure Build
+echo "🏗️  Building and starting core services..."
 docker compose up -d --build
 
-# 3. Prune unused images to save space
-echo "Cleaning up..."
+# 3. Database Health Check
+echo "⏳ Waiting for database to be healthy..."
+count=0
+while [ $count -lt $DB_HEALTH_WAIT ]; do
+  if docker compose ps db | grep -q "healthy"; then
+    echo "✅ Database is ready."
+    break
+  fi
+  sleep 2
+  count=$((count+2))
+done
+
+if [ $count -ge $DB_HEALTH_WAIT ]; then
+  echo "❌ Error: Database health check timed out."
+  exit 1
+fi
+
+# 4. Cleanup
+echo "🧹 Cleaning up legacy images and build cache..."
 docker image prune -f
 
-echo "Deployment complete!"
+echo "✨ Deployment complete! Services are live:"
+echo "   - Frontend: http://localhost:3000"
+echo "   - Backend:  http://localhost:8000/api"
+echo "   - n8n:      http://localhost:5678"

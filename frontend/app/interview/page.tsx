@@ -1,290 +1,133 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Loader2, HelpCircle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Mic2, Brain, Target, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
-import api from "@/lib/api-client";
+import { Card, CardContent } from "@/components/ui/card";
+import { useModalStore } from "@/store/modalStore";
 
-const FALLBACK_ROLES = [
-  "Data Engineer",
-  "Software Engineer",
-  "Data Scientist",
-  "Data Analyst",
-  "ML Engineer",
-  "DevOps Engineer",
-  "Cloud Architect",
-  "Cybersecurity Analyst",
-  "Full Stack Developer",
-  "Product Manager",
+const FEATURES = [
+  {
+    icon: Brain,
+    title: "AI interviewer",
+    description:
+      "Powered by Google Gemini — asks real-world questions for your chosen role and difficulty.",
+  },
+  {
+    icon: Target,
+    title: "Gap-targeted questions",
+    description:
+      "If you have a profile, the interviewer focuses on the skills you're missing most.",
+  },
+  {
+    icon: Mic2,
+    title: "5-question format",
+    description:
+      "Short, focused sessions you can complete in under 15 minutes at any time.",
+  },
+  {
+    icon: Award,
+    title: "Session feedback",
+    description:
+      "After the final question the AI summarises your performance with improvement tips.",
+  },
 ];
 
-interface InterviewMessage {
-  role: "user" | "assistant";
-  content: string;
-  gapTargeted?: boolean;
-  targetSkill?: string;
-}
+const ROLES = [
+  "Software Engineer",
+  "Data Scientist",
+  "ML Engineer",
+  "Data Engineer",
+  "Cloud Architect",
+];
 
-export default function MockInterview() {
-  const [roleOptions, setRoleOptions] = useState(FALLBACK_ROLES);
-  const [role, setRole] = useState("Software Engineer");
-  const [difficulty, setDifficulty] = useState("intermediate");
-  const [messages, setMessages] = useState<InterviewMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [started, setStarted] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [complete, setComplete] = useState(false);
-  const [questionNum, setQuestionNum] = useState(0);
-
-  useEffect(() => {
-    api
-      .get("/api/roles")
-      .then((res) => {
-        const titles = res.data.map((r: { title: string }) => r.title);
-        if (titles.length > 0) setRoleOptions(titles);
-      })
-      .catch((err) => {
-        console.error(err);
-      });
-  }, []);
-
-  const startInterview = async () => {
-    setLoading(true);
-    setStarted(true);
-    setComplete(false);
-    setFeedback(null);
-    setMessages([]);
-    try {
-      const profileId = localStorage.getItem("profileId");
-      const res = await api.post("/api/interview", {
-        profile_id: profileId ? parseInt(profileId) : null,
-        role_title: role,
-        messages: [],
-        difficulty,
-      });
-      setMessages([
-        {
-          role: "assistant",
-          content: res.data.reply,
-          gapTargeted: res.data.gap_targeted,
-          targetSkill: res.data.target_skill,
-        },
-      ]);
-      setQuestionNum(res.data.question_number);
-    } catch (err) {
-      console.error(err);
-      setMessages([
-        {
-          role: "assistant",
-          content: "Let's start! Tell me about yourself and your experience.",
-        },
-      ]);
-      setQuestionNum(1);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const sendAnswer = async () => {
-    if (!input.trim() || loading) return;
-    const userMsg: InterviewMessage = { role: "user", content: input.trim() };
-    const newMsgs = [...messages, userMsg];
-    setMessages(newMsgs);
-    setInput("");
-    setLoading(true);
-    try {
-      const profileId = localStorage.getItem("profileId");
-      const res = await api.post("/api/interview", {
-        profile_id: profileId ? parseInt(profileId) : null,
-        role_title: role,
-        messages: newMsgs,
-        difficulty,
-      });
-      setMessages([
-        ...newMsgs,
-        {
-          role: "assistant",
-          content: res.data.reply,
-          gapTargeted: res.data.gap_targeted,
-          targetSkill: res.data.target_skill,
-        },
-      ]);
-      setQuestionNum(res.data.question_number);
-      if (res.data.feedback) setFeedback(res.data.feedback);
-      if (res.data.is_complete) setComplete(true);
-    } catch (err) {
-      console.error(err);
-      toast.error("Interview request failed. Please try again.");
-      setMessages([
-        ...newMsgs,
-        {
-          role: "assistant",
-          content:
-            "Sorry, there was a connection issue. Please try answering again.",
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+export default function InterviewPage() {
+  const { openModal } = useModalStore();
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="max-w-2xl mx-auto space-y-8">
+      {/* Header */}
       <header>
         <p className="section-label mb-1">Practice</p>
         <h1 className="text-2xl font-extrabold tracking-tight">
           Mock Interview
         </h1>
+        <p className="text-sm text-muted-foreground mt-1.5">
+          Sharpen your interview skills with an AI-powered practice session
+          tailored to your target role. Get real-time feedback after every
+          5-question round.
+        </p>
       </header>
 
-      {!started ? (
-        <Card variant="data">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <HelpCircle className="h-4 w-4 text-primary" />
-              <p className="text-xs text-muted-foreground">
-                Select a role and difficulty to begin a 5-question practice
-                session.
+      {/* CTA card */}
+      <Card variant="elevated" className="overflow-hidden">
+        <CardContent className="p-0">
+          {/* Visual header strip */}
+          <div className="relative bg-primary/5 border-b border-border/40 px-8 py-10 flex flex-col items-center gap-5">
+            {/* Animated orb */}
+            <div className="relative flex items-center justify-center">
+              <span className="absolute inset-0 rounded-full bg-primary/10 animate-ping" />
+              <span className="absolute inset-2 rounded-full bg-primary/8" />
+              <div className="relative z-10 w-20 h-20 rounded-full bg-background border border-border/60 shadow-lg flex items-center justify-center">
+                <Mic2 className="h-9 w-9 text-primary" />
+              </div>
+            </div>
+
+            <div className="text-center">
+              <p className="font-bold text-base">Choose your role and go</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Select difficulty, pick a role, and the interviewer will start
+                straight away.
               </p>
             </div>
-            <div className="space-y-1.5">
-              <Label
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ letterSpacing: "0.08em" }}
-              >
-                Target Role
-              </Label>
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {roleOptions.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ letterSpacing: "0.08em" }}
-              >
-                Difficulty
-              </Label>
-              <Select value={difficulty} onValueChange={setDifficulty}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="beginner">Beginner</SelectItem>
-                  <SelectItem value="intermediate">Intermediate</SelectItem>
-                  <SelectItem value="advanced">Advanced</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button size="lg" className="w-full" onClick={startInterview}>
-              Start Interview
+
+            <Button
+              size="xl"
+              className="gap-2.5 px-8"
+              onClick={() => openModal("interview")}
+            >
+              <Mic2 className="h-5 w-5" />
+              Start Practice Session
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Status bar */}
-          <div className="flex gap-2 items-center">
-            <Badge variant="accent">{role}</Badge>
-            <Badge variant="outline">{difficulty}</Badge>
-            <Badge variant="data" className="data-num">
-              Q{questionNum} / 5
-            </Badge>
           </div>
 
-          {/* Transcript */}
-          <Card variant="elevated" className="max-h-[400px] overflow-auto">
-            <CardContent className="p-4">
-              {messages.map((msg, i) => (
-                <div
-                  key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`}
-                  className="mb-5 last:mb-0"
-                >
-                  <p className="section-label mb-1.5">
-                    {msg.role === "assistant" ? "Interviewer" : "You"}
-                  </p>
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {msg.content}
-                  </p>
-                  {msg.gapTargeted && msg.targetSkill && (
-                    <Badge variant="warning" className="mt-2">
-                      Targets your gap: {msg.targetSkill}
-                    </Badge>
-                  )}
+          {/* Feature grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-border/30">
+            {FEATURES.map(({ icon: Icon, title, description }) => (
+              <div key={title} className="flex items-start gap-3 p-5 bg-card">
+                <div className="mt-0.5 p-2 rounded-lg bg-primary/8 text-primary shrink-0">
+                  <Icon className="h-4 w-4" />
                 </div>
-              ))}
-              {loading && (
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              )}
-            </CardContent>
-          </Card>
+                <div>
+                  <p className="text-sm font-semibold">{title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    {description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-          {feedback && (
-            <Card variant="highlight">
-              <CardContent className="p-4">
-                <p className="section-label mb-2">Feedback</p>
-                <p className="text-sm leading-relaxed">{feedback}</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {complete ? (
-            <Button
-              onClick={() => {
-                setStarted(false);
-                setMessages([]);
-              }}
-              className="w-full"
+      {/* Sample roles */}
+      <div className="space-y-2.5 pb-4">
+        <p className="text-xs font-semibold text-foreground/70">
+          Available for roles including
+        </p>
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {ROLES.map((r) => (
+            <span
+              key={r}
+              className="px-2.5 py-1 rounded-md bg-muted/60 border border-border/40"
             >
-              Start New Interview
-            </Button>
-          ) : (
-            <div className="flex gap-2">
-              <Textarea
-                rows={3}
-                placeholder="Type your answer..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={loading}
-                className="flex-1"
-              />
-              <Button
-                onClick={sendAnswer}
-                disabled={loading}
-                className="min-w-[80px] self-end"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Answer"
-                )}
-              </Button>
-            </div>
-          )}
-        </>
-      )}
+              {r}
+            </span>
+          ))}
+          <span className="px-2.5 py-1 rounded-md bg-muted/60 border border-border/40">
+            + more
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

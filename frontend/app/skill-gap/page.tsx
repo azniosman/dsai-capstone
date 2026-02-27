@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,7 +13,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   Cell,
   RadarChart,
   PolarGrid,
@@ -22,32 +21,14 @@ import {
   Radar,
   Legend,
 } from "recharts";
-import GapTable from "@/components/gap-table";
-import WorkflowStepper from "@/components/workflow-stepper";
-import EmptyState from "@/components/empty-state";
-import SkeletonCard from "@/components/skeleton-card";
+import { ChartCard } from "@/components/ui/chart-card";
+import GapTable from "@/components/skill-gap/gap-table";
+import WorkflowStepper from "@/components/ui/workflow-stepper";
+import EmptyState from "@/components/ui/empty-state";
+import SkeletonCard from "@/components/ui/skeleton-card";
 import api from "@/lib/api-client";
 import { extractApiError } from "@/lib/utils";
-
-// Gap severity colors — semantic palette, consistent with status utilities
-const GAP_COLORS: Record<string, string> = {
-  none: "hsl(145 60% 36%)", // green — no gap
-  low: "hsl(220 80% 55%)", // blue  — small gap
-  medium: "hsl(40 90% 45%)", // amber — medium gap
-  high: "hsl(5 78% 50%)", // red   — critical gap
-};
-
-// Recharts tooltip style — matches card bg/border in light mode
-const CHART_STYLE = {
-  contentStyle: {
-    backgroundColor: "oklch(0.9699 0.0013 106.4238)",
-    border: "1px solid oklch(0.8687 0.0043 56.366)",
-    borderRadius: "12px",
-    fontSize: "12px",
-    color: "oklch(0.2795 0.0368 260.031)",
-    boxShadow: "2px 2px 10px 4px hsl(240 4% 60% / 0.18)",
-  },
-};
+import { GAP_COLOR, CHART_AXIS, TOOLTIP_STYLE } from "@/lib/chart-colors";
 
 interface GapItem {
   skill: string;
@@ -73,133 +54,135 @@ function SkillGapView({ gap }: { gap: RoleGap }) {
     setHoveredSkill(skill);
   }, []);
 
-  const chartData = gap.gaps.map((g) => ({
-    skill: g.skill,
-    level: g.user_level,
-    required: g.required_level === "required" ? 1.0 : 0.7,
-    severity: g.gap_severity,
-  }));
+  const chartData = useMemo(
+    () =>
+      gap.gaps.map((g) => ({
+        skill: g.skill,
+        level: g.user_level,
+        required: g.required_level === "required" ? 1.0 : 0.7,
+        severity: g.gap_severity,
+      })),
+    [gap.gaps],
+  );
 
-  const radarData = gap.gaps.slice(0, 10).map((g) => ({
-    skill: g.skill.length > 12 ? g.skill.slice(0, 12) + "…" : g.skill,
-    "Your Level": Math.round(g.user_level * 100),
-    Required: g.required_level === "required" ? 100 : 70,
-  }));
+  const radarData = useMemo(
+    () =>
+      gap.gaps.slice(0, 10).map((g) => ({
+        skill: (g.skill?.length ?? 0) > 12 ? g.skill.slice(0, 12) + "…" : (g.skill ?? ""),
+        "Your Level": Math.round(g.user_level * 100),
+        Required: g.required_level === "required" ? 100 : 70,
+      })),
+    [gap.gaps],
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Score + chart toggle */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold">{gap.role_title}</span>
-          <Badge
-            variant={
-              score >= 70 ? "success" : score >= 40 ? "warning" : "destructive"
-            }
-            className="data-num"
-          >
-            {score}% Match
-          </Badge>
-        </div>
-        <ToggleGroup
-          type="single"
-          value={chartType}
-          onValueChange={(v) => v && setChartType(v)}
-          size="sm"
+      {/* Score header */}
+      <div className="flex items-center gap-2">
+        <BarChart3 className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">{gap.role_title}</span>
+        <Badge
+          variant={
+            score >= 70 ? "success" : score >= 40 ? "warning" : "destructive"
+          }
+          className="data-num"
         >
-          <ToggleGroupItem value="radar">Radar</ToggleGroupItem>
-          <ToggleGroupItem value="bar">Bar</ToggleGroupItem>
-        </ToggleGroup>
+          {score}% Match
+        </Badge>
       </div>
 
       {/* Chart */}
-      <Card variant="data">
-        <CardContent className="p-4">
-          <div
-            className="h-[350px]"
-            role="img"
-            aria-label="Chart comparing your skill levels to required levels"
+      <ChartCard
+        title="Skill Comparison"
+        height={350}
+        ariaLabel="Chart comparing your skill levels to required levels"
+        action={
+          <ToggleGroup
+            type="single"
+            value={chartType}
+            onValueChange={(v) => v && setChartType(v)}
+            size="sm"
           >
-            <ResponsiveContainer>
-              {chartType === "radar" ? (
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="#d9d4cc" />
-                  <PolarAngleAxis
-                    dataKey="skill"
-                    tick={{ fill: "#374151", fontSize: 11 }}
-                  />
-                  <PolarRadiusAxis
-                    domain={[0, 100]}
-                    tick={{ fill: "#6b7280", fontSize: 10 }}
-                  />
-                  <Radar
-                    name="Your Level"
-                    dataKey="Your Level"
-                    stroke="#00BFFF"
-                    fill="#00BFFF"
-                    fillOpacity={0.3}
-                  />
-                  <Radar
-                    name="Required"
-                    dataKey="Required"
-                    stroke="#e8562a"
-                    fill="#e8562a"
-                    fillOpacity={0.1}
-                  />
-                  <Legend
-                    wrapperStyle={{ color: "#374151", fontSize: "12px" }}
-                  />
-                </RadarChart>
-              ) : (
-                <BarChart
-                  data={chartData}
-                  layout="vertical"
-                  margin={{ left: 100 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
-                  <XAxis
-                    type="number"
-                    domain={[0, 1]}
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="skill"
-                    width={100}
-                    tick={{ fill: "#374151", fontSize: 11 }}
-                  />
-                  <Tooltip
-                    formatter={(v) => `${Math.round(Number(v) * 100)}%`}
-                    contentStyle={CHART_STYLE.contentStyle}
-                  />
-                  <Bar
-                    dataKey="level"
-                    name="Your Level"
-                    radius={[0, 3, 3, 0]}
-                    onMouseEnter={(_: unknown, index: number) => handleHoverSkill(chartData[index]?.skill ?? null)}
-                    onMouseLeave={() => handleHoverSkill(null)}
-                  >
-                    {chartData.map((entry) => (
-                      <Cell
-                        key={entry.skill}
-                        fill={GAP_COLORS[entry.severity]}
-                        opacity={
-                          hoveredSkill === null || hoveredSkill === entry.skill
-                            ? 1
-                            : 0.35
-                        }
-                        strokeWidth={hoveredSkill === entry.skill ? 2 : 0}
-                        stroke={hoveredSkill === entry.skill ? "#fff" : "none"}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+            <ToggleGroupItem value="radar">Radar</ToggleGroupItem>
+            <ToggleGroupItem value="bar">Bar</ToggleGroupItem>
+          </ToggleGroup>
+        }
+      >
+        {chartType === "radar" ? (
+          <RadarChart data={radarData}>
+            <PolarGrid stroke="hsl(var(--border))" />
+            <PolarAngleAxis dataKey="skill" tick={CHART_AXIS.tickBold} />
+            <PolarRadiusAxis
+              domain={[0, 100]}
+              tick={{ ...CHART_AXIS.tick, fontSize: 10 }}
+            />
+            <Radar
+              name="Your Level"
+              dataKey="Your Level"
+              stroke="hsl(var(--primary))"
+              fill="hsl(var(--primary))"
+              fillOpacity={0.3}
+            />
+            <Radar
+              name="Required"
+              dataKey="Required"
+              stroke="hsl(var(--muted-foreground))"
+              fill="hsl(var(--muted-foreground))"
+              fillOpacity={0.1}
+            />
+            <Legend
+              wrapperStyle={{
+                color: "hsl(var(--foreground))",
+                fontSize: "12px",
+              }}
+            />
+          </RadarChart>
+        ) : (
+          <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
+            <CartesianGrid {...CHART_AXIS.grid} />
+            <XAxis type="number" domain={[0, 1]} tick={CHART_AXIS.tick} />
+            <YAxis
+              type="category"
+              dataKey="skill"
+              width={100}
+              tick={CHART_AXIS.tickBold}
+            />
+            <Tooltip
+              formatter={(v) => `${Math.round(Number(v) * 100)}%`}
+              contentStyle={TOOLTIP_STYLE}
+            />
+            <Bar
+              dataKey="level"
+              name="Your Level"
+              radius={[0, 3, 3, 0]}
+              animationDuration={600}
+              animationEasing="ease-out"
+              onMouseEnter={(_: unknown, index: number) =>
+                handleHoverSkill(chartData[index]?.skill ?? null)
+              }
+              onMouseLeave={() => handleHoverSkill(null)}
+            >
+              {chartData.map((entry) => (
+                <Cell
+                  key={entry.skill}
+                  fill={GAP_COLOR[entry.severity]}
+                  opacity={
+                    hoveredSkill === null || hoveredSkill === entry.skill
+                      ? 1
+                      : 0.35
+                  }
+                  strokeWidth={hoveredSkill === entry.skill ? 2 : 0}
+                  stroke={
+                    hoveredSkill === entry.skill
+                      ? "hsl(var(--background))"
+                      : "none"
+                  }
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        )}
+      </ChartCard>
 
       <GapTable
         gaps={gap.gaps}
@@ -296,19 +279,25 @@ export default function SkillGap() {
           ))}
         </div>
 
-        {/* Content Area */}
-        {gaps.map((gap, i) => (
-          <div
-            key={i}
-            className={
-              tab === String(i)
-                ? "block animate-in fade-in slide-in-from-left-1 duration-300"
-                : "hidden"
-            }
-          >
-            <SkillGapView gap={gap} />
-          </div>
-        ))}
+        {/* Content Area — AnimatePresence re-mounts active tab so charts re-animate */}
+        <AnimatePresence mode="wait">
+          {gaps.map((gap, i) =>
+            tab === String(i) ? (
+              <motion.div
+                key={gap.role_title}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{
+                  duration: 0.22,
+                  ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+                }}
+              >
+                <SkillGapView gap={gap} />
+              </motion.div>
+            ) : null,
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

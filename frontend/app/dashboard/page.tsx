@@ -28,7 +28,12 @@ import { AIResponse } from "@/components/ui/ai-response";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, extractApiError } from "@/lib/utils";
 import api from "@/lib/api-client";
-import { SkillRadar, type SkillRadarMetrics } from "@/components/ui/skill-radar";
+import {
+  SkillRadar,
+  type SkillRadarMetrics,
+} from "@/components/ui/skill-radar";
+import { useModalStore } from "@/store/modalStore";
+import { useProfileBuilderStore } from "@/store/profileBuilderStore";
 
 import { toast } from "sonner";
 
@@ -70,6 +75,7 @@ const QUICK_ACTIONS = [
     desc: "Matched roles",
     icon: Briefcase,
     href: "/recommendations",
+    modal: "careerAnalysis" as const,
     color: "text-primary",
   },
   {
@@ -77,6 +83,7 @@ const QUICK_ACTIONS = [
     desc: "Gap analysis",
     icon: BarChart3,
     href: "/skill-gap",
+    modal: "skillGap" as const,
     color: "text-primary/70",
   },
   {
@@ -84,6 +91,7 @@ const QUICK_ACTIONS = [
     desc: "AI guidance",
     icon: MessageSquare,
     href: "/chat",
+    modal: "aiChat" as const,
     color: "text-primary",
   },
   {
@@ -156,10 +164,7 @@ function KpiSkeleton() {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {[...Array(4)].map((_, i) => (
-        <Card
-          key={i}
-          className="rounded-[1.5rem] bg-card/40 border-border/40 overflow-hidden shadow-sm"
-        >
+        <Card key={i} className="clay-card overflow-hidden">
           <CardContent className="p-5">
             <Skeleton className="h-3 w-24 mb-4" />
             <Skeleton className="h-10 w-16 mb-2" />
@@ -197,6 +202,8 @@ function CountingNumber({ value }: { value: number }) {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { openModal } = useModalStore();
+  const openProfileBuilder = useProfileBuilderStore((state) => state.open);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [aiThinking, setAiThinking] = useState(false);
@@ -324,27 +331,32 @@ export default function Dashboard() {
   // Radar data for whichever role is currently hovered — deterministic, no Math.random
   const radarData = useMemo(() => {
     if (!summary || recs.length === 0) return [];
-    const rec = recs[hoveredRecIdx] ?? recs[0];
-    const shorten = (s: string) => (s.length > 14 ? s.slice(0, 14) + "…" : s);
+    const rec = recs[hoveredRecIdx] || recs[0];
+    if (!rec) return [];
 
-    const missingPoints = rec.missing_skills.slice(0, 3).map((skill) => ({
-      skill: shorten(skill),
-      userLevel: 1 + deterministicOffset(skill),   // 1 or 2
-      requiredLevel: 4 + deterministicOffset(skill), // 4 or 5
-    }));
+    const shorten = (s: string) =>
+      s && s.length > 14 ? s.slice(0, 14) + "…" : s || "";
+
+    const missingPoints = (rec.missing_skills || [])
+      .slice(0, 3)
+      .map((skill) => ({
+        skill: shorten(skill),
+        userLevel: 1 + deterministicOffset(skill), // 1 or 2
+        requiredLevel: 4 + deterministicOffset(skill), // 4 or 5
+      }));
 
     const matchedSource = rec.matched_skills?.length
       ? rec.matched_skills
-      : summary.skills.filter((s) => !rec.missing_skills.includes(s));
+      : (summary?.skills || []).filter((s) => !rec.missing_skills?.includes(s));
 
-    const matchedPoints = matchedSource.slice(0, 3).map((skill) => ({
+    const matchedPoints = (matchedSource || []).slice(0, 3).map((skill) => ({
       skill: shorten(skill),
-      userLevel: 3 + deterministicOffset(skill),    // 3 or 4
+      userLevel: 3 + deterministicOffset(skill), // 3 or 4
       requiredLevel: 3 + deterministicOffset(skill), // 3 or 4
     }));
 
     return [...missingPoints, ...matchedPoints];
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summary, recs, hoveredRecIdx]);
 
   return (
@@ -365,11 +377,7 @@ export default function Dashboard() {
             Your career intelligence snapshot — updated in real time.
           </p>
         </div>
-        <Button
-          size="sm"
-          className="shrink-0 rounded-full shadow-md bg-foreground text-background hover:bg-foreground/90 font-semibold px-5 h-10 group"
-          asChild
-        >
+        <Button size="sm" className="shrink-0 clay-btn px-5 h-10 group" asChild>
           <Link href="/recommendations">
             All Matches{" "}
             <ArrowUpRight className="ml-1.5 h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -389,7 +397,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card className="h-full rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
+              <Card className="h-full clay-card hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-primary/10 transition-colors" />
                 <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
                   <div>
@@ -421,7 +429,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card className="h-full rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
+              <Card className="h-full clay-card hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-primary/10 transition-colors" />
                 <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
                   <div>
@@ -453,7 +461,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Card className="h-full rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
+              <Card className="h-full clay-card hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
                 <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
                   <div>
@@ -486,7 +494,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              <Card className="h-full rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
+              <Card className="h-full clay-card hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
                 <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-transparent pointer-events-none -z-10 opacity-50" />
                 <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
                   <div>
@@ -573,7 +581,7 @@ export default function Dashboard() {
                 See all <ChevronRight className="h-3 w-3" />
               </Link>
             </div>
-            <Card className="rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 overflow-hidden shadow-xl">
+            <Card className="clay-card overflow-hidden">
               <CardContent className="p-0">
                 {loading ? (
                   <div className="p-4 space-y-px">
@@ -605,6 +613,7 @@ export default function Dashboard() {
                         <div
                           key={rec.role_id}
                           onMouseEnter={() => setHoveredRecIdx(idx)}
+                          onClick={() => openModal("roleMatch", rec)}
                           className={cn(
                             "flex items-center justify-between px-6 py-4.5 transition-all duration-200 group cursor-pointer border-l-[3px]",
                             isActive
@@ -639,11 +648,12 @@ export default function Dashboard() {
                               size="icon-sm"
                               variant="ghost"
                               className="opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0"
-                              asChild
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openModal("roleMatch", rec);
+                              }}
                             >
-                              <Link href="/recommendations">
-                                <ArrowUpRight className="h-4 w-4" />
-                              </Link>
+                              <ArrowUpRight className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
@@ -664,10 +674,10 @@ export default function Dashboard() {
                     </p>
                     <Button
                       size="sm"
-                      className="mt-6 rounded-full px-6 shadow-md shadow-primary/20"
-                      asChild
+                      className="mt-6 clay-btn px-6"
+                      onClick={openProfileBuilder}
                     >
-                      <Link href="/account">Build Profile</Link>
+                      Build Profile
                     </Button>
                   </div>
                 )}
@@ -676,32 +686,36 @@ export default function Dashboard() {
           </div>
 
           {/* Skill Radar Chart — updates on role hover */}
-          {recs.length > 0 && radarData.length > 0 && (() => {
-            const activeRec = recs[hoveredRecIdx] ?? recs[0];
-            const radarMetrics: SkillRadarMetrics = {
-              match_score: activeRec.match_score,
-              content_score: activeRec.content_score ?? 0,
-              rule_score: activeRec.rule_score ?? 0,
-              career_switcher_bonus: activeRec.career_switcher_bonus ?? 0,
-              skill_match_quality: activeRec.skill_match_quality ?? "developing",
-              matched_count: activeRec.matched_skills.length,
-              missing_count: activeRec.missing_skills.length,
-              rationale: activeRec.rationale ?? "",
-              salary_range: activeRec.salary_range,
-            };
-            return (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <SkillRadar
-                  data={radarData}
-                  roleName={activeRec.title}
-                  metrics={radarMetrics}
-                />
-              </motion.div>
-            );
-          })()}
+          {recs.length > 0 &&
+            radarData.length > 0 &&
+            (() => {
+              const activeRec = recs[hoveredRecIdx] ?? recs[0];
+              const radarMetrics: SkillRadarMetrics = {
+                match_score: activeRec.match_score,
+                content_score: activeRec.content_score ?? 0,
+                rule_score: activeRec.rule_score ?? 0,
+                career_switcher_bonus: activeRec.career_switcher_bonus ?? 0,
+                skill_match_quality:
+                  activeRec.skill_match_quality ?? "developing",
+                matched_count: activeRec.matched_skills?.length || 0,
+                missing_count: activeRec.missing_skills?.length || 0,
+                rationale: activeRec.rationale ?? "",
+                salary_range: activeRec.salary_range,
+              };
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="min-h-[350px]"
+                >
+                  <SkillRadar
+                    data={radarData}
+                    roleName={activeRec.title}
+                    metrics={radarMetrics}
+                  />
+                </motion.div>
+              );
+            })()}
         </div>
 
         {/* Right Column — 1/3 */}
@@ -709,14 +723,20 @@ export default function Dashboard() {
           {/* Quick Actions */}
           <div>
             <p className="section-label mb-2.5">Quick Actions</p>
-            <Card className="rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 overflow-hidden shadow-xl">
+            <Card className="clay-card overflow-hidden">
               <CardContent className="p-2">
                 <div className="grid grid-cols-2 gap-px bg-border/20">
                   {QUICK_ACTIONS.map((action) => (
-                    <Link
-                      key={action.href}
-                      href={action.href}
-                      className="flex flex-col gap-2 p-4 bg-background/50 hover:bg-muted/40 transition-colors duration-200 group"
+                    <button
+                      key={action.label}
+                      onClick={() => {
+                        if (action.modal) {
+                          openModal(action.modal);
+                        } else {
+                          router.push(action.href);
+                        }
+                      }}
+                      className="flex flex-col gap-2 p-4 bg-background/50 hover:bg-muted/40 transition-colors duration-200 group text-left w-full h-full"
                     >
                       <action.icon
                         className={cn(
@@ -732,7 +752,7 @@ export default function Dashboard() {
                           {action.desc}
                         </div>
                       </div>
-                    </Link>
+                    </button>
                   ))}
                 </div>
               </CardContent>
@@ -740,7 +760,7 @@ export default function Dashboard() {
           </div>
 
           {/* Pro Insight */}
-          <Card className="rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 overflow-hidden shadow-xl relative group">
+          <Card className="clay-card overflow-hidden relative group">
             <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-transparent to-transparent pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
             <CardContent className="p-6 relative z-10">
               <div className="flex items-center gap-2 mb-4">
@@ -760,11 +780,7 @@ export default function Dashboard() {
                 <span className="text-foreground font-bold">40% more</span>{" "}
                 recruiter visibility.
               </p>
-              <Button
-                size="sm"
-                className="w-full rounded-full shadow-md shadow-primary/20 bg-primary/10 text-primary hover:bg-primary/20 border-0"
-                asChild
-              >
+              <Button size="sm" className="w-full clay-btn" asChild>
                 <Link href="/projects">
                   Add Project <ArrowUpRight className="ml-1.5 h-3 w-3" />
                 </Link>
@@ -773,7 +789,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Progress Teaser */}
-          <Card className="rounded-[1.5rem] bg-card/40 backdrop-blur-xl border-border/40 overflow-hidden shadow-xl">
+          <Card className="clay-card overflow-hidden">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-5">
                 <p className="section-label">Activity</p>

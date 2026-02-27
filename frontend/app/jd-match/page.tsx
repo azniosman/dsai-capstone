@@ -1,181 +1,141 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, FileText } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { FileText, BarChart2, Crosshair, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
-import { toast } from "sonner";
-import GapTable from "@/components/gap-table";
-import api from "@/lib/api-client";
+import { useModalStore } from "@/store/modalStore";
 
-const GAP_COLORS: Record<string, string> = {
-  none: "#28c76f",
-  low: "#00BFFF",
-  medium: "#f9a825",
-  high: "#e84848",
-};
+const FEATURES = [
+  {
+    icon: FileText,
+    title: "Skill extraction",
+    description:
+      "Automatically pulls required skills from any job description — no manual tagging needed.",
+  },
+  {
+    icon: BarChart2,
+    title: "Match score",
+    description:
+      "Scores your profile against the JD using the same hybrid algorithm as Recommendations.",
+  },
+  {
+    icon: Crosshair,
+    title: "Gap analysis",
+    description:
+      "Shows exactly which required skills you're missing and how critical each gap is.",
+  },
+  {
+    icon: BookOpen,
+    title: "SCTP-ready",
+    description:
+      "Gaps are labelled so you can cross-reference SkillsFuture courses to close them fast.",
+  },
+];
 
-const CHART_STYLE = {
-  contentStyle: { backgroundColor: "#ffffff", border: "1px solid #d9d4cc", borderRadius: "6px", fontSize: "12px", color: "#1a1a1a" },
-  labelStyle: { color: "#374151" },
-};
+export default function JDMatchPage() {
+  const { openModal } = useModalStore();
+  const [hasProfile, setHasProfile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-interface Gap {
-  skill: string;
-  user_level: number;
-  gap_severity: string;
-  required_level: string;
-  user_level_label: string;
-  priority: string;
-}
-
-interface MatchResult {
-  job_title: string;
-  match_score: number;
-  extracted_skills: string[];
-  gaps: Gap[];
-}
-
-export default function JDMatch() {
-  const [jd, setJd] = useState("");
-  const [title, setTitle] = useState("");
-  const [result, setResult] = useState<MatchResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleMatch = async () => {
-    const profileId = localStorage.getItem("profileId");
-    if (!profileId) { setError("Create a profile first."); return; }
-    if (!jd.trim()) { setError("Paste a job description."); return; }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.post("/api/jd-match", {
-        profile_id: parseInt(profileId),
-        job_description: jd,
-        job_title: title || null,
-      });
-      setResult(res.data);
-      toast.success(`Analysis complete — ${Math.round(res.data.match_score * 100)}% match!`);
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to analyze JD";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const chartData = result?.gaps.map((g) => ({
-    skill: g.skill, level: g.user_level, severity: g.gap_severity,
-  })) || [];
-
-  const score = result ? Math.round(result.match_score * 100) : 0;
-  const scoreColor = score >= 60 ? "text-primary" : score >= 40 ? "text-amber-500" : "text-destructive";
+  useEffect(() => {
+    setTimeout(() => {
+      setMounted(true);
+      setHasProfile(!!localStorage.getItem("profileId"));
+    }, 0);
+  }, []);
 
   return (
-    <div className="space-y-5">
+    <div className="max-w-2xl mx-auto space-y-8">
+      {/* Header */}
       <header>
         <p className="section-label mb-1">Analysis Tool</p>
-        <h1 className="text-2xl font-extrabold tracking-tight">Job Description Match</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          Job Description Match
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1.5">
+          Paste any job posting to get an instant match score, extracted skill
+          list, and a prioritised gap breakdown against your profile.
+        </p>
       </header>
 
-      <Card variant="data">
-        <CardContent className="p-6 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-            <FileText className="h-4 w-4 text-primary" />
-            <p className="section-label">Paste a JD to score your profile against it</p>
+      {/* Profile required notice */}
+      {mounted && !hasProfile && (
+        <Alert>
+          <AlertDescription className="flex items-center justify-between gap-4 flex-wrap">
+            <span>
+              A saved profile is required to compute your match score.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openModal("profile")}
+            >
+              Build Profile
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* CTA card */}
+      <Card variant="elevated" className="overflow-hidden">
+        <CardContent className="p-0">
+          {/* Visual header strip */}
+          <div className="relative bg-primary/5 border-b border-border/40 px-8 py-10 flex flex-col items-center gap-5">
+            {/* Animated icon orb */}
+            <div className="relative flex items-center justify-center">
+              <span className="absolute inset-0 rounded-full bg-primary/10 animate-ping" />
+              <span className="absolute inset-2 rounded-full bg-primary/8" />
+              <div className="relative z-10 w-20 h-20 rounded-full bg-background border border-border/60 shadow-lg flex items-center justify-center">
+                <FileText className="h-9 w-9 text-primary" />
+              </div>
+            </div>
+
+            <div className="text-center">
+              <p className="font-bold text-base">Ready to analyze</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Paste a job description and get results in seconds.
+              </p>
+            </div>
+
+            <Button
+              size="xl"
+              className="gap-2.5 px-8"
+              disabled={mounted && !hasProfile}
+              onClick={() => openModal("jdMatch")}
+            >
+              <FileText className="h-5 w-5" />
+              Analyze a Job Description
+            </Button>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="title" className="text-xs font-semibold uppercase tracking-widest" style={{ letterSpacing: "0.08em" }}>
-              Job Title (optional)
-            </Label>
-            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} />
+
+          {/* Feature grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-border/30">
+            {FEATURES.map(({ icon: Icon, title, description }) => (
+              <div key={title} className="flex items-start gap-3 p-5 bg-card">
+                <div className="mt-0.5 p-2 rounded-lg bg-primary/8 text-primary shrink-0">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    {description}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="jd" className="text-xs font-semibold uppercase tracking-widest" style={{ letterSpacing: "0.08em" }}>
-              Job Description
-            </Label>
-            <Textarea
-              id="jd"
-              rows={8}
-              value={jd}
-              onChange={(e) => setJd(e.target.value)}
-              placeholder="Paste the full job description here..."
-            />
-          </div>
-          <Button onClick={handleMatch} disabled={loading}>
-            {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            Analyze Match
-          </Button>
         </CardContent>
       </Card>
 
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-
-      {result && (
-        <div className="space-y-5">
-          {/* Score card */}
-          <Card variant="metric">
-            <CardContent className="p-5">
-              <p className="section-label mb-2">{result.job_title}</p>
-              <div className={`kpi-number-accent ${scoreColor}`} style={{ fontSize: "3rem" }}>
-                {score}<span className="text-xl font-normal text-muted-foreground">%</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 mb-4">Match Score</p>
-              <div className="score-bar-track w-full">
-                <div
-                  className="score-bar-fill"
-                  style={{ width: `${score}%`, background: score >= 60 ? "hsl(190 100% 50%)" : score >= 40 ? "hsl(38 95% 56%)" : "hsl(5 82% 56%)" }}
-                />
-              </div>
-              <div className="mt-4 flex gap-1.5 flex-wrap items-center">
-                <p className="section-label mr-1">Extracted Skills</p>
-                {result.extracted_skills.map((s) => (
-                  <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {chartData.length > 0 && (
-            <Card variant="elevated">
-              <CardContent className="p-5">
-                <p className="section-label mb-4">Your Skill Levels</p>
-                <div className="h-[300px]" role="img" aria-label="Bar chart showing your skill levels for this job">
-                  <ResponsiveContainer>
-                    <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
-                      <XAxis type="number" domain={[0, 1]} tick={{ fill: "#6b7280", fontSize: 11 }} />
-                      <YAxis type="category" dataKey="skill" width={100} tick={{ fill: "#374151", fontSize: 11 }} />
-                      <Tooltip
-                        formatter={(v) => `${Math.round(Number(v) * 100)}%`}
-                        contentStyle={CHART_STYLE.contentStyle}
-                      />
-                      <Bar dataKey="level" name="Your Level" radius={[0, 3, 3, 0]}>
-                        {chartData.map((entry, i) => (
-                          <Cell key={i} fill={GAP_COLORS[entry.severity]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <GapTable gaps={result.gaps} />
-        </div>
-      )}
+      {/* Tips */}
+      <div className="text-xs text-muted-foreground space-y-1 pb-4">
+        <p className="font-semibold text-foreground/70 mb-2">Tips</p>
+        <p>• Paste the full JD including responsibilities and requirements.</p>
+        <p>• The optional job title field helps label your results clearly.</p>
+        <p>• Use the gap table to shortlist SCTP courses to close critical gaps.</p>
+      </div>
     </div>
   );
 }
