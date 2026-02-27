@@ -10,7 +10,7 @@ SkillBridge — Job Recommendation & Skill Gap Analysis System for SCTP learners
 
 - **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + Recharts + Framer Motion + Three.js
 - **Backend**: NestJS 10 + TypeScript + MikroORM + Passport.js (replacing Python FastAPI — migration in progress)
-- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, Google Gemini, AWS Bedrock (Claude 3.5 Sonnet) — NestJS `IntelligenceModule` currently returns mocked responses; LLM wiring in progress
+- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, Google Gemini, AWS Bedrock (Claude 3.5 Sonnet) — `IntelligenceModule` wired via `LlmService`; fallback chain: Gemini → Bedrock → 503
 - **Database**: PostgreSQL 16 + pgvector
 - **Automation**: n8n workflows
 - **Deployment (capstone)**: Docker Compose locally; AWS Lambda + Aurora Serverless v2 + S3/CloudFront via Terraform
@@ -62,6 +62,9 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `BEDROCK_MODEL_ID` — Bedrock model (must use cross-region inference profile ID, not direct model ID)
 - `NEXT_PUBLIC_API_URL` — frontend env var pointing to backend (default `http://localhost:8000`)
 - `CORS_ALLOWED_ORIGINS` — JSON array of allowed origins (default `["http://localhost:3000","http://localhost:5173"]`)
+- `SSG_CLIENT_ID`, `SSG_CLIENT_SECRET` — optional; SkillsFuture/WSG API credentials. If absent, SSG module falls back to seeded SCTP data
+- `SSG_API_BASE_URL`, `SSG_TOKEN_URL` — SSG API endpoints (optional)
+- `SSG_CACHE_TTL_SECONDS` — how long to cache SSG responses in PostgreSQL (optional)
 
 ## Architecture
 
@@ -71,25 +74,26 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 **ORM config**: `src/mikro-orm.config.ts` — MikroORM with PostgreSQL driver; entities at `src/entities/*.entity.ts`.
 **App config/validation**: `src/common/config/env.validation.ts` — class-validator schema for env vars.
 
-**Entities** (`src/entities/`): `user.entity.ts`, `user-profile.entity.ts`, `skill.entity.ts`, `job-role.entity.ts`, `sctp-course.entity.ts`, `skill-progress.entity.ts`, `market-insight.entity.ts`, `profile-snapshot.entity.ts`, `tenant.entity.ts`
+**Entities** (`src/entities/`): `user.entity.ts`, `user-profile.entity.ts`, `skill.entity.ts`, `job-role.entity.ts`, `sctp-course.entity.ts`, `skill-progress.entity.ts`, `market-insight.entity.ts`, `profile-snapshot.entity.ts`, `tenant.entity.ts`, `ssg-cache.entity.ts`
 
 **Modules** (`src/`):
 - `auth/` — Passport.js JWT + Local strategies; `AuthController`, `AuthService`
 - `users/` — user CRUD
 - `profile/` — user profile management
 - `skills/` — skill taxonomy + user skills
-- `intelligence/` — AI features: `chat()`, `getRecommendations()`, `getSkillGap()`, `interview()`; **currently mocked** — LLM integration in progress
+- `intelligence/` — AI features: `chat()`, `getRecommendations()`, `getSkillGap()`, `interview()`, `rewriteResume()`; wired via `LlmService`
 - `intelligence/upload.controller.ts` — resume upload + parsing
 - `upskilling/` — roadmap and course pathways
 - `roles/` — job role listing
 - `courses/` — SCTP course catalog
-- `domain/` — Singapore labor market insights
+- `domain/` — Singapore labor market insights; also owns `GET /api/dashboard/summary`
+- `ssg/` — SkillsFuture/WSG API integration with three-tier fallback: PostgreSQL cache → live SSG API → seeded SCTPCourse rows
 - `common/` — shared config, filters, interceptors, utils (`resume-parser.util.ts`)
 - `seeders/` — MikroORM seed data
 
 **Auth flow**: `POST /auth/login` accepts JSON `{ username, password }` via Local strategy → returns JWT. Token attached as `Authorization: Bearer <token>`. JWT strategy validates subsequent requests.
 
-**Note**: The `intelligence/intelligence.service.ts` methods return mocked data. When wiring real LLM calls, inject a Gemini/Bedrock provider and follow the fallback chain: Gemini → Bedrock Claude 3.5 Sonnet → 503.
+**LLM wiring**: `LlmService` (`intelligence/llm.service.ts`) handles Gemini/Bedrock dispatch. Fallback chain: Gemini API → Bedrock Claude 3.5 Sonnet → HTTP 503. The `resume-rewriter` endpoint (`POST /api/resume-rewriter`) also lives in `IntelligenceController`.
 
 ### Frontend (`frontend/`)
 
@@ -220,3 +224,9 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 | POST   | /api/rag/query                | RAG-based document retrieval          |
 | POST   | /api/gap-analysis             | Async skill gap analysis              |
 | POST   | /api/voice                    | Voice coaching session                |
+| GET    | /api/dashboard/summary        | Authenticated user's dashboard KPIs   |
+| POST   | /api/resume-rewriter          | Rewrite a resume bullet for a role    |
+| GET    | /api/ssg/courses/search       | Search SkillsFuture courses (paginated; falls back to seeded data) |
+| GET    | /api/ssg/courses/:ref         | Get single SSG course by reference number |
+| GET    | /api/ssg/job-roles            | List WSG SkillsFramework job roles    |
+| POST   | /api/ssg/recommendations      | Personalised SSG courses by skill overlap |
