@@ -2,6 +2,9 @@
 
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
   Command,
   Sparkles,
@@ -78,32 +81,57 @@ function MarketBar({ value, delta }: { value: number; delta: string }) {
   );
 }
 
+const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+const registerSchema = z
+  .object({
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    email: z.string().email("Please enter a valid email address"),
+    password: z.string().min(8, "Password must be at least 8 characters long"),
+    password_confirm: z.string(),
+  })
+  .refine((data) => data.password === data.password_confirm, {
+    message: "Passwords do not match",
+    path: ["password_confirm"],
+  });
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+type RegisterFormValues = z.infer<typeof registerSchema>;
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") || "login");
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-    password_confirm: "",
-    name: "",
-  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Login Form Hook
+  const loginForm = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  // Register Form Hook
+  const registerForm = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { name: "", email: "", password: "", password_confirm: "" },
+  });
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const userName =
     typeof window !== "undefined" ? localStorage.getItem("userName") : null;
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onLoginSubmit = async (data: LoginFormValues) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.append("username", form.email);
-      params.append("password", form.password);
+      params.append("username", data.email);
+      params.append("password", data.password);
       const res = await api.post("/api/auth/login", params, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
@@ -133,18 +161,17 @@ function LoginForm() {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onRegisterSubmit = async (data: RegisterFormValues) => {
     setLoading(true);
     setError(null);
     const profileId = searchParams.get("profileId");
+
     try {
-      // Backend RegisterDto expects camelCase with forbidNonWhitelisted:true
       await api.post("/api/auth/register", {
-        email: form.email,
-        password: form.password,
-        passwordConfirm: form.password_confirm,
-        name: form.name,
+        email: data.email,
+        password: data.password,
+        passwordConfirm: data.password_confirm,
+        name: data.name,
         tenantName: "Global",
         profileId: profileId ? parseInt(profileId) : undefined,
       });
@@ -347,7 +374,10 @@ function LoginForm() {
             )}
 
             <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form
+                onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                className="space-y-4"
+              >
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="email"
@@ -360,12 +390,13 @@ function LoginForm() {
                     id="email"
                     type="email"
                     placeholder="name@example.com"
-                    required
-                    value={form.email}
-                    onChange={(e) =>
-                      setForm({ ...form, email: e.target.value })
-                    }
+                    {...loginForm.register("email")}
                   />
+                  {loginForm.formState.errors.email && (
+                    <p className="text-sm text-destructive">
+                      {loginForm.formState.errors.email.message}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label
@@ -378,12 +409,13 @@ function LoginForm() {
                   <Input
                     id="password"
                     type="password"
-                    required
-                    value={form.password}
-                    onChange={(e) =>
-                      setForm({ ...form, password: e.target.value })
-                    }
+                    {...loginForm.register("password")}
                   />
+                  {loginForm.formState.errors.password && (
+                    <p className="text-sm text-destructive">
+                      {loginForm.formState.errors.password.message}
+                    </p>
+                  )}
                 </div>
                 <Button
                   type="submit"
@@ -403,7 +435,10 @@ function LoginForm() {
             </TabsContent>
 
             <TabsContent value="register">
-              <form onSubmit={handleRegister} className="space-y-4">
+              <form
+                onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
+                className="space-y-4"
+              >
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="name"
@@ -415,10 +450,13 @@ function LoginForm() {
                   <Input
                     id="name"
                     placeholder="Jane Doe"
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    {...registerForm.register("name")}
                   />
+                  {registerForm.formState.errors.name && (
+                    <p className="text-sm text-destructive">
+                      {registerForm.formState.errors.name.message}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label
@@ -432,12 +470,13 @@ function LoginForm() {
                     id="reg-email"
                     type="email"
                     placeholder="name@example.com"
-                    required
-                    value={form.email}
-                    onChange={(e) =>
-                      setForm({ ...form, email: e.target.value })
-                    }
+                    {...registerForm.register("email")}
                   />
+                  {registerForm.formState.errors.email && (
+                    <p className="text-sm text-destructive">
+                      {registerForm.formState.errors.email.message}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label
@@ -450,16 +489,13 @@ function LoginForm() {
                   <Input
                     id="reg-password"
                     type="password"
-                    required
-                    minLength={8}
-                    value={form.password}
-                    onChange={(e) =>
-                      setForm({ ...form, password: e.target.value })
-                    }
+                    {...registerForm.register("password")}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Minimum 8 characters
-                  </p>
+                  {registerForm.formState.errors.password && (
+                    <p className="text-sm text-destructive">
+                      {registerForm.formState.errors.password.message}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label
@@ -472,12 +508,13 @@ function LoginForm() {
                   <Input
                     id="reg-confirm"
                     type="password"
-                    required
-                    value={form.password_confirm}
-                    onChange={(e) =>
-                      setForm({ ...form, password_confirm: e.target.value })
-                    }
+                    {...registerForm.register("password_confirm")}
                   />
+                  {registerForm.formState.errors.password_confirm && (
+                    <p className="text-sm text-destructive">
+                      {registerForm.formState.errors.password_confirm.message}
+                    </p>
+                  )}
                 </div>
                 <Button
                   type="submit"

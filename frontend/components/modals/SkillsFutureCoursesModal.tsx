@@ -6,7 +6,7 @@ import { CourseCard } from "@/components/ui/course-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ssgApi, type SsgCourse, type PaginatedSsgCoursesResponse } from "@/lib/api";
+import { ssgApi, type PaginatedSsgCoursesResponse } from "@/lib/api";
 import {
   Search,
   ChevronLeft,
@@ -34,13 +34,14 @@ export default function SkillsFutureCoursesModal({
   onClose,
   initialKeyword = "",
   initialSkill = "",
-  profileSkills,
   targetRole,
 }: SkillsFutureCoursesModalProps) {
   const [keyword, setKeyword] = useState(initialKeyword);
   const [inputValue, setInputValue] = useState(initialKeyword);
   const [page, setPage] = useState(0);
-  const [result, setResult] = useState<PaginatedSsgCoursesResponse | null>(null);
+  const [result, setResult] = useState<PaginatedSsgCoursesResponse | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,11 +90,12 @@ export default function SkillsFutureCoursesModal({
 
   const totalPages = result ? Math.ceil(result.total / PAGE_SIZE) : 0;
 
-  const sourceInfo = result?.source === "live"
-    ? { label: "Live SSG API", variant: "success" as const }
-    : result?.source === "cached"
-    ? { label: "Cached", variant: "accent" as const }
-    : { label: "Offline (seeded)", variant: "secondary" as const };
+  const sourceInfo =
+    result?.source === "live"
+      ? { label: "Live SSG API", variant: "success" as const }
+      : result?.source === "cached"
+        ? { label: "Cached", variant: "accent" as const }
+        : { label: "Offline (seeded)", variant: "secondary" as const };
 
   return (
     <AppModal
@@ -115,7 +117,8 @@ export default function SkillsFutureCoursesModal({
         totalPages > 1 ? (
           <div className="flex w-full items-center justify-between">
             <p className="text-xs text-muted-foreground">
-              Page {page + 1} of {totalPages} &middot; {result?.total ?? 0} courses
+              Page {page + 1} of {totalPages} &middot; {result?.total ?? 0}{" "}
+              courses
             </p>
             <div className="flex gap-2">
               <Button
@@ -197,7 +200,9 @@ export default function SkillsFutureCoursesModal({
           <div className="h-16 w-16 rounded-3xl bg-muted/50 flex items-center justify-center mb-4">
             <GraduationCap className="h-8 w-8 text-muted-foreground/40" />
           </div>
-          <p className="text-base font-bold text-foreground">No courses found</p>
+          <p className="text-base font-bold text-foreground">
+            No courses found
+          </p>
           <p className="text-sm text-muted-foreground mt-1.5 max-w-xs">
             Try a different keyword or clear the search to browse all courses.
           </p>

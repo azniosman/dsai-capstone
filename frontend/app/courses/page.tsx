@@ -37,23 +37,29 @@ interface Course {
 }
 
 /** Normalise backend camelCase fields (NestJS/MikroORM) to the snake_case shape this page uses. */
-function normalizeCourse(raw: any): Course {
-  const fee = raw.course_fee ?? raw.courseFee ?? 0;
-  const subsidyPct = raw.subsidy_percent ?? raw.subsidyPercent ?? 70;
+function normalizeCourse(raw: Record<string, unknown>): Course {
+  const fee = Number(raw.course_fee ?? raw.courseFee ?? 0);
+  const subsidyPct = Number(raw.subsidy_percent ?? raw.subsidyPercent ?? 70);
   return {
-    id: raw.id,
-    title: raw.title,
-    provider: raw.provider,
-    duration_weeks: raw.duration_weeks ?? raw.durationWeeks ?? 0,
-    level: raw.level ?? "intermediate",
-    mces_eligible: raw.mces_eligible ?? raw.mcesEligible ?? false,
-    certification: raw.certification,
-    skills_taught: raw.skills_taught ?? raw.skillsTaught ?? [],
+    id: Number(raw.id),
+    title: String(raw.title || ""),
+    provider: String(raw.provider || ""),
+    duration_weeks: Number(raw.duration_weeks ?? raw.durationWeeks ?? 0),
+    level: String(raw.level ?? "intermediate"),
+    mces_eligible: Boolean(raw.mces_eligible ?? raw.mcesEligible ?? false),
+    certification: raw.certification ? String(raw.certification) : undefined,
+    skills_taught: Array.isArray(raw.skills_taught ?? raw.skillsTaught)
+      ? ((raw.skills_taught ?? raw.skillsTaught) as string[])
+      : [],
     course_fee: fee,
     subsidy_percent: subsidyPct,
-    subsidy_amount: raw.subsidy_amount ?? Math.round((fee * subsidyPct) / 100),
-    sfc_applicable: raw.sfc_applicable ?? raw.skillsfutureCreditAmount ?? 0,
-    nett_payable: raw.nett_payable ?? raw.nettFeeAfterSubsidy ?? 0,
+    subsidy_amount: Number(
+      raw.subsidy_amount ?? Math.round((fee * subsidyPct) / 100),
+    ),
+    sfc_applicable: Number(
+      raw.sfc_applicable ?? raw.skillsfutureCreditAmount ?? 0,
+    ),
+    nett_payable: Number(raw.nett_payable ?? raw.nettFeeAfterSubsidy ?? 0),
   };
 }
 
@@ -83,12 +89,16 @@ export default function CourseBrowser() {
           signal: controller.signal,
         });
         // Backend returns SCTPCourse[] directly with camelCase fields — normalize to snake_case
-        const rawList = Array.isArray(res.data) ? res.data : (res.data?.courses ?? []);
+        const rawList = Array.isArray(res.data)
+          ? res.data
+          : (res.data?.courses ?? []);
         const courseList: Course[] = rawList.map(normalizeCourse);
         setCourses(courseList);
         setProviders((prev) => {
           if (prev.length === 0 && courseList.length > 0) {
-            return [...new Set(courseList.map((c: Course) => c.provider))].sort() as string[];
+            return [
+              ...new Set(courseList.map((c: Course) => c.provider)),
+            ].sort() as string[];
           }
           return prev;
         });
@@ -130,7 +140,10 @@ export default function CourseBrowser() {
       <Card variant="data">
         <CardContent className="p-4">
           <div className="flex gap-4 flex-wrap items-end">
-            <Select value={provider} onValueChange={(v) => setProvider(v === "all" ? "" : v)}>
+            <Select
+              value={provider}
+              onValueChange={(v) => setProvider(v === "all" ? "" : v)}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Providers" />
               </SelectTrigger>
@@ -144,7 +157,10 @@ export default function CourseBrowser() {
               </SelectContent>
             </Select>
 
-            <Select value={level} onValueChange={(v) => setLevel(v === "all" ? "" : v)}>
+            <Select
+              value={level}
+              onValueChange={(v) => setLevel(v === "all" ? "" : v)}
+            >
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="All Levels" />
               </SelectTrigger>

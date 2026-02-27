@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -14,6 +16,7 @@ import {
   BookOpen,
   Target,
   Calendar,
+  Trophy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,45 +32,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  LineChart,
-  Line,
-  Legend,
-  Cell,
-} from "recharts";
 import { ChartCard } from "@/components/ui/chart-card";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
 import { extractApiError, cn } from "@/lib/utils";
-import { CHART_SERIES, CHART_AXIS, TOOLTIP_STYLE } from "@/lib/chart-colors";
+import { KpiCard } from "@/components/dashboard/KpiCard";
+// import { TimelineView } from "@/components/dashboard/TimelineView";
+
+const SkillProficiencyBar = dynamic(
+  () =>
+    import("@/components/dashboard/charts/SkillProficiencyBar").then(
+      (mod) => mod.SkillProficiencyBar,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[350px] w-full bg-card/40 animate-pulse rounded-xl" />
+    ),
+  },
+);
+const ProgressTrendLine = dynamic(
+  () =>
+    import("@/components/dashboard/charts/ProgressTrendLine").then(
+      (mod) => mod.ProgressTrendLine,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[350px] w-full bg-card/40 animate-pulse rounded-xl" />
+    ),
+  },
+);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ProgressEntry {
-  id?: number;
-  skill: string;
-  level: number;
-  recorded_at: string;
-}
-
-interface ProgressData {
-  skills_acquired: number;
-  skills_in_progress: number;
-  skills_total: number;
-  entries: ProgressEntry[];
-}
-
-interface TimelinePoint {
-  date: string;
-  skill: string;
-  level: number;
-}
+import type { ProgressEntry, ProgressData, TimelinePoint } from "@/types/api";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -267,11 +266,43 @@ function computeStreak(entries: ProgressEntry[]): number {
 
 export default function ProgressDashboard() {
   const router = useRouter();
-  const [progress, setProgress] = useState<ProgressData | null>(null);
-  const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient = useQueryClient();
+
+  // Auto-redirect if not logged in
+  if (typeof window !== "undefined" && !localStorage.getItem("token")) {
+    router.push("/login");
+  }
+
+  const profileId =
+    typeof window !== "undefined" ? localStorage.getItem("profileId") : null;
+
+  const {
+    data: progress,
+    isLoading: isProgressLoading,
+    error: progressError,
+    refetch,
+  } = useQuery({
+    queryKey: ["progress", profileId],
+    queryFn: async () => {
+      const res = await api.get(`/api/progress/${profileId}`);
+      return res.data as ProgressData;
+    },
+    enabled: !!profileId,
+  });
+
+  const { data: timeline = [], isLoading: isTimelineLoading } = useQuery({
+    queryKey: ["progress-timeline", profileId],
+    queryFn: async () => {
+      const res = await api.get(`/api/progress/${profileId}/timeline`);
+      return (res.data.timeline || []) as TimelinePoint[];
+    },
+    enabled: !!profileId,
+  });
+
+  const loading = isProgressLoading || isTimelineLoading;
+  const error = progressError
+    ? extractApiError(progressError, "Failed to load progress")
+    : null;
 
   // Record form
   const [newSkill, setNewSkill] = useState("");
@@ -288,40 +319,12 @@ export default function ProgressDashboard() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
 
-  const profileId =
-    typeof window !== "undefined" ? localStorage.getItem("profileId") : null;
-
-  useEffect(() => {
-    if (!profileId) {
-      router.push("/");
-      return;
-    }
-    const controller = new AbortController();
-    const fetch = async () => {
-      try {
-        const [progRes, timeRes] = await Promise.all([
-          api.get(`/api/progress/${profileId}`, { signal: controller.signal }),
-          api.get(`/api/progress/${profileId}/timeline`, {
-            signal: controller.signal,
-          }),
-        ]);
-        if (!controller.signal.aborted) {
-          setProgress(progRes.data);
-          setTimeline(timeRes.data.timeline || []);
-        }
-      } catch (err: unknown) {
-        if (!controller.signal.aborted) {
-          setError(extractApiError(err, "Failed to load progress"));
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    };
-    fetch();
-    return () => controller.abort();
-  }, [profileId, router, refreshKey]);
-
-  const refresh = () => setRefreshKey((k) => k + 1);
+  const refresh = () => {
+    refetch();
+    queryClient.invalidateQueries({
+      queryKey: ["progress-timeline", profileId],
+    });
+  };
 
   const recordProgress = async () => {
     if (!newSkill.trim() || !profileId) return;
@@ -450,59 +453,45 @@ export default function ProgressDashboard() {
         </h1>
       </header>
 
-      {/* ── KPI Row ─────────────────────────────────────────────────────── */}
+      {/* ── KPI Row ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          {
-            icon: (
-              <CheckCircle2
-                className="h-5 w-5"
-                style={{ color: "hsl(145 60% 36%)" }}
-              />
-            ),
-            value: progress?.skills_acquired ?? 0,
-            label: "Acquired",
-            color: "hsl(145 60% 36%)",
-          },
-          {
-            icon: (
-              <BookOpen
-                className="h-5 w-5"
-                style={{ color: "hsl(40 90% 45%)" }}
-              />
-            ),
-            value: progress?.skills_in_progress ?? 0,
-            label: "In Progress",
-            color: "hsl(40 90% 45%)",
-          },
-          {
-            icon: <Target className="h-5 w-5 text-primary" />,
-            value: progress?.skills_total ?? 0,
-            label: "Total Tracked",
-            color: "hsl(var(--primary))",
-          },
-          {
-            icon: (
-              <Flame className="h-5 w-5" style={{ color: "hsl(20 90% 55%)" }} />
-            ),
-            value: streak,
-            label: "Day Streak",
-            color: "hsl(20 90% 55%)",
-          },
-        ].map((kpi) => (
-          <Card key={kpi.label} variant="metric" className="text-center">
-            <CardContent className="p-5">
-              <div className="flex justify-center mb-2">{kpi.icon}</div>
-              <div
-                className="text-3xl font-black tabular-nums"
-                style={{ color: kpi.color }}
-              >
-                {kpi.value}
-              </div>
-              <p className="section-label mt-1.5">{kpi.label}</p>
-            </CardContent>
-          </Card>
-        ))}
+        <KpiCard
+          icon={<CheckCircle2 className="h-5 w-5" />}
+          label="Acquired"
+          value={progress?.skills_acquired ?? 0}
+          delta={0}
+          accentColor="text-[hsl(145,60%,36%)]"
+          iconColor="bg-emerald-500/10 text-emerald-600 ring-emerald-500/20"
+          glowColor="bg-emerald-500/5"
+          subLabel="Skills mastered"
+        />
+        <KpiCard
+          icon={<BookOpen className="h-5 w-5" />}
+          label="In Progress"
+          value={progress?.skills_in_progress ?? 0}
+          delta={0}
+          accentColor="text-amber-500"
+          iconColor="bg-amber-500/10 text-amber-500 ring-amber-500/20"
+          glowColor="bg-amber-500/5"
+          subLabel="Being learned"
+        />
+        <KpiCard
+          icon={<Target className="h-5 w-5" />}
+          label="Total Tracked"
+          value={progress?.skills_total ?? 0}
+          delta={0}
+          subLabel="In portfolio"
+        />
+        <KpiCard
+          icon={<Flame className="h-5 w-5" />}
+          label="Day Streak"
+          value={streak}
+          delta={0}
+          accentColor="text-orange-500"
+          iconColor="bg-orange-500/10 text-orange-500 ring-orange-500/20"
+          glowColor="bg-orange-500/5"
+          subLabel="Consecutive days"
+        />
       </div>
 
       {/* ── Record Progress Form ──────────────────────────────────────────── */}
@@ -673,42 +662,7 @@ export default function ProgressDashboard() {
           height={Math.max(180, levelBarData.length * 28 + 40)}
           ariaLabel="Bar chart of current skill levels"
         >
-          <BarChart
-            data={levelBarData}
-            layout="vertical"
-            margin={{ left: 8, right: 8 }}
-          >
-            <CartesianGrid {...CHART_AXIS.grid} horizontal={false} />
-            <XAxis
-              type="number"
-              domain={[0, 1]}
-              ticks={[0, 0.5, 1]}
-              tickFormatter={(v) => `${Math.round(v * 100)}%`}
-              tick={{ ...CHART_AXIS.tick, fontSize: 10 }}
-            />
-            <YAxis
-              type="category"
-              dataKey="skill"
-              width={90}
-              tick={CHART_AXIS.tickBold}
-            />
-            <Tooltip
-              formatter={(v) => [`${Math.round(Number(v) * 100)}%`, "Level"]}
-              contentStyle={TOOLTIP_STYLE}
-            />
-            <Bar
-              dataKey="level"
-              radius={[0, 4, 4, 0]}
-              name="Level"
-              maxBarSize={18}
-              animationDuration={600}
-              animationEasing="ease-out"
-            >
-              {levelBarData.map((entry) => (
-                <Cell key={entry.skill} fill={getLevelColor(entry.level)} />
-              ))}
-            </Bar>
-          </BarChart>
+          <SkillProficiencyBar data={levelBarData} />
         </ChartCard>
       )}
 
@@ -732,33 +686,7 @@ export default function ProgressDashboard() {
           height={260}
           ariaLabel="Line chart of skill progress over time"
         >
-          <LineChart data={chartData}>
-            <CartesianGrid {...CHART_AXIS.grid} />
-            <XAxis dataKey="date" tick={CHART_AXIS.tick} />
-            <YAxis
-              domain={[0, 1]}
-              ticks={[0, 0.5, 1]}
-              tickFormatter={(v) => `${Math.round(v * 100)}%`}
-              tick={CHART_AXIS.tick}
-            />
-            <Tooltip
-              contentStyle={TOOLTIP_STYLE}
-              formatter={(v) => [`${Math.round(Number(v) * 100)}%`]}
-            />
-            <Legend wrapperStyle={{ fontSize: "12px" }} />
-            {allSkills.map((skill, i) => (
-              <Line
-                key={skill}
-                type="monotone"
-                dataKey={skill}
-                stroke={CHART_SERIES[i % CHART_SERIES.length]}
-                strokeWidth={2}
-                animationDuration={800}
-                animationEasing="ease-in-out"
-                dot
-              />
-            ))}
-          </LineChart>
+          <ProgressTrendLine data={chartData} skills={allSkills} />
         </ChartCard>
       )}
 

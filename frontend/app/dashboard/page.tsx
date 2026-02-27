@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   Briefcase,
   BarChart3,
@@ -15,9 +17,6 @@ import {
   ArrowUpRight,
   Brain,
   ChevronRight,
-  ArrowUp,
-  ArrowDown,
-  Minus,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,46 +27,28 @@ import { AIResponse } from "@/components/ui/ai-response";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, extractApiError } from "@/lib/utils";
 import api from "@/lib/api-client";
-import {
-  SkillRadar,
-  type SkillRadarMetrics,
-} from "@/components/ui/skill-radar";
+import type { SkillRadarMetrics } from "@/components/ui/skill-radar";
+
+// Dynamically import heavy chart components
+const SkillRadar = dynamic(
+  () => import("@/components/ui/skill-radar").then((mod) => mod.SkillRadar),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="min-h-[350px] w-full bg-card/40 animate-pulse rounded-[2rem]" />
+    ),
+  },
+);
 import { useModalStore } from "@/store/modalStore";
 import { useProfileBuilderStore } from "@/store/profileBuilderStore";
+import {
+  KpiCard,
+  KpiCardSkeleton,
+  ScoreBar,
+} from "@/components/dashboard/KpiCard";
 
 import { toast } from "sonner";
-
-/* ───────── Types ───────── */
-interface DashboardSummary {
-  profile_id: number;
-  name: string;
-  education: string | null;
-  years_experience: number;
-  is_career_switcher: boolean;
-  skills: string[];
-  skills_count: number;
-  recommendations_count: number;
-  gaps_identified: number;
-  progress_entries: number;
-  career_readiness: number;
-  skills_delta: number;
-  recommendations_delta: number;
-  gaps_delta: number;
-}
-interface Recommendation {
-  role_id: number;
-  title: string;
-  category: string;
-  salary_range?: string;
-  match_score: number;
-  content_score: number;
-  rule_score: number;
-  skill_match_quality: string;
-  career_switcher_bonus: number;
-  matched_skills: string[];
-  missing_skills: string[];
-  rationale: string;
-}
+import type { DashboardSummary, Recommendation } from "@/types/api";
 
 const QUICK_ACTIONS = [
   {
@@ -117,171 +98,60 @@ const QUICK_ACTIONS = [
   },
 ];
 
-/* Score bar with semantic coloring */
-function ScoreBar({ score }: { score: number }) {
-  const fill =
-    score >= 70
-      ? "bg-primary"
-      : score >= 40
-        ? "bg-amber-500"
-        : "bg-destructive";
-  return (
-    <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
-      <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: `${score}%` }}
-        transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-        className={`h-full ${fill} shadow-[0_0_10px_rgba(inherit,0.5)]`}
-      />
-    </div>
-  );
-}
-
-/* KPI delta indicator */
-function Delta({ value }: { value: number }) {
-  if (value > 0)
-    return (
-      <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
-        <ArrowUp className="h-3 w-3" />
-        {value}
-      </span>
-    );
-  if (value < 0)
-    return (
-      <span className="flex items-center gap-0.5 text-[10px] font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-md">
-        <ArrowDown className="h-3 w-3" />
-        {Math.abs(value)}
-      </span>
-    );
-  return (
-    <span className="text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-md">
-      <Minus className="h-3 w-3 inline" />
-    </span>
-  );
-}
-
-function KpiSkeleton() {
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {[...Array(4)].map((_, i) => (
-        <Card key={i} className="clay-card overflow-hidden">
-          <CardContent className="p-5">
-            <Skeleton className="h-3 w-24 mb-4" />
-            <Skeleton className="h-10 w-16 mb-2" />
-            <Skeleton className="h-3 w-20" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-/** Animated Number Counter */
-function CountingNumber({ value }: { value: number }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let start = 0;
-    const duration = 1500; // ms
-    const increment = value / (duration / 16);
-
-    const animate = () => {
-      start += increment;
-      if (start < value) {
-        setDisplayValue(Math.ceil(start));
-        requestAnimationFrame(animate);
-      } else {
-        setDisplayValue(value);
-      }
-    };
-    requestAnimationFrame(animate);
-  }, [value]);
-
-  return <span>{displayValue}</span>;
-}
-
 export default function Dashboard() {
   const router = useRouter();
   const { openModal } = useModalStore();
   const openProfileBuilder = useProfileBuilderStore((state) => state.open);
-  const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [aiThinking, setAiThinking] = useState(false);
   const [promptResponse, setPromptResponse] = useState<string | null>(null);
   const [engine, setEngine] = useState<string | null>(null);
-  const [recs, setRecs] = useState<Recommendation[]>([]);
   const [hoveredRecIdx, setHoveredRecIdx] = useState(0);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
+  // Auto-redirect if not logged in
+  if (typeof window !== "undefined" && !localStorage.getItem("token")) {
+    router.push("/login");
+  }
 
-    const fetchData = async () => {
-      const profileId = localStorage.getItem("profileId");
-
-      // OPTIMISTIC UI: Try to load from cache first for instant rendering
-      const cachedData = sessionStorage.getItem("dashboard_cache");
-      if (cachedData) {
-        try {
-          const parsed = JSON.parse(cachedData);
-          if (parsed.summary) setSummary(parsed.summary);
-          if (parsed.recs) setRecs(parsed.recs);
-          setLoading(false); // Instantly turn off skeleton loaders
-        } catch (e) {
-          console.error("Failed to parse dashboard cache", e);
-        }
+  // Fetch Dashboard Summary
+  const {
+    data: summary,
+    isLoading: isSummaryLoading,
+    error: summaryError,
+  } = useQuery({
+    queryKey: ["dashboard-summary"],
+    queryFn: async () => {
+      const res = await api.get("/api/dashboard/summary");
+      if (res.data?.profile_id) {
+        localStorage.setItem("profileId", String(res.data.profile_id));
       }
+      return res.data as DashboardSummary;
+    },
+  });
 
-      try {
-        const summaryRes = await api.get("/api/dashboard/summary");
-        let newSummary = null;
-        let newRecs: Recommendation[] = [];
+  const profileId =
+    summary?.profile_id ||
+    (typeof window !== "undefined" ? localStorage.getItem("profileId") : null);
 
-        if (summaryRes) {
-          newSummary = summaryRes.data;
-          setSummary(newSummary);
-          if (newSummary?.profile_id) {
-            localStorage.setItem("profileId", String(newSummary.profile_id));
-          }
-        }
+  // Fetch Recommendations (depends on profileId)
+  const { data: recs = [], isLoading: isRecsLoading } = useQuery({
+    queryKey: ["recommendations", profileId],
+    queryFn: async () => {
+      const res = await api.post("/api/recommend", {
+        profile_id: Number(profileId),
+      });
+      return (res.data.recommendations?.slice(0, 5) || []) as Recommendation[];
+    },
+    enabled: !!profileId,
+  });
 
-        const pid =
-          profileId || (newSummary ? String(newSummary.profile_id) : null);
-        if (pid) {
-          const recsRes = await api.post("/api/recommend", {
-            profile_id: Number(pid),
-          });
-          if (recsRes) {
-            newRecs = recsRes.data.recommendations?.slice(0, 5) || [];
-            setRecs(newRecs);
-          }
-        }
+  const loading = isSummaryLoading || isRecsLoading;
 
-        // Save fresh data to cache for next navigation
-        if (newSummary) {
-          sessionStorage.setItem(
-            "dashboard_cache",
-            JSON.stringify({
-              summary: newSummary,
-              recs: newRecs,
-            }),
-          );
-        }
-      } catch (err: unknown) {
-        console.error(err);
-        // Only show error toast if we don't already have cached data
-        if (!cachedData) {
-          toast.error(extractApiError(err, "Failed to load dashboard data"));
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [router]);
+  if (summaryError) {
+    if (!toast.custom)
+      toast.error(
+        extractApiError(summaryError, "Failed to load dashboard data"),
+      );
+  }
 
   const handlePromptSubmit = async (value: string) => {
     setAiThinking(true);
@@ -387,139 +257,49 @@ export default function Dashboard() {
 
       {/* ─── KPI Row (Bento Grid Style) ─── */}
       {loading ? (
-        <KpiSkeleton />
+        <KpiCardSkeleton />
       ) : (
         summary && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Skills */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card className="h-full clay-card hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-primary/10 transition-colors" />
-                <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
-                  <div>
-                    <div className="p-2 bg-primary/10 w-fit rounded-xl mb-4 text-primary ring-1 ring-primary/20">
-                      <Briefcase className="w-4 h-4" />
-                    </div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
-                      Skills Tracked
-                    </p>
-                  </div>
-                  <div>
-                    <div className="text-4xl font-black tracking-tighter text-foreground mb-2 flex items-baseline">
-                      <CountingNumber value={summary.skills_count} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Delta value={summary.skills_delta} />
-                      <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
-                        Active in profile
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Job Matches */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="h-full clay-card hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-primary/10 transition-colors" />
-                <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
-                  <div>
-                    <div className="p-2 bg-primary/10 w-fit rounded-xl mb-4 text-primary ring-1 ring-primary/20">
-                      <Target className="w-4 h-4" />
-                    </div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
-                      Job Matches
-                    </p>
-                  </div>
-                  <div>
-                    <div className="text-4xl font-black tracking-tighter text-primary mb-2 flex items-baseline">
-                      <CountingNumber value={summary.recommendations_count} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Delta value={summary.recommendations_delta} />
-                      <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
-                        Roles available
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Gaps */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="h-full clay-card hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
-                <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
-                  <div>
-                    <div className="p-2 bg-amber-500/10 w-fit rounded-xl mb-4 text-amber-500 ring-1 ring-amber-500/20">
-                      <BarChart3 className="w-4 h-4" />
-                    </div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
-                      Gaps Identified
-                    </p>
-                  </div>
-                  <div>
-                    <div className="text-4xl font-black tracking-tighter text-amber-500 mb-2 flex items-baseline">
-                      <CountingNumber value={summary.gaps_identified} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {/* Negative delta is conceptually good here (less gaps), but UI logic remains standard for now */}
-                      <Delta value={summary.gaps_delta} />
-                      <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
-                        To bridge
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Career Readiness */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card className="h-full clay-card hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
-                <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-transparent pointer-events-none -z-10 opacity-50" />
-                <CardContent className="p-6 relative z-10 flex flex-col justify-between h-full">
-                  <div>
-                    <div className="p-2 bg-background w-fit rounded-xl mb-4 text-foreground ring-1 ring-border shadow-sm">
-                      <Zap className="w-4 h-4" />
-                    </div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
-                      Career Readiness
-                    </p>
-                  </div>
-                  <div>
-                    <div
-                      className={cn(
-                        "text-4xl font-black tracking-tighter mb-3 flex items-baseline drop-shadow-md",
-                        readinessColor,
-                      )}
-                    >
-                      <CountingNumber value={readiness} />
-                      <span className="text-xl font-bold ml-1">%</span>
-                    </div>
-                    <ScoreBar score={readiness} />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+            <KpiCard
+              icon={<Briefcase className="w-4 h-4" />}
+              label="Skills Tracked"
+              value={summary.skills_count}
+              delta={summary.skills_delta}
+              subLabel="Active in profile"
+              motionDelay={0.1}
+            />
+            <KpiCard
+              icon={<Target className="w-4 h-4" />}
+              label="Job Matches"
+              value={summary.recommendations_count}
+              delta={summary.recommendations_delta}
+              accentColor="text-primary"
+              subLabel="Roles available"
+              motionDelay={0.2}
+            />
+            <KpiCard
+              icon={<BarChart3 className="w-4 h-4" />}
+              label="Gaps Identified"
+              value={summary.gaps_identified}
+              delta={summary.gaps_delta}
+              accentColor="text-amber-500"
+              iconColor="bg-amber-500/10 text-amber-500 ring-amber-500/20"
+              glowColor="bg-amber-500/5"
+              subLabel="To bridge"
+              motionDelay={0.3}
+            />
+            <KpiCard
+              icon={<Zap className="w-4 h-4" />}
+              label="Career Readiness"
+              value={readiness}
+              delta={0}
+              accentColor={readinessColor}
+              iconColor="bg-background text-foreground ring-border"
+              suffix="%"
+              showScoreBar
+              motionDelay={0.4}
+            />
           </div>
         )
       )}

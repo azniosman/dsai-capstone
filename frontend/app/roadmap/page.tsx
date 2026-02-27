@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Download, Route, GraduationCap, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,51 +10,29 @@ import WorkflowStepper from "@/components/ui/workflow-stepper";
 import EmptyState from "@/components/ui/empty-state";
 import SkeletonCard from "@/components/ui/skeleton-card";
 import api from "@/lib/api-client";
-
-interface RoadmapData {
-  total_weeks: number;
-  total_cost: number;
-  total_after_subsidy: number;
-  total_skillsfuture_applicable: number;
-  narrative?: string;
-  roadmap: Array<{
-    week_start: number;
-    week_end: number;
-    course_title: string;
-    provider: string;
-    duration_weeks: number;
-    level: string;
-    skill: string;
-    certification?: string;
-    skillsfuture_eligible?: boolean;
-    skillsfuture_credit_amount?: number;
-    course_fee: number;
-    nett_fee_after_subsidy: number;
-    url?: string;
-  }>;
-}
+import type { RoadmapData } from "@/types/api";
 
 export default function Roadmap() {
-  const [data, setData] = useState<RoadmapData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const profileId =
     typeof window !== "undefined" ? localStorage.getItem("profileId") : null;
 
-  useEffect(() => {
-    if (!profileId) {
-      setTimeout(() => setLoading(false), 0);
-      return;
-    }
-    api
-      .get(`/api/upskilling/${profileId}`)
-      .then((res) => setData(res.data))
-      .catch((err) =>
-        setError(err.response?.data?.detail || "Failed to load roadmap"),
-      )
-      .finally(() => setLoading(false));
-  }, [profileId]);
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["roadmap", profileId],
+    queryFn: async () => {
+      const res = await api.get(`/api/upskilling/${profileId}`);
+      return res.data as RoadmapData;
+    },
+    enabled: !!profileId,
+  });
+
+  const error = queryError
+    ? (queryError as { response?: { data?: { detail?: string } } }).response
+        ?.data?.detail || "Failed to load roadmap"
+    : null;
 
   const downloadPdf = () => {
     const base = api.defaults.baseURL || window.location.origin;

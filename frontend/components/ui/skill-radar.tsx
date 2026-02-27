@@ -161,17 +161,6 @@ function ScoreWeightBar({
 }
 
 export function SkillRadar({ data, roleName, metrics }: SkillRadarProps) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="min-h-[350px] w-full bg-card/40 animate-pulse rounded-[2rem]" />
-    );
-  }
-
   if (!data || data.length === 0) {
     return (
       <Card className="h-full w-full flex items-center justify-center min-h-[350px] bg-card/40 border-border/40 backdrop-blur-md rounded-[2rem]">
