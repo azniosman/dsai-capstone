@@ -22,7 +22,15 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   app.enableCors({
-    origin: '*', // To be configured properly later
+    origin: (() => {
+      const raw = process.env.CORS_ALLOWED_ORIGINS;
+      if (!raw) return ['http://localhost:3000', 'http://localhost:5173'];
+      try {
+        return JSON.parse(raw) as string[];
+      } catch {
+        return raw.split(',');
+      }
+    })(),
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   });

@@ -116,10 +116,10 @@ export class AuthController {
 
     let payload: any;
     try {
-      payload = this.jwtService.verify(token, {
-        secret:
-          this.configService.get<string>('JWT_SECRET') ?? 'default_secret',
-      });
+      const secret = this.configService.get<string>('JWT_SECRET');
+      if (!secret)
+        throw new Error('JWT_SECRET environment variable is required');
+      payload = this.jwtService.verify(token, { secret });
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }

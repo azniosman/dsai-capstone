@@ -56,7 +56,7 @@ services:
     ports:
       - "5678:5678"
     environment:
-      - N8N_ basic_auth_active=true
+      - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-changeme}
       - N8N_HOST=${N8N_HOST:-localhost}

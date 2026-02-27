@@ -20,5 +20,6 @@ import { SkillProgress } from '@app/entities/skill-progress.entity';
   ],
   controllers: [DomainController],
   providers: [DomainService],
+  exports: [DomainService],
 })
 export class DomainModule {}

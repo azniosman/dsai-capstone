@@ -7,6 +7,7 @@ import { ChatRequestDto, RecommendRequestDto } from './dto/intelligence.dto';
 import { InterviewRequestDto } from './dto/interview.dto';
 import { LlmService } from './llm.service';
 import { ResumeParser } from '../common/utils/resume-parser.util';
+import { DomainService } from '../domain/domain.service';
 
 @Injectable()
 export class IntelligenceService {
@@ -16,6 +17,7 @@ export class IntelligenceService {
     @InjectRepository(JobRole)
     private readonly roleRepository: EntityRepository<JobRole>,
     private readonly llmService: LlmService,
+    private readonly domainService: DomainService,
   ) {}
 
   // Shared hybrid scoring: 0.55 × content + 0.25 × rule + 0.20 × career bonus
@@ -747,109 +749,8 @@ export class IntelligenceService {
     return { suggestions };
   }
 
-  async getMarketInsights(_tenantId: number): Promise<any> {
-    return {
-      top_skills_overall: [
-        'Python',
-        'SQL',
-        'GenAI',
-        'TypeScript',
-        'AWS',
-        'Docker',
-        'Kubernetes',
-      ],
-      highest_demand_sectors: [
-        'FinTech',
-        'HealthTech',
-        'E-commerce',
-        'Cybersecurity',
-        'Cloud Computing',
-      ],
-      last_updated: new Date().toLocaleDateString('en-SG', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      }),
-      insights: [
-        {
-          role_category: 'FinTech',
-          demand_level: 'high',
-          avg_salary_sgd: 8500,
-          yoy_growth_pct: 12,
-          hiring_volume: 450,
-          trending_skills: ['React', 'NestJS', 'TypeScript'],
-          forecast_2026: 'Bullish',
-          outlook:
-            'Continued demand for full-stack engineers with focus on security and scalability.',
-        },
-        {
-          role_category: 'HealthTech',
-          demand_level: 'high',
-          avg_salary_sgd: 9500,
-          yoy_growth_pct: 18,
-          hiring_volume: 320,
-          trending_skills: ['Python', 'PyTorch', 'SQL'],
-          forecast_2026: 'Strong',
-          outlook:
-            'Surge in AI-driven diagnostics and personalized medicine requirements.',
-        },
-        {
-          role_category: 'E-commerce',
-          demand_level: 'medium',
-          avg_salary_sgd: 7200,
-          yoy_growth_pct: 8,
-          hiring_volume: 380,
-          trending_skills: ['Python', 'SQL', 'Machine Learning'],
-          forecast_2026: 'Stable',
-          outlook:
-            'Steady growth driven by personalisation and recommendation engine investments.',
-        },
-        {
-          role_category: 'Cybersecurity',
-          demand_level: 'high',
-          avg_salary_sgd: 10500,
-          yoy_growth_pct: 22,
-          hiring_volume: 280,
-          trending_skills: ['SIEM', 'Network Security', 'Python'],
-          forecast_2026: 'Strong',
-          outlook:
-            'Critical talent shortage; MAS regulations driving compliance hiring across all sectors.',
-        },
-        {
-          role_category: 'Cloud Computing',
-          demand_level: 'high',
-          avg_salary_sgd: 9800,
-          yoy_growth_pct: 20,
-          hiring_volume: 410,
-          trending_skills: ['AWS', 'Kubernetes', 'Terraform'],
-          forecast_2026: 'Bullish',
-          outlook:
-            'Digital transformation mandates across government and enterprise driving cloud adoption.',
-        },
-        {
-          role_category: 'Data & Analytics',
-          demand_level: 'high',
-          avg_salary_sgd: 8200,
-          yoy_growth_pct: 15,
-          hiring_volume: 520,
-          trending_skills: ['Python', 'SQL', 'Spark'],
-          forecast_2026: 'Bullish',
-          outlook:
-            'Data-driven decision making becoming standard; GenAI integration accelerating demand.',
-        },
-        {
-          role_category: 'Software Engineering',
-          demand_level: 'high',
-          avg_salary_sgd: 7800,
-          yoy_growth_pct: 10,
-          hiring_volume: 680,
-          trending_skills: ['TypeScript', 'React', 'Node.js'],
-          forecast_2026: 'Stable',
-          outlook:
-            'Consistent baseline demand; AI tooling raising productivity expectations.',
-        },
-      ],
-    };
+  async getMarketInsights(tenantId: number): Promise<any> {
+    return this.domainService.getMarketInsights(tenantId);
   }
 
   async analyzeJdMatch(
