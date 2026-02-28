@@ -291,7 +291,8 @@ jobs:
             module.iam \
             module.lambda_backend \
             module.api_gateway \
-            module.s3_frontend; do
+            module.s3_frontend \
+            module.eventbridge; do
             terraform state rm "$MOD" 2>&1 | head -3 || true
           done
           # Indexed (count-based) modules use bracket notation
@@ -319,7 +320,9 @@ jobs:
             --skip-final-snapshot 2>/dev/null || true
 
           echo "=== Step 3: Delete Lambda functions, API Gateway, CWL log groups ==="
-          for FN in api voice rag-query embed-gen gap-analysis resume-upload; do
+          for FN in api voice rag-query embed-gen gap-analysis resume-upload \
+                    ssg-sync cache-cleanup recommendation-refresh \
+                    embedding-backfill market-insights warmup; do
             aws lambda delete-function \
               --function-name "${P}-${E}-${FN}" 2>/dev/null || true
           done
@@ -341,26 +344,39 @@ jobs:
             "/aws/lambda/${P}-${E}-embed-gen" \
             "/aws/lambda/${P}-${E}-gap-analysis" \
             "/aws/lambda/${P}-${E}-resume-upload" \
+            "/aws/lambda/${P}-${E}-ssg-sync" \
+            "/aws/lambda/${P}-${E}-cache-cleanup" \
+            "/aws/lambda/${P}-${E}-recommendation-refresh" \
+            "/aws/lambda/${P}-${E}-embedding-backfill" \
+            "/aws/lambda/${P}-${E}-market-insights" \
+            "/aws/lambda/${P}-${E}-warmup" \
             "/aws/apigateway/${P}-${E}"; do
             aws logs delete-log-group --log-group-name "$LG" 2>/dev/null || true
           done
 
-          echo "=== Step 4: Delete IAM role and custom policy ==="
-          ROLE_NAME="${P}-${E}-lambda-exec"
-          for ARN in $(aws iam list-attached-role-policies \
-            --role-name "$ROLE_NAME" \
-            --query 'AttachedPolicies[].PolicyArn' \
-            --output text 2>/dev/null); do
-            aws iam detach-role-policy \
-              --role-name "$ROLE_NAME" --policy-arn "$ARN" 2>/dev/null || true
+          echo "=== Step 4: Delete IAM roles and custom policies ==="
+          for ROLE_NAME in \
+            "${P}-${E}-lambda-exec" \
+            "${P}-${E}-automation-lambda" \
+            "${P}-${E}-eventbridge-scheduler"; do
+            for ARN in $(aws iam list-attached-role-policies \
+              --role-name "$ROLE_NAME" \
+              --query 'AttachedPolicies[].PolicyArn' \
+              --output text 2>/dev/null); do
+              aws iam detach-role-policy \
+                --role-name "$ROLE_NAME" --policy-arn "$ARN" 2>/dev/null || true
+            done
+            aws iam delete-role --role-name "$ROLE_NAME" 2>/dev/null || true
           done
-          aws iam delete-role --role-name "$ROLE_NAME" 2>/dev/null || true
-          aws iam delete-policy \
-            --policy-arn "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy" \
-            2>/dev/null || true
-          aws iam delete-policy \
-            --policy-arn "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-opensearch-policy" \
-            2>/dev/null || true
+          for POLICY in \
+            "${P}-${E}-lambda-policy" \
+            "${P}-${E}-opensearch-policy" \
+            "${P}-${E}-automation-lambda-policy" \
+            "${P}-${E}-eventbridge-scheduler-policy"; do
+            aws iam delete-policy \
+              --policy-arn "arn:aws:iam::${ACCOUNT}:policy/${POLICY}" \
+              2>/dev/null || true
+          done
 
           echo "=== Step 5: Delete ALL project-tagged VPCs and their dependencies ==="
           for VPC_ID in $(aws ec2 describe-vpcs \
