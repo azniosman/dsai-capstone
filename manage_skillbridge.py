@@ -17,6 +17,7 @@ Non-interactive usage:
     python manage_skillbridge.py --action build-lambda
     python manage_skillbridge.py --action test-full         [--base-url http://localhost:8000]
     python manage_skillbridge.py --action test-verify       [--base-url http://localhost:8000]
+    python manage_skillbridge.py --action aws-nuke --yes-i-know-what-im-doing
 """
 
 from __future__ import annotations
@@ -81,6 +82,7 @@ MENU_ITEMS: list[tuple[str, str]] = [
     ("test-full",         "Run full tests        (integration suite — ~60 s)"),
     ("test-verify",       "Run verify tests      (market / courses feature checks)"),
     ("check-deps",        "Check dependencies    (tools, packages, env vars)"),
+    ("aws-nuke",          "AWS Nuke ALL resources  (⚠️  DANGEROUS — destroys everything)"),
     ("exit",              "Exit"),
 ]
 
@@ -581,6 +583,139 @@ def run_verify_features(base_url: str = "http://localhost:8000") -> None:
     log.info("Feature verification script finished.")
 
 
+def run_aws_nuke(*, non_interactive: bool = False) -> None:
+    """
+    ⚠️  DANGEROUS: Destroy ALL AWS resources using aws-nuke.
+
+    This action is irreversible.  Every AWS resource in the target account
+    and region that matches the aws-nuke config will be permanently deleted.
+
+    Prerequisites:
+        - ``aws-nuke`` binary on PATH (https://github.com/ekristen/aws-nuke)
+        - ``AWS_NUKE_CONFIG`` env var pointing to a valid aws-nuke YAML config
+        - AWS credentials configured (``aws sts get-caller-identity`` must work)
+
+    Interactive mode: prompts for the exact phrase
+        ``I UNDERSTAND DELETE EVERYTHING``
+        and then requires the operator to re-type the AWS account ID.
+
+    Non-interactive mode (``--yes-i-know-what-im-doing``): skips prompts,
+        logs a warning, and proceeds directly.  Only use in CI pipelines
+        where you are certain about what will be destroyed.
+
+    Args:
+        non_interactive: Skip interactive confirmation prompts.  Must be
+            explicitly enabled via ``--yes-i-know-what-im-doing`` CLI flag.
+    """
+    section("AWS Nuke — DESTROY ALL RESOURCES  (⚠️  DANGEROUS)")
+
+    # ── 1. Binary check ───────────────────────────────────────────────────────
+    if not shutil.which("aws-nuke"):
+        log.error(
+            "'aws-nuke' binary not found on PATH. "
+            "Install it from https://github.com/ekristen/aws-nuke and retry."
+        )
+        sys.exit(1)
+
+    # ── 2. Config file ────────────────────────────────────────────────────────
+    config_path = os.environ.get("AWS_NUKE_CONFIG", "")
+    if not config_path:
+        log.error(
+            "AWS_NUKE_CONFIG is not set. "
+            "Export the path to your aws-nuke YAML config before running:\n"
+            "  export AWS_NUKE_CONFIG=/path/to/nuke-config.yaml"
+        )
+        sys.exit(1)
+    if not Path(config_path).exists():
+        log.error("aws-nuke config file not found: %s", config_path)
+        sys.exit(1)
+
+    # ── 3. Resolve AWS account ID and region ──────────────────────────────────
+    if not shutil.which("aws"):
+        log.error("'aws' CLI not found. Install the AWS CLI and retry.")
+        sys.exit(1)
+    try:
+        identity_result = subprocess.run(
+            [
+                "aws", "sts", "get-caller-identity",
+                "--query", "Account",
+                "--output", "text",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=15,
+        )
+        account_id = identity_result.stdout.strip()
+    except subprocess.CalledProcessError:
+        log.error(
+            "Failed to retrieve AWS identity. "
+            "Ensure AWS credentials are configured and try again."
+        )
+        sys.exit(1)
+
+    region = (
+        os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "us-east-1"
+    )
+
+    # ── 4. Confirmation ───────────────────────────────────────────────────────
+    if non_interactive:
+        log.warning(
+            "Non-interactive aws-nuke — skipping prompts "
+            "(--yes-i-know-what-im-doing was passed)."
+        )
+        log.warning(
+            "Target: account=%s  region=%s  config=%s",
+            account_id,
+            region,
+            config_path,
+        )
+    else:
+        pad = 44
+        print(
+            f"\n"
+            f"  ╔══════════════════════════════════════════════════════════╗\n"
+            f"  ║          ⚠️   THIS ACTION IS IRREVERSIBLE  ⚠️            ║\n"
+            f"  ║                                                          ║\n"
+            f"  ║  aws-nuke will DELETE EVERY AWS RESOURCE in:            ║\n"
+            f"  ║                                                          ║\n"
+            f"  ║    Account : {account_id:<{pad}} ║\n"
+            f"  ║    Region  : {region:<{pad}} ║\n"
+            f"  ║    Config  : {config_path:<{pad}} ║\n"
+            f"  ╚══════════════════════════════════════════════════════════╝\n"
+        )
+
+        phrase = prompt("Type exactly: I UNDERSTAND DELETE EVERYTHING")
+        if phrase != "I UNDERSTAND DELETE EVERYTHING":
+            log.error("Confirmation phrase did not match. Aborting.")
+            sys.exit(1)
+
+        entered_account = prompt(f"Re-enter AWS account ID to confirm")
+        if entered_account != account_id:
+            log.error(
+                "Account ID mismatch (expected %s, got %s). Aborting.",
+                account_id,
+                entered_account,
+            )
+            sys.exit(1)
+
+        print("\n  Confirmed. Proceeding with aws-nuke...\n")
+
+    # ── 5. Execute aws-nuke ───────────────────────────────────────────────────
+    try:
+        subprocess.run(
+            ["aws-nuke", "run", "--config", config_path, "--no-dry-run", "--force"],
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        log.error("aws-nuke exited with code %d.", exc.returncode)
+        sys.exit(exc.returncode)
+
+    log.info("aws-nuke completed.")
+
+
 # ── Interactive menu ───────────────────────────────────────────────────────────
 
 def show_menu() -> None:
@@ -685,6 +820,14 @@ def dispatch_action(
             run_verify_features(_base_url())
         elif action == "check-deps":
             check_dependencies()
+        elif action == "aws-nuke":
+            if not interactive and not getattr(args, "yes_i_know_what_im_doing", False):
+                log.error(
+                    "Non-interactive aws-nuke requires --yes-i-know-what-im-doing. "
+                    "This flag confirms you accept the irreversible consequences."
+                )
+                sys.exit(1)
+            run_aws_nuke(non_interactive=not interactive)
         else:
             log.error("Unknown action: %s", action)
             sys.exit(1)
@@ -733,6 +876,7 @@ actions:
   test-full           Run full integration test suite
   test-verify         Run feature verification tests
   check-deps          Check required tools, packages, and env vars
+  aws-nuke            ⚠️  DESTROY ALL AWS resources (irreversible)
 
 examples:
   # Interactive menu
@@ -744,6 +888,10 @@ examples:
   python manage_skillbridge.py --action deploy-serverless --env prod --region ap-southeast-1
   python manage_skillbridge.py --action build-push --env dev
   python manage_skillbridge.py --action test-full --base-url http://localhost:8000
+
+  # AWS Nuke (requires explicit opt-in flag; set AWS_NUKE_CONFIG first)
+  export AWS_NUKE_CONFIG=/path/to/nuke-config.yaml
+  python manage_skillbridge.py --action aws-nuke --yes-i-know-what-im-doing
 """,
     )
     parser.add_argument(
@@ -773,6 +921,18 @@ examples:
         default="",
         metavar="URL",
         help="Backend base URL for test actions (default: http://localhost:8000).",
+    )
+    parser.add_argument(
+        "--yes-i-know-what-im-doing",
+        dest="yes_i_know_what_im_doing",
+        action="store_true",
+        default=False,
+        help=(
+            "Required when running --action aws-nuke non-interactively. "
+            "Bypasses interactive confirmation prompts. "
+            "⚠️  Only use this if you are absolutely certain you want to "
+            "destroy all AWS resources in the target account."
+        ),
     )
     return parser.parse_args()
 

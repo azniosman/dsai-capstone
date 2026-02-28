@@ -549,6 +549,70 @@ jobs:
 
           echo "ECR import complete"
 
+      # ── Step 4b: Import IAM into Terraform state (safety net) ───────────────
+      # If module.iam was removed from state in a previous run (state corruption),
+      # the IAM roles/policies still exist in AWS and Terraform would fail with
+      # 409 EntityAlreadyExists. Import them so Terraform updates in place.
+      # All imports use || true so the step is idempotent on fresh deploys where
+      # the resources don't exist yet (import fails, Terraform creates them).
+      - name: Import IAM into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region:                  ${{ env.AWS_REGION }}
+          TF_VAR_environment:                 ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:                 ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key:                  ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront:           ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_internal_automation_token:   ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+
+          # Helper: remove from state then import (idempotent — safe to re-run)
+          import_iam_role() {
+            local addr="$1" name="$2"
+            terraform state rm "$addr" 2>/dev/null || true
+            terraform import -input=false "$addr" "$name" 2>&1 | grep -v "^$" || true
+          }
+          import_iam_policy() {
+            local addr="$1" arn="$2"
+            terraform state rm "$addr" 2>/dev/null || true
+            terraform import -input=false "$addr" "$arn" 2>&1 | grep -v "^$" || true
+          }
+          import_iam_attachment() {
+            local addr="$1" id="$2"
+            terraform state rm "$addr" 2>/dev/null || true
+            terraform import -input=false "$addr" "$id" 2>&1 | grep -v "^$" || true
+          }
+
+          # ── Lambda exec role (main backend) ───────────────────────────────────
+          import_iam_role   "module.iam.aws_iam_role.lambda_exec"              "${P}-${E}-lambda-exec"
+          import_iam_policy "module.iam.aws_iam_policy.skillbridge_lambda"     "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.lambda_basic_execution" \
+            "${P}-${E}-lambda-exec/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.lambda_vpc_access" \
+            "${P}-${E}-lambda-exec/arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.skillbridge_lambda" \
+            "${P}-${E}-lambda-exec/arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy"
+
+          # ── EventBridge automation Lambda role ────────────────────────────────
+          import_iam_role   "module.iam.aws_iam_role.automation_lambda"              "${P}-${E}-automation-lambda"
+          import_iam_policy "module.iam.aws_iam_policy.automation_lambda"            "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-automation-lambda-policy"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.automation_lambda_basic" \
+            "${P}-${E}-automation-lambda/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.automation_lambda" \
+            "${P}-${E}-automation-lambda/arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-automation-lambda-policy"
+
+          # ── EventBridge Scheduler role ─────────────────────────────────────────
+          import_iam_role   "module.iam.aws_iam_role.eventbridge_scheduler"              "${P}-${E}-eventbridge-scheduler"
+          import_iam_policy "module.iam.aws_iam_policy.eventbridge_scheduler"            "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-eventbridge-scheduler-policy"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.eventbridge_scheduler" \
+            "${P}-${E}-eventbridge-scheduler/arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-eventbridge-scheduler-policy"
+
+          echo "IAM import complete"
+
       # ── Step 5: Terraform Plan + Apply ────────────────────────────────────────
       - name: Terraform Plan
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
