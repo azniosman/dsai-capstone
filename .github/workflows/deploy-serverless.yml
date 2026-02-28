@@ -161,11 +161,12 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
-          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
-          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
-          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_aws_region:                  ${{ env.AWS_REGION }}
+          TF_VAR_environment:                 ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:                 ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key:                  ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront:           ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_internal_automation_token:   ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
         run: |
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
@@ -202,7 +203,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ hashFiles('backend/Dockerfile.lambda', 'backend/requirements.txt') }}
+          key: ${{ runner.os }}-buildx-${{ hashFiles('Dockerfile.lambda', 'nestjs-backend/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-buildx-
 
@@ -216,7 +217,7 @@ jobs:
 
           docker buildx build \
             --platform linux/amd64 \
-            -f backend/Dockerfile.lambda \
+            -f Dockerfile.lambda \
             --provenance=false \
             --cache-from "type=local,src=/tmp/.buildx-cache" \
             --cache-to   "type=local,dest=/tmp/.buildx-cache-new,mode=max" \
@@ -240,7 +241,9 @@ jobs:
           set -euo pipefail
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
-          for FN in api voice rag-query embed-gen gap-analysis resume-upload; do
+          for FN in api voice rag-query embed-gen gap-analysis resume-upload \
+                    ssg-sync cache-cleanup recommendation-refresh \
+                    embedding-backfill market-insights warmup; do
             FNAME="${P}-${E}-${FN}"
             if aws lambda get-function --function-name "$FNAME" &>/dev/null; then
               echo "Updating ${FNAME}..."
@@ -261,11 +264,12 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
-          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
-          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
-          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_aws_region:                  ${{ env.AWS_REGION }}
+          TF_VAR_environment:                 ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:                 ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key:                  ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront:           ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_internal_automation_token:   ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
         run: |
           # Disable bash -e for this entire step.
           # This is a delete/cleanup script: every AWS CLI and terraform command
@@ -513,11 +517,12 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
-          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
-          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
-          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_aws_region:                  ${{ env.AWS_REGION }}
+          TF_VAR_environment:                 ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:                 ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key:                  ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront:           ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_internal_automation_token:   ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
         run: |
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
@@ -543,26 +548,28 @@ jobs:
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
-          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
-          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
-          TF_VAR_gemini_api_key:    ${{ secrets.GEMINI_API_KEY }}
-          TF_VAR_lambda_image_uri:  ${{ env.IMAGE_URI }}
-          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_aws_region:                  ${{ env.AWS_REGION }}
+          TF_VAR_environment:                 ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:                 ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key:                  ${{ secrets.SECRET_KEY }}
+          TF_VAR_gemini_api_key:              ${{ secrets.GEMINI_API_KEY }}
+          TF_VAR_lambda_image_uri:            ${{ env.IMAGE_URI }}
+          TF_VAR_enable_cloudfront:           ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_internal_automation_token:   ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
         run: terraform plan -out=tfplan -input=false
 
       - name: Terraform Apply
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
         working-directory: ./terraform
         env:
-          TF_VAR_aws_region:        ${{ env.AWS_REGION }}
-          TF_VAR_environment:       ${{ env.ENVIRONMENT }}
-          TF_VAR_db_password:       ${{ env.SAFE_DB_PASSWORD }}
-          TF_VAR_secret_key:        ${{ secrets.SECRET_KEY }}
-          TF_VAR_gemini_api_key:    ${{ secrets.GEMINI_API_KEY }}
-          TF_VAR_lambda_image_uri:  ${{ env.IMAGE_URI }}
-          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_aws_region:                  ${{ env.AWS_REGION }}
+          TF_VAR_environment:                 ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:                 ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key:                  ${{ secrets.SECRET_KEY }}
+          TF_VAR_gemini_api_key:              ${{ secrets.GEMINI_API_KEY }}
+          TF_VAR_lambda_image_uri:            ${{ env.IMAGE_URI }}
+          TF_VAR_enable_cloudfront:           ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_internal_automation_token:   ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
         run: terraform apply tfplan
 
       # ── Capture Terraform outputs ─────────────────────────────────────────────
@@ -652,11 +659,11 @@ jobs:
         run: |
           set -euo pipefail
           API="${{ steps.tf.outputs.api_url }}"
-          echo "Polling ${API}/health ..."
+          echo "Polling ${API}/api/health ..."
           for i in $(seq 1 30); do
             HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
               --connect-timeout 10 --max-time 30 \
-              "${API}/health" || echo "000")
+              "${API}/api/health" || echo "000")
             echo "  Attempt $i/30 — HTTP ${HTTP}"
             if [ "$HTTP" = "200" ]; then
               echo "  API is live"
