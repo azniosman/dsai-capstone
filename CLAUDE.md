@@ -65,6 +65,7 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `SSG_CLIENT_ID`, `SSG_CLIENT_SECRET` — optional; SkillsFuture/WSG API credentials. If absent, SSG module falls back to seeded SCTP data
 - `SSG_API_BASE_URL`, `SSG_TOKEN_URL` — SSG API endpoints (optional)
 - `SSG_CACHE_TTL_SECONDS` — how long to cache SSG responses in PostgreSQL (optional)
+- `INTERNAL_AUTOMATION_TOKEN` — shared secret validated by `InternalTokenGuard`; injected from Secrets Manager in production; required for automation Lambdas to call `/internal/*` endpoints
 
 ## Architecture
 
@@ -88,6 +89,7 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `courses/` — SCTP course catalog
 - `domain/` — Singapore labor market insights; also owns `GET /api/dashboard/summary`
 - `ssg/` — SkillsFuture/WSG API integration with three-tier fallback: PostgreSQL cache → live SSG API → seeded SCTPCourse rows
+- `internal/` — `InternalController` + `InternalModule`; automation endpoints invoked exclusively via Lambda Invoke API, never via public API Gateway. Guarded by `InternalTokenGuard` (`common/guards/`) which validates `X-Internal-Token` header against `INTERNAL_AUTOMATION_TOKEN`. `GET /internal/health` has no auth guard (used by warmup ping).
 - `common/` — shared config, filters, interceptors, utils (`resume-parser.util.ts`)
 - `seeders/` — MikroORM seed data
 
@@ -130,9 +132,21 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `data/seed/` — `skills_taxonomy.json` (~150+ skills), `job_roles.json` (SGD salary benchmarks), `sctp_courses.json` (SkillsFuture SCTP courses with subsidy fields)
 - NestJS seeders in `nestjs-backend/src/seeders/` consume this data.
 
+### Automation Lambdas (`lambdas/automation/`)
+
+Python Lambda functions triggered by EventBridge Scheduler. All reuse the backend Docker image via a CMD override. They invoke `/internal/*` NestJS endpoints via Lambda Invoke API (not HTTP), passing `X-Internal-Token` fetched from Secrets Manager.
+
+- `base_automation.py` — shared `call_internal_endpoint()`, `emit_metric()`, `get_internal_token()` (token cached in module scope across warm invocations)
+- `ssg_sync.py` — SSG course + job role sync (daily 01:00 / 01:30 UTC)
+- `recommendation_refresh.py` — recommendation pre-compute + LLM rationale pre-gen (daily 02:00 / 02:30 UTC; Phase 2 stubs)
+- `cache_cleanup.py` — bulk-delete expired `ssg_cache` rows (daily 03:00 UTC)
+- `market_insights.py` — aggregate market insight metrics (daily 04:00 UTC)
+- `embedding_backfill.py` — Titan embedding backfill (every 6 hours; Phase 2 stub)
+- `lambda_warmup.py` — warm-up ping to `GET /internal/health` (every 5 minutes, optional)
+
 ### Infrastructure
 
-Terraform modules in `terraform/modules/`: `vpc`, `database` (Aurora Serverless v2 + pgvector), `backend` (Lambda + API Gateway), `lambda_backend`, `api_gateway`, `frontend` (S3 + CloudFront), `ecr`, `ecs`, `rds`, `iam`, `opensearch`, `sagemaker`, `websocket`.
+Terraform modules in `terraform/modules/`: `vpc`, `database` (Aurora Serverless v2 + pgvector), `backend` (Lambda + API Gateway), `lambda_backend`, `api_gateway`, `frontend` (S3 + CloudFront), `ecr`, `ecs`, `rds`, `iam`, `opensearch`, `sagemaker`, `websocket`, `eventbridge` (automation Lambdas + 8 EventBridge Scheduler rules + SQS DLQ + SNS alerts + 6 CloudWatch alarms).
 
 CI/CD: `.github/workflows/deploy-serverless.yml` — static IAM keys from GitHub environment secrets (`dev`/`prod`), targets `us-east-1`.
 
@@ -169,6 +183,8 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 - **Bedrock requires console opt-in**: AWS accounts must enable model access in the Bedrock console (Model access → request Claude 3.5 Sonnet v2). IAM permissions alone are insufficient — a missing opt-in returns `ValidationException: Operation not allowed`.
 
 - **`trailingSlash: true` breaks S3 routing**: Never set `trailingSlash: true` in `next.config.ts` when `NEXT_OUTPUT=export`. It nests output as `login/index.html` instead of flat `login.html`, breaking the CloudFront routing script.
+
+- **`/internal/*` endpoints are Lambda Invoke only**: Do NOT add API Gateway routes for them. The `InternalTokenGuard` is a second layer of defence, not the primary one — the primary guard is that they have no public route. The automation Lambdas call `base_automation.call_internal_endpoint()` which constructs a Lambda Invoke payload mimicking an API Gateway event. The NestJS Lambda handler processes it identically to a real HTTP request.
 
 - **`POST /api/chat` returns SSE**: Response is `text/event-stream`. `res.data.reply` is always `undefined`. Parse as:
   ```typescript
@@ -230,3 +246,16 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 | GET    | /api/ssg/courses/:ref         | Get single SSG course by reference number |
 | GET    | /api/ssg/job-roles            | List WSG SkillsFramework job roles    |
 | POST   | /api/ssg/recommendations      | Personalised SSG courses by skill overlap |
+
+**Internal automation endpoints** (Lambda Invoke only — not on API Gateway; require `X-Internal-Token` header except health):
+
+| Method | Path                                      | Description                                |
+| ------ | ----------------------------------------- | ------------------------------------------ |
+| GET    | /internal/health                          | Warmup health check (no auth)              |
+| POST   | /internal/sync/ssg/courses                | SSG course cache population                |
+| POST   | /internal/sync/ssg/jobroles               | SSG job role cache population              |
+| POST   | /internal/cache/cleanup                   | Bulk-delete expired ssg_cache rows         |
+| POST   | /internal/recommendations/precompute      | Pre-compute recommendation scores (Phase 2)|
+| POST   | /internal/recommendations/rationale-pregen| Pre-gen LLM rationale (Phase 2)           |
+| POST   | /internal/embeddings/backfill             | Titan embedding backfill (Phase 2)         |
+| POST   | /internal/analytics/aggregate             | Pre-compute market insight metrics         |

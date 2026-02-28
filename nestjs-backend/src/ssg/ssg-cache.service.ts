@@ -98,4 +98,23 @@ export class SsgCacheService implements OnModuleInit {
       );
     }
   }
+
+  /**
+   * Bulk-deletes all `ssg_cache` rows where `expires_at < NOW()`.
+   *
+   * Called by the EventBridge-triggered `POST /internal/cache/cleanup`
+   * endpoint on a nightly schedule. This replaces the per-row lazy-delete
+   * pattern that allowed the table to grow unbounded.
+   *
+   * @returns The number of rows that were deleted.
+   */
+  async purgeExpired(): Promise<number> {
+    const conn = this.em.getConnection();
+    const result = await conn.execute(
+      `DELETE FROM ssg_cache WHERE expires_at < NOW() RETURNING id`,
+    );
+    const deleted = Array.isArray(result) ? result.length : 0;
+    this.logger.log(`Purged ${deleted} expired cache rows`);
+    return deleted;
+  }
 }

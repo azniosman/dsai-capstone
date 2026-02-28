@@ -68,6 +68,11 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   readonly BEDROCK_MODEL_ID?: string;
+
+  // Internal automation — shared secret for EventBridge Lambda-to-Lambda calls
+  @IsString()
+  @IsOptional()
+  readonly INTERNAL_AUTOMATION_TOKEN?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

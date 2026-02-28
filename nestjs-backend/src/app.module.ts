@@ -13,6 +13,7 @@ import { RolesModule } from './roles/roles.module';
 import { CoursesModule } from './courses/courses.module';
 import { DomainModule } from './domain/domain.module';
 import { SsgModule } from './ssg/ssg.module';
+import { InternalModule } from './internal/internal.module';
 import mikroOrmConfig from './mikro-orm.config';
 
 @Module({
@@ -29,6 +30,7 @@ import mikroOrmConfig from './mikro-orm.config';
     CoursesModule,
     DomainModule,
     SsgModule,
+    InternalModule,
   ],
   controllers: [AppController],
   providers: [AppService],

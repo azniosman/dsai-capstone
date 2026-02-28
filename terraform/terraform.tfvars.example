@@ -27,3 +27,13 @@ enable_opensearch = false
 # Lambda sizing (1024 MB recommended for sentence-transformers cold start)
 lambda_memory_mb       = 1024
 lambda_timeout_seconds = 29
+
+# ─── EventBridge Automation Layer ───────────────────────────────────────────
+# Generate: python3 -c "import secrets; print(secrets.token_hex(32))"
+internal_automation_token = "CHANGE_ME_use_python_secrets_token_hex_32"
+
+# Email for CloudWatch alarm notifications
+ops_email = "your@email.com"
+
+# Disable warm-up pings when stack is idle (saves Lambda invocations)
+enable_warmup = true
