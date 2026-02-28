@@ -31,6 +31,8 @@ export interface Profile {
   user_id: number | null;
   name: string;
   email?: string;
+  phone?: string;
+  location?: string;
   education: string | null;
   years_experience: number;
   is_career_switcher: boolean;
@@ -41,18 +43,20 @@ export interface Profile {
 }
 
 export interface Recommendation {
-  role_id: number;
+  // Core fields returned by NestJS backend (mocked)
   title: string;
-  category: string;
-  salary_range?: string;
   match_score: number;
-  content_score: number;
-  rule_score: number;
-  skill_match_quality: "strong" | "moderate" | "developing";
-  career_switcher_bonus: number;
-  matched_skills: string[];
-  missing_skills: string[];
-  rationale: string;
+  skill_match_quality: "strong" | "moderate" | "developing" | "high" | "medium" | "low";
+  // Fields from full Python implementation (optional for now)
+  role_id?: number;
+  category?: string;
+  salary_range?: string;
+  content_score?: number;
+  rule_score?: number;
+  career_switcher_bonus?: number;
+  matched_skills?: string[];
+  missing_skills?: string[];
+  rationale?: string;
 }
 
 export interface RecommendationsResponse {
@@ -62,23 +66,29 @@ export interface RecommendationsResponse {
 
 export interface GapItem {
   skill: string;
-  user_level: number;
-  required_level: string;
-  user_level_label: string;
-  gap_severity: "none" | "low" | "medium" | "high";
-  priority: string;
+  // Backend currently uses camelCase (mocked), full impl uses snake_case
+  gapSeverity?: "none" | "low" | "medium" | "high";
+  gap_severity?: "none" | "low" | "medium" | "high";
+  // Fields from full implementation
+  user_level?: number;
+  required_level?: string | number;
+  user_level_label?: string;
+  priority?: string;
 }
 
 export interface RoleGap {
-  role_id: number;
-  role_title: string;
-  match_score: number;
+  // Backend currently uses targetRole (mocked), full impl uses role_title
+  targetRole?: string;
+  role_title?: string;
+  role_id?: number;
+  match_score?: number;
   gaps: GapItem[];
 }
 
 export interface SkillGapResponse {
   profile_id: number;
-  skill_gaps: RoleGap[];
+  // Backend returns `gaps` (not `skill_gaps`)
+  gaps: RoleGap[];
 }
 
 export interface RoadmapCourse {
@@ -130,21 +140,31 @@ export interface JDMatchResult {
   gaps: GapItem[];
 }
 
-export interface MarketCategory {
-  category: string;
+export interface MarketInsight {
+  // Backend field names (NestJS mocked response)
+  role_category?: string;
   demand_level: string;
-  avg_salary_monthly: number;
-  job_openings: number;
+  avg_salary_sgd?: number;
+  avg_salary_monthly?: number; // alias
   yoy_growth_pct: number;
-  top_skills: string[];
-  forecast_2026: string;
-  outlook: string;
+  hiring_volume?: number;
+  job_openings?: number; // alias
+  trending_skills?: string[];
+  top_skills?: string[]; // alias
+  forecast_2026?: string;
+  outlook?: string;
 }
 
 export interface MarketInsightsResponse {
-  top_skills: string[];
-  fastest_growing_sectors: string[];
-  categories: MarketCategory[];
+  // Backend field names
+  top_skills_overall?: string[];
+  highest_demand_sectors?: string[];
+  insights?: MarketInsight[];
+  last_updated?: string;
+  // Frontend alias fields (from full implementation)
+  top_skills?: string[];
+  fastest_growing_sectors?: string[];
+  categories?: MarketInsight[];
   generated_at?: string;
 }
 
@@ -188,9 +208,14 @@ export interface Role {
 }
 
 export interface ResumeUploadResult {
+  // Fields returned by NestJS backend
+  name?: string;
+  email?: string;
+  phone?: string;
   skills: string[];
   experience_years?: number;
   raw_text_preview?: string;
+  // Fields from full implementation
   profile_id?: number;
   readiness_score?: number;
   strengths?: string[];
@@ -213,25 +238,44 @@ export interface SubsidyResult {
 // ─────────────────────────────────────────────
 
 export const authApi = {
-  /** Register a new user account */
-  register: (payload: { name: string; email: string; password: string }) =>
+  /**
+   * Register a new user account.
+   * Backend RegisterDto expects camelCase: passwordConfirm, tenantName.
+   */
+  register: (payload: {
+    name: string;
+    email: string;
+    password: string;
+    passwordConfirm: string;
+    tenantName?: string;
+    profileId?: number;
+  }) =>
     api
-      .post<{
-        access_token: string;
-        refresh_token?: string;
-        user: User;
-      }>("/api/auth/register", payload)
+      .post<{ id: number; email: string; name: string }>("/api/auth/register", {
+        ...payload,
+        tenantName: payload.tenantName ?? "Global",
+      })
       .then((r) => r.data),
 
-  /** Login and receive JWT tokens */
-  login: (payload: { email: string; password: string }) =>
-    api
+  /**
+   * Login and receive JWT tokens.
+   * Backend LocalAuthGuard uses passport-local with usernameField: 'username'.
+   * Must send as application/x-www-form-urlencoded with `username` field.
+   */
+  login: (payload: { email: string; password: string }) => {
+    const params = new URLSearchParams();
+    params.append("username", payload.email);
+    params.append("password", payload.password);
+    return api
       .post<{
         access_token: string;
         refresh_token?: string;
-        user: User;
-      }>("/api/auth/login", payload)
-      .then((r) => r.data),
+        token_type: string;
+      }>("/api/auth/login", params, {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      })
+      .then((r) => r.data);
+  },
 
   /** Fetch the currently authenticated user */
   me: () => api.get<User>("/api/auth/me").then((r) => r.data),
@@ -254,14 +298,16 @@ export const profileApi = {
     is_career_switcher?: boolean;
     skills?: string[];
     email?: string;
+    phone?: string;
+    location?: string;
   }) => api.post<Profile>("/api/profile", payload).then((r) => r.data),
 
   /** Get the profile linked to the current user */
   me: () => api.get<Profile>("/api/profile/me").then((r) => r.data),
 
-  /** Update profile by ID */
+  /** Update profile by ID (PATCH) */
   update: (id: number, payload: Partial<Profile>) =>
-    api.put<Profile>(`/api/profile/${id}`, payload).then((r) => r.data),
+    api.patch<Profile>(`/api/profile/${id}`, payload).then((r) => r.data),
 };
 
 // ─────────────────────────────────────────────
@@ -271,7 +317,7 @@ export const profileApi = {
 export const resumeApi = {
   /**
    * Upload a PDF or DOCX resume.
-   * Returns extracted skills, experience, and optional profile_id.
+   * Returns extracted name, email, phone, skills, experience_years.
    */
   upload: (
     file: File,
@@ -339,56 +385,25 @@ export const roadmapApi = {
 
 export const chatApi = {
   /**
-   * Send a message to the AI career coach and stream the response.
-   * Messages must include the full conversation history.
-   * On chunk received, it fires the `onChunk` callback.
+   * Send a message to the AI career coach.
+   * Backend returns JSON { reply, engine } (not an SSE stream).
+   * This function adapts the JSON response to the streaming callback interface
+   * so ChatCoach works without changes: emits [ENGINE:...] then the reply.
    */
   sendStream: async (
     payload: { profile_id?: number | null; messages: ChatMessage[] },
     onChunk: (chunk: string) => void
   ): Promise<void> => {
-    try {
-      // We use raw fetch here because axios doesn't natively support ReadableStream
-      // in the browser easily without custom adapters.
-      
-      const token = typeof window !== 'undefined' ? localStorage.getItem('skillbridge_access_token') : null;
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      
-      const response = await fetch(`${baseUrl}/api/chat`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
+    const res = await api.post<ChatResponse>("/api/chat", payload);
+    const { reply, engine } = res.data;
 
-      if (!response.ok) {
-        throw new Error(`Chat API error: ${response.status}`);
-      }
-
-      if (!response.body) {
-        throw new Error("ReadableStream not yet supported in this browser.");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        onChunk(chunk);
-      }
-    } catch (e) {
-      console.error("Stream failed:", e);
-      throw e;
+    // Emit engine tag first so ChatCoach's engine-detection regex picks it up
+    if (engine) {
+      onChunk(`[ENGINE: ${engine}]\n`);
     }
+
+    // Emit the full reply as a single chunk
+    onChunk(reply ?? "");
   },
 };
 
@@ -437,8 +452,7 @@ export const coursesApi = {
   calculateSubsidy: (payload: {
     course_id: number;
     profile_id?: number;
-    is_sme?: boolean;
-    is_mces?: boolean;
+    is_career_switcher?: boolean;
   }) =>
     api
       .post<SubsidyResult>("/api/calculate-subsidy", payload)
@@ -469,8 +483,10 @@ export const interviewApi = {
     api
       .post<{
         reply: string;
-        is_final: boolean;
+        is_complete: boolean;
+        is_final?: boolean;
         feedback?: string;
+        question_number?: number;
       }>("/api/interview", payload)
       .then((r) => r.data),
 };
@@ -516,6 +532,91 @@ export const compareApi = {
           unique_skills: string[];
         }>;
       }>("/api/compare-roles", payload)
+      .then((r) => r.data),
+};
+
+// ─────────────────────────────────────────────
+// SSG / SkillsFuture API
+// ─────────────────────────────────────────────
+
+export interface SsgCourse {
+  referenceNumber: string;
+  title: string;
+  provider: string;
+  totalCostOfTrainingPerTrainee?: number;
+  subsidisedFee?: number;
+  skillsFrameworkSkillCodes?: string[];
+  objectives?: string;
+  modeOfTraining?: string;
+  totalTrainingDurationHour?: number;
+  registrationClosingDate?: string;
+  url?: string;
+  /** Data source indicator */
+  source: "live" | "cached" | "seeded";
+  matchedSkills?: string[];
+  /** Only present on recommended courses */
+  relevanceScore?: number;
+}
+
+export interface PaginatedSsgCoursesResponse {
+  data: SsgCourse[];
+  total: number;
+  limit: number;
+  offset: number;
+  source: "live" | "cached" | "seeded";
+}
+
+export interface SsgJobRole {
+  jobRoleCode: string;
+  jobRoleTitle: string;
+  jobRoleDescription?: string;
+  sector?: string;
+}
+
+export const ssgApi = {
+  /**
+   * Search SkillsFuture / SSG courses.
+   * Falls back to seeded data when SSG credentials are not configured on the backend.
+   */
+  searchCourses: (params: {
+    keyword?: string;
+    skill?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    api
+      .get<PaginatedSsgCoursesResponse>("/api/ssg/courses/search", {
+        params,
+      })
+      .then((r) => r.data),
+
+  /** Get a single SSG course by reference number (e.g. "TGS-2023012345") */
+  getCourse: (referenceNumber: string) =>
+    api
+      .get<SsgCourse>(`/api/ssg/courses/${encodeURIComponent(referenceNumber)}`)
+      .then((r) => r.data),
+
+  /** List WSG SkillsFramework job roles, optionally filtered by sector */
+  getJobRoles: (sector?: string) =>
+    api
+      .get<SsgJobRole[]>("/api/ssg/job-roles", { params: sector ? { sector } : {} })
+      .then((r) => r.data),
+
+  /**
+   * Get personalised SSG course recommendations scored by skill overlap.
+   * Returns top 10 courses ranked by relevanceScore.
+   */
+  getRecommendations: (payload: {
+    skills: string[];
+    targetRole?: string;
+    profileId?: number;
+  }) =>
+    api
+      .post<{
+        profileId: number | null;
+        targetRole: string | null;
+        courses: SsgCourse[];
+      }>("/api/ssg/recommendations", payload)
       .then((r) => r.data),
 };
 

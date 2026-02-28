@@ -5,8 +5,8 @@ import { Wrench, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import SkeletonCard from "@/components/skeleton-card";
-import EmptyState from "@/components/empty-state";
+import SkeletonCard from "@/components/ui/skeleton-card";
+import EmptyState from "@/components/ui/empty-state";
 import api from "@/lib/api-client";
 
 function difficultyVariant(

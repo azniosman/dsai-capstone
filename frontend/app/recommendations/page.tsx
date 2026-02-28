@@ -1,18 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Briefcase, ChevronDown, Brain, RefreshCw, Sparkles } from "lucide-react";
+import {
+  Briefcase,
+  ChevronDown,
+  Brain,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AIResponse } from "@/components/ui/ai-response";
-import MatchScoreBar from "@/components/match-score-bar";
-import SkillChip from "@/components/skill-chip";
-import WorkflowStepper from "@/components/workflow-stepper";
-import EmptyState from "@/components/empty-state";
-import SkeletonCard from "@/components/skeleton-card";
+import MatchScoreBar from "@/components/ui/match-score-bar";
+import SkillChip from "@/components/ui/skill-chip";
+import WorkflowStepper from "@/components/ui/workflow-stepper";
+import EmptyState from "@/components/ui/empty-state";
+import SkeletonCard from "@/components/ui/skeleton-card";
 import api from "@/lib/api-client";
 import { cn, extractApiError } from "@/lib/utils";
 
@@ -68,7 +74,12 @@ interface ParsedSection {
 }
 
 /* ──────────────────── Helpers ──────────────────── */
-const SEV_SCORE: Record<string, number> = { high: 3, medium: 2, low: 1, none: 0 };
+const SEV_SCORE: Record<string, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+  none: 0,
+};
 
 /** Try to split LLM output into numbered sections. Falls back to null. */
 function parseSections(text: string): ParsedSection[] | null {
@@ -104,14 +115,13 @@ function buildAnalysisPrompt(
   // ── Skill gap breakdown ──────────────────────────────
   let skillGapLines = "";
   const significantGaps =
-    roleGap?.gaps
-      .filter((g) => g.gap_severity !== "none")
-      .slice(0, 6) ?? [];
+    roleGap?.gaps?.filter((g) => g.gap_severity !== "none")?.slice(0, 6) ?? [];
 
   if (significantGaps.length > 0) {
     significantGaps.forEach((g) => {
       const gapScore = Math.round((1 - g.user_level) * 100);
-      const weight = typeof g.priority === "number" ? g.priority : Number(g.priority) || 1;
+      const weight =
+        typeof g.priority === "number" ? g.priority : Number(g.priority) || 1;
       const impactScore = SEV_SCORE[g.gap_severity] ?? 1;
       const reqPct = g.required_level === "required" ? "100%" : "70%";
       const currPct = Math.round(g.user_level * 100) + "%";
@@ -124,7 +134,7 @@ function buildAnalysisPrompt(
     });
   } else {
     // Fallback: derive from missing_skills
-    rec.missing_skills.slice(0, 5).forEach((skill, i) => {
+    (rec.missing_skills || []).slice(0, 5).forEach((skill, i) => {
       skillGapLines += `\n- Skill: ${skill}
   Required Level: 100%
   Current Level: 0%
@@ -138,13 +148,16 @@ function buildAnalysisPrompt(
   let marketLines = "";
   if (marketInsight) {
     const skills = [
-      ...new Set([...marketInsight.trending_skills, ...rec.missing_skills]),
+      ...new Set([
+        ...(marketInsight.trending_skills || []),
+        ...(rec.missing_skills || []),
+      ]),
     ].slice(0, 5);
     skills.forEach((s) => {
       marketLines += `\n- ${s}: ${marketInsight.yoy_growth_pct}% YoY growth (${marketInsight.demand_level} demand, ${marketInsight.hiring_volume} open roles)`;
     });
   } else {
-    rec.missing_skills.slice(0, 4).forEach((s) => {
+    (rec.missing_skills || []).slice(0, 4).forEach((s) => {
       marketLines += `\n- ${s}: N/A`;
     });
   }
@@ -158,14 +171,13 @@ function buildAnalysisPrompt(
         )[0]
       : null;
 
-  const recommendedSkill = topGap?.skill ?? rec.missing_skills[0] ?? "N/A";
-  const recGapScore = topGap
-    ? Math.round((1 - topGap.user_level) * 100)
-    : 100;
-  const recWeight =
-    topGap
-      ? (typeof topGap.priority === "number" ? topGap.priority : Number(topGap.priority) || 1)
-      : 5;
+  const recommendedSkill = topGap?.skill ?? rec.missing_skills?.[0] ?? "N/A";
+  const recGapScore = topGap ? Math.round((1 - topGap.user_level) * 100) : 100;
+  const recWeight = topGap
+    ? typeof topGap.priority === "number"
+      ? topGap.priority
+      : Number(topGap.priority) || 1
+    : 5;
   const selectionReason = topGap
     ? `Highest impact gap with ${topGap.gap_severity} severity (impact score: ${SEV_SCORE[topGap.gap_severity]}), weight: ${recWeight}, gap score: ${recGapScore}%.`
     : `Critical missing skill required for the ${rec.title} role with current proficiency at 0%.`;
@@ -265,7 +277,10 @@ function AnalysisPanel({
           size="sm"
           variant="outline"
           className="w-full gap-2 rounded-xl h-9 border-dashed hover:border-primary/50 hover:bg-primary/5 hover:text-primary transition-all"
-          onClick={(e) => { e.stopPropagation(); onGenerate(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onGenerate();
+          }}
         >
           <Brain className="h-3.5 w-3.5" />
           Generate AI Career Analysis
@@ -289,7 +304,9 @@ function AnalysisPanel({
                 />
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">Analysing your career fit…</p>
+            <p className="text-xs text-muted-foreground">
+              Analysing your career fit…
+            </p>
           </div>
         </div>
       </div>
@@ -306,7 +323,10 @@ function AnalysisPanel({
           size="sm"
           variant="ghost"
           className="mt-2 text-xs gap-1.5"
-          onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRegenerate();
+          }}
         >
           <RefreshCw className="h-3 w-3" /> Retry
         </Button>
@@ -339,7 +359,10 @@ function AnalysisPanel({
             variant="ghost"
             className="h-6 w-6 text-muted-foreground hover:text-primary"
             title="Regenerate"
-            onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRegenerate();
+            }}
           >
             <RefreshCw className="h-3 w-3" />
           </Button>
@@ -364,7 +387,11 @@ function AnalysisPanel({
           </div>
         ) : (
           /* Fallback: render with AIResponse */
-          <AIResponse content={state.text} streaming={false} model="SkillBridge AI Coach" />
+          <AIResponse
+            content={state.text}
+            streaming={false}
+            model="SkillBridge AI Coach"
+          />
         )}
       </motion.div>
     );
@@ -395,7 +422,10 @@ export default function Recommendations() {
 
     setTimeout(() => {
       setIsLoggedIn(!!token);
-      if (!profileId) { setLoading(false); return; }
+      if (!profileId) {
+        setLoading(false);
+        return;
+      }
       setHasProfile(true);
     }, 0);
 
@@ -409,17 +439,22 @@ export default function Recommendations() {
     ])
       .then(([recsResult, gapResult, marketResult]) => {
         if (recsResult.status === "fulfilled") {
-          const data: Recommendation[] = recsResult.value.data.recommendations;
+          const data: Recommendation[] =
+            recsResult.value.data.recommendations || [];
           setRecs(data);
           if (data.length > 0) setExpandedId(data[0].role_id);
         } else {
-          setError(extractApiError(recsResult.reason, "Failed to get recommendations"));
+          setError(
+            extractApiError(recsResult.reason, "Failed to get recommendations"),
+          );
         }
 
         if (gapResult.status === "fulfilled") {
           const gaps: RoleGap[] = gapResult.value.data.gaps ?? [];
           const byTitle: Record<string, RoleGap> = {};
-          gaps.forEach((g) => { byTitle[g.role_title] = g; });
+          gaps.forEach((g) => {
+            byTitle[g.role_title] = g;
+          });
           setGapsByRole(byTitle);
         }
 
@@ -430,31 +465,39 @@ export default function Recommendations() {
       .finally(() => setLoading(false));
   }, []);
 
-  /** Find gap data for a recommendation (fuzzy title match) */
   const getGapForRec = (rec: Recommendation): RoleGap | undefined => {
-    const exact = gapsByRole[rec.title];
+    const title = rec.title || "";
+    const exact = gapsByRole[title];
     if (exact) return exact;
     // Partial match fallback
     const key = Object.keys(gapsByRole).find(
       (k) =>
-        k.toLowerCase().includes(rec.title.toLowerCase()) ||
-        rec.title.toLowerCase().includes(k.toLowerCase()),
+        k.toLowerCase().includes(title.toLowerCase()) ||
+        title.toLowerCase().includes(k.toLowerCase()),
     );
     return key ? gapsByRole[key] : undefined;
   };
 
   /** Find market insight for a recommendation's category */
-  const getMarketForRec = (rec: Recommendation): MarketInsight | undefined =>
-    marketInsights.find(
+  const getMarketForRec = (rec: Recommendation): MarketInsight | undefined => {
+    const category = rec.category || "";
+    return marketInsights.find(
       (i) =>
-        i.role_category.toLowerCase().includes(rec.category.toLowerCase()) ||
-        rec.category.toLowerCase().includes(i.role_category.toLowerCase()),
+        (i.role_category || "")
+          .toLowerCase()
+          .includes(category.toLowerCase()) ||
+        category.toLowerCase().includes((i.role_category || "").toLowerCase()),
     );
+  };
 
   /** Call chat API with the structured prompt and cache result */
   const generateAnalysis = async (rec: Recommendation) => {
     const profileId = localStorage.getItem("profileId");
-    const prompt = buildAnalysisPrompt(rec, getGapForRec(rec), getMarketForRec(rec));
+    const prompt = buildAnalysisPrompt(
+      rec,
+      getGapForRec(rec),
+      getMarketForRec(rec),
+    );
 
     setAnalysis((prev) => ({
       ...prev,
@@ -481,7 +524,11 @@ export default function Recommendations() {
 
       setAnalysis((prev) => ({
         ...prev,
-        [rec.role_id]: { loading: false, text: text || "Insufficient data to generate analysis.", error: null },
+        [rec.role_id]: {
+          loading: false,
+          text: text || "Insufficient data to generate analysis.",
+          error: null,
+        },
       }));
     } catch (err) {
       setAnalysis((prev) => ({
@@ -489,7 +536,10 @@ export default function Recommendations() {
         [rec.role_id]: {
           loading: false,
           text: null,
-          error: extractApiError(err, "AI analysis unavailable. Please try again."),
+          error: extractApiError(
+            err,
+            "AI analysis unavailable. Please try again.",
+          ),
         },
       }));
     }
@@ -501,7 +551,9 @@ export default function Recommendations() {
 
       <header>
         <p className="section-label mb-1">Intelligence</p>
-        <h1 className="text-2xl font-extrabold tracking-tight">Recommended Roles</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          Recommended Roles
+        </h1>
       </header>
 
       {loading && <SkeletonCard count={3} />}
@@ -518,7 +570,8 @@ export default function Recommendations() {
               <div>
                 <p className="text-sm font-bold mb-0.5">Save your results</p>
                 <p className="text-xs text-muted-foreground">
-                  Create an account to save your profile and get updated recommendations.
+                  Create an account to save your profile and get updated
+                  recommendations.
                 </p>
               </div>
               <Button
@@ -568,7 +621,9 @@ export default function Recommendations() {
                           {String(idx + 1).padStart(2, "0")}
                         </span>
                         <h2 className="text-base font-bold">{rec.title}</h2>
-                        <Badge variant={qualityVariant(rec.skill_match_quality)}>
+                        <Badge
+                          variant={qualityVariant(rec.skill_match_quality)}
+                        >
                           {qualityLabel(rec.skill_match_quality)}
                         </Badge>
                       </div>
@@ -602,11 +657,17 @@ export default function Recommendations() {
                   {/* Compact skill count preview (collapsed only) */}
                   {!isOpen && (
                     <div className="flex gap-3 text-xs mt-2">
-                      <span className="font-semibold" style={{ color: "hsl(145 60% 36%)" }}>
-                        ✓ {rec.matched_skills.length} matched
+                      <span
+                        className="font-semibold"
+                        style={{ color: "hsl(145 60% 36%)" }}
+                      >
+                        ✓ {rec.matched_skills?.length || 0} matched
                       </span>
-                      <span className="font-semibold" style={{ color: "hsl(5 78% 50%)" }}>
-                        ✗ {rec.missing_skills.length} missing
+                      <span
+                        className="font-semibold"
+                        style={{ color: "hsl(5 78% 50%)" }}
+                      >
+                        ✗ {rec.missing_skills?.length || 0} missing
                       </span>
                     </div>
                   )}
@@ -627,22 +688,26 @@ export default function Recommendations() {
                         </p>
 
                         {/* Skill chips */}
-                        {rec.matched_skills.length > 0 && (
+                        {(rec.matched_skills?.length || 0) > 0 && (
                           <div className="mb-3">
-                            <p className="section-label mb-1.5">Matched Skills</p>
+                            <p className="section-label mb-1.5">
+                              Matched Skills
+                            </p>
                             <div className="flex gap-1 flex-wrap">
-                              {rec.matched_skills.map((s) => (
+                              {(rec.matched_skills || []).map((s) => (
                                 <SkillChip key={s} skill={s} severity="none" />
                               ))}
                             </div>
                           </div>
                         )}
 
-                        {rec.missing_skills.length > 0 && (
+                        {(rec.missing_skills?.length || 0) > 0 && (
                           <div className="mb-1">
-                            <p className="section-label mb-1.5">Missing Skills</p>
+                            <p className="section-label mb-1.5">
+                              Missing Skills
+                            </p>
                             <div className="flex gap-1 flex-wrap">
-                              {rec.missing_skills.map((s) => (
+                              {(rec.missing_skills || []).map((s) => (
                                 <SkillChip key={s} skill={s} severity="high" />
                               ))}
                             </div>

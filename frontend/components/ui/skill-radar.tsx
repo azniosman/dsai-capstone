@@ -1,12 +1,9 @@
-"use client";
-
 import {
   PolarAngleAxis,
   PolarGrid,
   PolarRadiusAxis,
   Radar,
   RadarChart,
-  ResponsiveContainer,
   Tooltip,
 } from "recharts";
 import {
@@ -25,6 +22,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { ChartCard } from "./chart-card";
 
 interface SkillData {
   skill: string;
@@ -33,11 +32,11 @@ interface SkillData {
 }
 
 export interface SkillRadarMetrics {
-  match_score: number;           // 0–1 overall
-  content_score: number;         // 0–1 skill similarity (weight 0.55)
-  rule_score: number;            // 0–1 profile fit      (weight 0.25)
+  match_score: number; // 0–1 overall
+  content_score: number; // 0–1 skill similarity (weight 0.55)
+  rule_score: number; // 0–1 profile fit      (weight 0.25)
   career_switcher_bonus: number; // 0–1 career bonus     (weight 0.20)
-  skill_match_quality: string;   // "strong" | "moderate" | "developing"
+  skill_match_quality: string; // "strong" | "moderate" | "developing"
   matched_count: number;
   missing_count: number;
   rationale: string;
@@ -67,7 +66,7 @@ const SCORE_WEIGHTS = [
   {
     key: "career_switcher_bonus",
     label: "Career Bonus",
-    weight: 0.20,
+    weight: 0.2,
     color: "hsl(145 60% 36%)",
   },
 ] as const;
@@ -98,8 +97,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             <span className="font-bold text-primary">{payload[0].value}/5</span>
           </div>
           <div className="flex items-center justify-between gap-4 bg-muted/50 px-2 py-1.5 rounded-md">
-            <span className="text-muted-foreground font-medium text-xs">Required</span>
-            <span className="font-bold text-foreground">{payload[1].value}/5</span>
+            <span className="text-muted-foreground font-medium text-xs">
+              Required
+            </span>
+            <span className="font-bold text-foreground">
+              {payload[1].value}/5
+            </span>
           </div>
         </div>
       </div>
@@ -134,9 +137,7 @@ function ScoreWeightBar({
             style={{ background: color }}
           />
           <span className="font-semibold text-foreground">{label}</span>
-          <span className="text-muted-foreground/50">
-            ×{weight.toFixed(2)}
-          </span>
+          <span className="text-muted-foreground/50">×{weight.toFixed(2)}</span>
         </div>
         <div className="flex items-center gap-1 font-mono">
           <span className="text-muted-foreground">{rawPct}%</span>
@@ -274,8 +275,17 @@ export function SkillRadar({ data, roleName, metrics }: SkillRadarProps) {
         )}
 
         {/* ─── Radar Chart ─── */}
-        <div className="h-[250px] w-full flex items-center justify-center">
-          <ResponsiveContainer width="100%" height="100%">
+        <div
+          className="h-[250px] min-h-[250px] w-full flex items-center justify-center overflow-hidden"
+          role="img"
+          aria-label={`Skill radar chart comparing your profile against ${roleName}`}
+        >
+          <ChartCard
+            title=""
+            height={250}
+            ariaLabel={`Radar chart for ${roleName}`}
+            className="border-0 shadow-none bg-transparent w-full"
+          >
             <RadarChart
               cx="50%"
               cy="50%"
@@ -368,7 +378,7 @@ export function SkillRadar({ data, roleName, metrics }: SkillRadarProps) {
                 className="drop-shadow-[0_0_8px_rgba(var(--primary),0.5)] transition-all duration-500"
               />
             </RadarChart>
-          </ResponsiveContainer>
+          </ChartCard>
         </div>
 
         {/* ─── Score Breakdown ─── */}
@@ -382,7 +392,6 @@ export function SkillRadar({ data, roleName, metrics }: SkillRadarProps) {
               transition={{ duration: 0.3 }}
               className="px-5 pt-3 pb-5 border-t border-border/20 space-y-4"
             >
-              {/* Section label + formula */}
               <div className="flex items-center justify-between">
                 <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">
                   Score Breakdown
@@ -392,7 +401,6 @@ export function SkillRadar({ data, roleName, metrics }: SkillRadarProps) {
                 </p>
               </div>
 
-              {/* Animated weighted bars */}
               <div className="space-y-2.5">
                 {SCORE_WEIGHTS.map((w, i) => {
                   const raw =
@@ -414,7 +422,6 @@ export function SkillRadar({ data, roleName, metrics }: SkillRadarProps) {
                 })}
               </div>
 
-              {/* Skill tally */}
               <div className="flex items-center gap-4 pt-0.5">
                 <div className="flex items-center gap-1.5 text-xs">
                   <CheckCircle2
@@ -448,7 +455,6 @@ export function SkillRadar({ data, roleName, metrics }: SkillRadarProps) {
                 )}
               </div>
 
-              {/* AI Rationale */}
               {metrics.rationale && (
                 <div className="bg-muted/30 rounded-xl p-3 border border-border/30">
                   <p className="text-[9px] uppercase tracking-widest text-primary font-bold mb-1.5">

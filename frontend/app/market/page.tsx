@@ -1,27 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { TrendingUp } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
+import { Building2, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Cell,
-} from "recharts";
-import SkeletonCard from "@/components/skeleton-card";
+import SkeletonCard from "@/components/ui/skeleton-card";
 import api from "@/lib/api-client";
-import { cn } from "@/lib/utils";
+import { cn, extractApiError } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const CHART_STYLE = {
-  contentStyle: {
-    backgroundColor: "#ffffff",
-    border: "1px solid #d9d4cc",
-    borderRadius: "6px",
-    fontSize: "12px",
-    color: "#1a1a1a",
-  },
-};
+const MarketSalaryBar = dynamic(
+  () =>
+    import("@/components/dashboard/charts/MarketCharts").then(
+      (mod) => mod.MarketSalaryBar,
+    ),
+  { ssr: false, loading: () => <Skeleton className="h-[350px] w-full" /> },
+);
+const MarketGrowthBar = dynamic(
+  () =>
+    import("@/components/dashboard/charts/MarketCharts").then(
+      (mod) => mod.MarketGrowthBar,
+    ),
+  { ssr: false, loading: () => <Skeleton className="h-[350px] w-full" /> },
+);
+const MarketRadar = dynamic(
+  () =>
+    import("@/components/dashboard/charts/MarketRadar").then(
+      (mod) => mod.MarketRadar,
+    ),
+  { ssr: false, loading: () => <Skeleton className="h-[350px] w-full" /> },
+);
 
 function demandVariant(level: string): "success" | "warning" | "destructive" {
   if (level === "high") return "success";
@@ -29,69 +40,90 @@ function demandVariant(level: string): "success" | "warning" | "destructive" {
   return "destructive";
 }
 
-interface Insight {
-  role_category: string;
-  demand_level: string;
-  avg_salary_sgd: number;
-  yoy_growth_pct: number;
-  hiring_volume: number;
-  trending_skills: string[];
-  forecast_2026?: string;
-  outlook?: string;
-}
-
-interface MarketData {
-  top_skills_overall: string[];
-  highest_demand_sectors: string[];
-  insights: Insight[];
-}
+import type { MarketData } from "@/types/api";
 
 export default function MarketInsights() {
-  const [data, setData] = useState<MarketData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.get("/api/market-insights")
-      .then((res) => setData(res.data))
-      .catch((err) => setError(err.response?.data?.detail || "Failed to load market data"))
-      .finally(() => setLoading(false));
-  }, []);
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["market-insights"],
+    queryFn: async () => {
+      const res = await api.get("/api/market-insights");
+      return res.data as MarketData;
+    },
+  });
+
+  const error = queryError
+    ? extractApiError(queryError, "Failed to load market data")
+    : null;
+
+  const salaryData = useMemo(
+    () =>
+      (data?.insights ?? []).map((i) => ({
+        category: i.role_category,
+        salary: i.avg_salary_sgd,
+        growth: i.yoy_growth_pct,
+      })),
+    [data],
+  );
+
+  const radarData = useMemo(
+    () =>
+      (data?.insights ?? []).map((i) => ({
+        category: i.role_category.replace("&", "\n&"),
+        demand: i.hiring_volume / 40,
+        growth: i.yoy_growth_pct,
+        salary: i.avg_salary_sgd / 200,
+      })),
+    [data],
+  );
+
+  const activeIdx = useMemo(
+    () =>
+      activeCategory
+        ? salaryData.findIndex((d) => d.category === activeCategory)
+        : -1,
+    [activeCategory, salaryData],
+  );
+
+  const activeInsight = useMemo(
+    () =>
+      activeCategory
+        ? (data?.insights.find((i) => i.role_category === activeCategory) ??
+          null)
+        : null,
+    [activeCategory, data],
+  );
 
   if (loading) return <SkeletonCard count={4} />;
-  if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>;
-  if (!data) return <Alert variant="destructive"><AlertDescription>No market data available.</AlertDescription></Alert>;
-
-  const salaryData = data.insights.map((i) => ({
-    category: i.role_category,
-    salary: i.avg_salary_sgd,
-    growth: i.yoy_growth_pct,
-  }));
-
-  const radarData = data.insights.map((i) => ({
-    category: i.role_category.replace("&", "\n&"),
-    demand: i.hiring_volume / 40,
-    growth: i.yoy_growth_pct,
-    salary: i.avg_salary_sgd / 200,
-  }));
-
-  const activeIdx = activeCategory
-    ? salaryData.findIndex((d) => d.category === activeCategory)
-    : -1;
-
-  const activeInsight = activeCategory
-    ? data.insights.find((i) => i.role_category === activeCategory)
-    : null;
+  if (error)
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  if (!data)
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>No market data available.</AlertDescription>
+      </Alert>
+    );
 
   return (
     <div className="space-y-5">
       <header>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="live-dot" />
-          <p className="section-label">Live Data</p>
-        </div>
-        <h1 className="text-2xl font-extrabold tracking-tight">Singapore Tech Market</h1>
+        <p className="section-label mb-1">
+          {data.last_updated
+            ? `Data as of ${data.last_updated}`
+            : "Market Data"}
+        </p>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          Singapore Tech Market
+        </h1>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -120,13 +152,22 @@ export default function MarketInsights() {
                   key={sector}
                   className={cn(
                     "flex items-center gap-2 px-2 py-1 rounded-md transition-colors",
-                    activeCategory === sector ? "bg-primary/10" : "hover:bg-muted/40",
+                    activeCategory === sector
+                      ? "bg-primary/10"
+                      : "hover:bg-muted/40",
                   )}
                   onMouseEnter={() => setActiveCategory(sector)}
                   onMouseLeave={() => setActiveCategory(null)}
                 >
-                  <span className="text-xs font-bold data-num text-primary w-4">{i + 1}</span>
-                  <span className={cn("text-sm font-medium transition-colors", activeCategory === sector && "text-primary font-bold")}>
+                  <span className="text-xs font-bold data-num text-primary w-4">
+                    {i + 1}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm font-medium transition-colors",
+                      activeCategory === sector && "text-primary font-bold",
+                    )}
+                  >
                     {sector}
                   </span>
                 </div>
@@ -136,95 +177,31 @@ export default function MarketInsights() {
         </Card>
 
         {/* Salary chart — highlights active sector */}
-        <Card variant="elevated">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="section-label">Avg Monthly Salary (SGD)</p>
-              {activeInsight && (
-                <span className="text-xs text-primary font-bold animate-pulse">
-                  ↑ {activeInsight.role_category}
-                </span>
-              )}
-            </div>
-            <div className="h-[280px]" role="img" aria-label="Bar chart of average monthly salaries by tech category">
-              <ResponsiveContainer>
-                <BarChart data={salaryData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
-                  <XAxis dataKey="category" tick={{ fill: "#6b7280", fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
-                  <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} />
-                  <Tooltip
-                    formatter={(v) => `SGD ${Number(v).toLocaleString()}`}
-                    contentStyle={CHART_STYLE.contentStyle}
-                  />
-                  <Bar dataKey="salary" radius={[3, 3, 0, 0]}>
-                    {salaryData.map((entry, i) => (
-                      <Cell
-                        key={entry.category}
-                        fill="#00BFFF"
-                        opacity={activeIdx === -1 || i === activeIdx ? 1 : 0.3}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
+        <Card className="overflow-hidden p-5">
+          <p className="section-label mb-4">Avg Monthly Salary (SGD)</p>
+          {activeInsight && (
+            <span className="text-xs text-primary font-bold float-right -mt-8 animate-pulse">
+              ↑ {activeInsight.role_category}
+            </span>
+          )}
+          <MarketSalaryBar data={salaryData} activeIdx={activeIdx} />
         </Card>
 
-        {/* YoY growth chart — highlights active sector */}
-        <Card variant="elevated">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="section-label">YoY Growth (%)</p>
-              {activeInsight && (
-                <span className="text-xs font-bold" style={{ color: "hsl(145 60% 36%)" }}>
-                  {activeInsight.yoy_growth_pct}% growth
-                </span>
-              )}
-            </div>
-            <div className="h-[280px]" role="img" aria-label="Bar chart of year-over-year growth by category">
-              <ResponsiveContainer>
-                <BarChart data={salaryData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
-                  <XAxis dataKey="category" tick={{ fill: "#6b7280", fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
-                  <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} />
-                  <Tooltip
-                    formatter={(v) => `${v}%`}
-                    contentStyle={CHART_STYLE.contentStyle}
-                  />
-                  <Bar dataKey="growth" radius={[3, 3, 0, 0]}>
-                    {salaryData.map((entry, i) => (
-                      <Cell
-                        key={entry.category}
-                        fill="#28c76f"
-                        opacity={activeIdx === -1 || i === activeIdx ? 1 : 0.3}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
+        {/* YoY growth chart -- highlights active sector */}
+        <Card className="overflow-hidden p-5">
+          <p className="section-label mb-4">YoY Growth (%)</p>
+          {activeInsight && (
+            <span className="text-xs font-bold text-emerald-600 float-right -mt-8">
+              {activeInsight.yoy_growth_pct}% growth
+            </span>
+          )}
+          <MarketGrowthBar data={salaryData} activeIdx={activeIdx} />
         </Card>
 
         {/* Radar overview */}
-        <Card variant="data" className="col-span-1 md:col-span-2">
-          <CardContent className="p-5">
-            <p className="section-label mb-4">Market Overview Radar</p>
-            <div className="h-[350px]" role="img" aria-label="Radar chart showing market demand and growth across tech categories">
-              <ResponsiveContainer>
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="#d9d4cc" />
-                  <PolarAngleAxis dataKey="category" tick={{ fill: "#374151", fontSize: 11 }} />
-                  <PolarRadiusAxis tick={{ fill: "#6b7280", fontSize: 10 }} />
-                  <Radar name="Demand" dataKey="demand" stroke="#00BFFF" fill="#00BFFF" fillOpacity={0.2} />
-                  <Radar name="Growth %" dataKey="growth" stroke="#28c76f" fill="#28c76f" fillOpacity={0.2} />
-                  <Legend wrapperStyle={{ color: "#374151", fontSize: "12px" }} />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="col-span-1 md:col-span-2">
+          <MarketRadar data={radarData} />
+        </div>
 
         {/* Sector detail cards — hover spotlights the charts above */}
         {data.insights.map((ins) => {
@@ -242,20 +219,34 @@ export default function MarketInsights() {
             >
               <CardContent className="p-5">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className={cn("font-bold text-sm transition-colors", isActive && "text-primary")}>{ins.role_category}</h3>
-                  <div className="flex items-center gap-1.5">
-                    {isActive && (
-                      <span className="live-dot" />
+                  <h3
+                    className={cn(
+                      "font-bold text-sm transition-colors",
+                      isActive && "text-primary",
                     )}
-                    <Badge variant={demandVariant(ins.demand_level)}>{ins.demand_level}</Badge>
+                  >
+                    {ins.role_category}
+                  </h3>
+                  <div className="flex items-center gap-1.5">
+                    {isActive && <span className="live-dot" />}
+                    <Badge variant={demandVariant(ins.demand_level)}>
+                      {ins.demand_level}
+                    </Badge>
                   </div>
                 </div>
                 <p className="text-xl font-extrabold data-num text-primary mb-0.5">
-                  SGD {ins.avg_salary_sgd.toLocaleString()}<span className="text-xs font-normal text-muted-foreground">/mo</span>
+                  SGD {ins.avg_salary_sgd.toLocaleString()}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    /mo
+                  </span>
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  <span className="data-num">{ins.hiring_volume}</span> openings &middot;{" "}
-                  <span className="data-num trend-up">{ins.yoy_growth_pct}%</span> YoY growth
+                  <span className="data-num">{ins.hiring_volume}</span> openings
+                  &middot;{" "}
+                  <span className="data-num trend-up">
+                    {ins.yoy_growth_pct}%
+                  </span>{" "}
+                  YoY growth
                 </p>
 
                 {ins.forecast_2026 && (
@@ -263,15 +254,15 @@ export default function MarketInsights() {
                     <p className="section-label text-primary mb-1">
                       2026 Outlook: {ins.forecast_2026}
                     </p>
-                    <p className="text-xs leading-relaxed">
-                      {ins.outlook}
-                    </p>
+                    <p className="text-xs leading-relaxed">{ins.outlook}</p>
                   </div>
                 )}
 
                 <div className="flex flex-wrap gap-1">
                   {ins.trending_skills.slice(0, 4).map((s) => (
-                    <Badge key={s} variant="accent" className="text-xs">{s}</Badge>
+                    <Badge key={s} variant="accent" className="text-xs">
+                      {s}
+                    </Badge>
                   ))}
                 </div>
               </CardContent>

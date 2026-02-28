@@ -8,237 +8,208 @@ SkillBridge — Job Recommendation & Skill Gap Analysis System for SCTP learners
 
 ## Tech Stack
 
-- **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + Recharts + Framer Motion
-- **Backend**: Python 3.11 + FastAPI + SQLAlchemy 2 + Pydantic + Mangum (Lambda adapter)
-- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), spaCy, FAISS, Google Gemini, AWS Bedrock (Claude 3.5 Sonnet)
-- **Database**: PostgreSQL 16
+- **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + Recharts + Framer Motion + Three.js
+- **Backend**: NestJS 10 + TypeScript + MikroORM + Passport.js (replacing Python FastAPI — migration in progress)
+- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, Google Gemini, AWS Bedrock (Claude 3.5 Sonnet) — `IntelligenceModule` wired via `LlmService`; fallback chain: Gemini → Bedrock → 503
+- **Database**: PostgreSQL 16 + pgvector
 - **Automation**: n8n workflows
 - **Deployment (capstone)**: Docker Compose locally; AWS Lambda + Aurora Serverless v2 + S3/CloudFront via Terraform
 - **Deployment (enterprise roadmap)**: AWS ECS Fargate + RDS + OpenSearch
 
-## Serverless AWS Deployment
-
-The CI/CD workflow is at `.github/workflows/deploy-serverless.yml` — trigger via GitHub Actions → "Deploy Serverless Stack" → Run workflow.
-
-```bash
-# Quick redeploy (image + frontend only, no infra teardown — ~5 min)
-# Use after backend-only code changes. Also calls update-function-code for all 6 Lambda functions.
-gh workflow run deploy-serverless.yml -f environment=dev -f skip_terraform=true
-
-# Full deploy (clean-slate teardown + Terraform apply — ~35 min)
-# Required for infra changes (memory, VPC, DB, API Gateway, etc.)
-gh workflow run deploy-serverless.yml -f environment=dev
-
-# Get current API endpoint after deploy
-cd terraform && terraform output -raw api_endpoint
-
-# Run integration tests against live AWS (full_test.py has hardcoded localhost:8000)
-sed 's|http://localhost:8000|https://<api_endpoint>|' scripts/full_test.py | python3
-```
-
-The serverless Terraform stack (`terraform/`) targets:
-- **Lambda** (container image from ECR, 3008 MB) + **API Gateway HTTP API**
-- **Aurora Serverless v2** (private subnet, ~$43/month)
-- **S3 + CloudFront** with OAC (frontend)
-- **Optional OpenSearch** (set `enable_opensearch=true`, adds ~$26/month)
-
-Cost tip: `terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.aws_eip.nat'` to pause NAT Gateway ($32/month) between demos.
-
-**Full deploy strategy**: The clean-slate step deletes all non-ECR AWS resources before `terraform apply` recreates them. This means **API Gateway URL and S3 bucket name change** on every full deploy. Always read outputs after deploy. `skip_terraform=true` preserves existing infra and URLs.
-
 ## Build & Run Commands
 
 ```bash
-# Full stack (Docker) — starts db, backend, frontend, n8n
+# Full stack (Docker) — starts db (:5432), backend (:8000), frontend (:3000), n8n (:5678)
 docker compose up
 
-# Docker deployment helper (wraps docker compose up -d --build)
-bash scripts/deploy.sh
+# NestJS backend (local dev)
+cd nestjs-backend
+npm install
+npm run start:dev     # watch mode, runs on :8000
+npm run build         # compile to dist/
+npm run lint          # ESLint
 
-# Backend development (local)
-cd backend
-pip install -r requirements.txt          # or: conda create -n skillbridge python=3.11 -y && conda activate skillbridge
-python -m spacy download en_core_web_sm   # required for NLP features
-uvicorn app.main:app --reload             # runs on :8000
-
-# Backend tests (uses in-memory SQLite, no DB needed)
-cd backend && pytest
-cd backend && pytest tests/test_recommender.py -v        # single file
-cd backend && pytest tests/test_recommender.py::test_name -v  # single test
-
-# End-to-end feature tests (requires running backend)
-python scripts/full_test.py        # comprehensive API walkthrough
-python scripts/verify_features.py  # feature flag / smoke check
+# NestJS backend tests
+cd nestjs-backend
+npm run test          # unit tests (Jest)
+npm run test:e2e      # e2e tests
+npm run test:cov      # coverage report
 
 # Frontend development
 cd frontend
 npm install
-npm run dev       # runs on :3000
-npm run lint      # ESLint
-npm run build     # production build
+npm run dev           # runs on :3000
+npm run lint          # ESLint
+npm run build         # production build (must pass before PR)
 
-# Seed database (requires running PostgreSQL)
-python data/scripts/seed_db.py
+# Database seeding (via MikroORM seeder)
+cd nestjs-backend
+npm run seed          # if wired; or via MikroORM CLI: npx mikro-orm seeder:run
 
 # AWS deployment scripts
-bash scripts/build_lambda.sh        # packages backend into Lambda ZIP
 bash scripts/build_and_push.sh      # builds Docker images and pushes to ECR
 ```
 
 ## Environment Configuration
 
-Backend settings are in `backend/app/config.py` using `pydantic_settings.BaseSettings`. Key env vars (set in `.env` at project root; see `.env.example`):
+Backend env vars (set in `.env` at project root; see `.env.example`):
 
-- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB` — DB connection (or `DATABASE_URL` to override)
-- `SECRET_KEY` — JWT signing key (must change from default in production)
-- `GEMINI_API_KEY`, `GEMINI_MODEL` — optional, for LLM chat/interview features (default model: `gemini-2.0-flash`)
-- `SENTENCE_TRANSFORMER_MODEL` — ML model name (default `all-MiniLM-L6-v2`)
-- `NEXT_PUBLIC_API_URL` — frontend env var pointing to backend (default `http://localhost:8000`)
+- `DATABASE_URL` — full Postgres connection string (overrides individual vars)
+- `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME` — individual DB fields (defaults: `capstone`/`changeme`/`localhost`/`5432`/`capstone`)
+- `JWT_SECRET` — JWT signing key
+- `GEMINI_API_KEY`, `GEMINI_MODEL` — optional, for LLM features (default: `gemini-2.0-flash`)
 - `AWS_REGION` — AWS region (default `ap-southeast-1`)
-- `BEDROCK_MODEL_ID` — AWS Bedrock model (default `us.anthropic.claude-3-5-sonnet-20241022-v2:0` — must use cross-region inference profile ID, not direct model ID)
-- `SAGEMAKER_EMBEDDING_ENDPOINT` — optional SageMaker embeddings endpoint name
-- `OPENSEARCH_HOST`, `OPENSEARCH_USERNAME`, `OPENSEARCH_PASSWORD` — optional OpenSearch for enterprise deployment
+- `BEDROCK_MODEL_ID` — Bedrock model (must use cross-region inference profile ID, not direct model ID)
+- `NEXT_PUBLIC_API_URL` — frontend env var pointing to backend (default `http://localhost:8000`)
+- `CORS_ALLOWED_ORIGINS` — JSON array of allowed origins (default `["http://localhost:3000","http://localhost:5173"]`)
+- `SSG_CLIENT_ID`, `SSG_CLIENT_SECRET` — optional; SkillsFuture/WSG API credentials. If absent, SSG module falls back to seeded SCTP data
+- `SSG_API_BASE_URL`, `SSG_TOKEN_URL` — SSG API endpoints (optional)
+- `SSG_CACHE_TTL_SECONDS` — how long to cache SSG responses in PostgreSQL (optional)
+- `INTERNAL_AUTOMATION_TOKEN` — shared secret validated by `InternalTokenGuard`; injected from Secrets Manager in production; required for automation Lambdas to call `/internal/*` endpoints
 
 ## Architecture
 
-### Backend
+### Backend (NestJS — `nestjs-backend/`)
 
-- `backend/app/main.py` — FastAPI entry point; handles startup lifecycle: creates tables, syncs schema (`_sync_schema` adds missing columns via ALTER TABLE), seeds reference data, warms up ML models and FAISS indexes; exports `handler` (Mangum) for Lambda
-- `backend/app/config.py` — centralized settings via `pydantic_settings`
-- `backend/app/database.py` — SQLAlchemy engine, session factory, `get_db` dependency (pool_size=5, max_overflow=10, pre_ping enabled)
-- `backend/app/auth.py` — JWT utilities (access + refresh tokens, JTI blacklist with TTL cleanup)
-- `backend/app/api_key_auth.py` — API key authentication; alternative to JWT for programmatic/tenant access
-- `backend/app/limiter.py` — Rate limiting middleware via slowapi
+**Entry point**: `src/main.ts` — bootstraps NestJS app on port 8000.
+**ORM config**: `src/mikro-orm.config.ts` — MikroORM with PostgreSQL driver; entities at `src/entities/*.entity.ts`.
+**App config/validation**: `src/common/config/env.validation.ts` — class-validator schema for env vars.
 
-**Routers** (`backend/app/routers/`, all mounted under `/api`):
-auth, profile, recommend, skill_gap, upskilling, chat, interview, jd_match, resume_rewriter, upload, export, dashboard, market, compare, courses, progress, projects, peer, sso, api_keys, audit_logs, voice, rag, gap_analysis, demo
+**Entities** (`src/entities/`): `user.entity.ts`, `user-profile.entity.ts`, `skill.entity.ts`, `job-role.entity.ts`, `sctp-course.entity.ts`, `skill-progress.entity.ts`, `market-insight.entity.ts`, `profile-snapshot.entity.ts`, `tenant.entity.ts`, `ssg-cache.entity.ts`
 
-**Services** (`backend/app/services/`):
-`recommender` (hybrid scoring), `skill_matcher` (embedding similarity), `gap_analyzer`, `roadmap_generator`, `course_pathways`, `resume_parser`, `market_simulator`, `subsidy_calculator` (SkillsFuture/MCES), `audit_logger`, `bedrock_service` (AWS Bedrock LLM), `sagemaker_service` (SageMaker embeddings), `voice_service`, `dashboard_service`
+**Modules** (`src/`):
+- `auth/` — Passport.js JWT + Local strategies; `AuthController`, `AuthService`
+- `users/` — user CRUD
+- `profile/` — user profile management
+- `skills/` — skill taxonomy + user skills
+- `intelligence/` — AI features: `chat()`, `getRecommendations()`, `getSkillGap()`, `interview()`, `rewriteResume()`; wired via `LlmService`
+- `intelligence/upload.controller.ts` — resume upload + parsing
+- `upskilling/` — roadmap and course pathways
+- `roles/` — job role listing
+- `courses/` — SCTP course catalog
+- `domain/` — Singapore labor market insights; also owns `GET /api/dashboard/summary`
+- `ssg/` — SkillsFuture/WSG API integration with three-tier fallback: PostgreSQL cache → live SSG API → seeded SCTPCourse rows
+- `internal/` — `InternalController` + `InternalModule`; automation endpoints invoked exclusively via Lambda Invoke API, never via public API Gateway. Guarded by `InternalTokenGuard` (`common/guards/`) which validates `X-Internal-Token` header against `INTERNAL_AUTOMATION_TOKEN`. `GET /internal/health` has no auth guard (used by warmup ping).
+- `common/` — shared config, filters, interceptors, utils (`resume-parser.util.ts`)
+- `seeders/` — MikroORM seed data
 
-**ML layer** (`backend/app/ml/`):
+**Auth flow**: `POST /auth/login` accepts JSON `{ username, password }` via Local strategy → returns JWT. Token attached as `Authorization: Bearer <token>`. JWT strategy validates subsequent requests.
 
-- `embeddings.py` — Sentence Transformer wrapper; global model instance loaded at startup; `encode_texts()` + cosine similarity
-- `taxonomy.py` — FAISS-based skill normalization; maps free-text skills to canonical taxonomy names (threshold 0.75)
+**LLM wiring**: `LlmService` (`intelligence/llm.service.ts`) handles Gemini/Bedrock dispatch. Fallback chain: Gemini API → Bedrock Claude 3.5 Sonnet → HTTP 503. The `resume-rewriter` endpoint (`POST /api/resume-rewriter`) also lives in `IntelligenceController`.
 
-- `backend/app/models/` — SQLAlchemy ORM models (all models have `tenant_id` foreign key); includes `snapshot.py` for ML feature snapshots
-- `backend/app/schemas/` — Pydantic request/response schemas
-- `backend/alembic/` — Database migrations (prefer `_sync_schema()` for simple column additions; use Alembic for structural changes)
-- `backend/pyproject.toml` — pytest config; sets `asyncio_mode = auto` (required for async test functions)
+### Frontend (`frontend/`)
 
-**Docker build note**: The backend Dockerfile pre-downloads spaCy and Sentence Transformer models at build time and sets `HF_HUB_OFFLINE=1` so containers work in private subnets without internet access.
-
-### Frontend
-
-- `frontend/app/` — Next.js App Router; pages by feature: recommendations, skill-gap, roadmap, jd-match, chat, interview, market, compare, courses, progress, projects, peers, resume-rewriter, dashboard, account
-- `frontend/components/` — `ui/` (shadcn primitives), `layout/` (navbar, breadcrumbs), feature components (gap-table, skill-chip, match-score-bar, roadmap-timeline, workflow-stepper, skeleton-card, empty-state, error-boundary, voice-coach, page-transition, theme-provider)
-- `frontend/lib/api-client.ts` — Axios instance with JWT auto-attach and token refresh (shared Promise to prevent race conditions); auto-redirects to `/login` on auth failure
-- `frontend/contexts/tenant-context.tsx` — Multi-tenant theming context; injects CSS custom properties per tenant
-- `frontend/middleware.ts` — Security headers (CSP, X-Frame-Options, Permissions-Policy)
+- `app/` — Next.js App Router pages by feature (recommendations, skill-gap, roadmap, jd-match, chat, interview, market, compare, courses, progress, projects, peers, dashboard, account)
+- `components/` — organized by domain:
+  - `ui/` — shadcn primitives + extended SkillBridge components (`skill-radar.tsx`, `match-score-bar.tsx`, `skill-chip.tsx`, `skeleton-card.tsx`, `empty-state.tsx`, `AppModal.tsx`, `chart-card.tsx`)
+  - `layout/` — `app-shell.tsx`, `sidebar-nav.tsx`, `page-header.tsx`, `error-boundary.tsx`, `page-transition.tsx`
+  - `landing/` — Three.js canvas components: `bg-canvas.tsx` (flow-field, loaded via `dynamic()`), `neuron-canvas.tsx`
+  - `modals/` — feature modals (`AIChatModal.tsx`, `BuildProfileModal.tsx`, `CareerAnalysisModal.tsx`, `ProfileModal.tsx`, `ResumeUploadModal.tsx`, `ResumePreviewModal.tsx`, `SkillGapModal.tsx`)
+  - `profile-builder/` — multi-step wizard (`StepUploadResume`, `StepPersonalInfo`, `StepSkills`, `StepReview`)
+  - `profile/` — profile form
+  - `chat/` — `ChatCoach.tsx` embeddable chat panel
+  - `roadmap/`, `skill-gap/`, `voice-coach/` — feature-specific components
+- `store/` — Zustand stores:
+  - `modalStore.ts` — global modal open/close state
+  - `profileBuilderStore.ts` — profile wizard state (step, resume file, parsed data, personal info, skills)
+- `providers/` — React providers:
+  - `ModalProvider.tsx` — renders modal portals based on `modalStore`
+  - `QueryProvider.tsx` — React Query client wrapper
+- `lib/api-client.ts` — Axios instance; JWT auto-attach + refresh (shared Promise prevents race conditions); redirects to `/login` on 401
+- `lib/api.ts` — typed service layer; always use these functions in pages, not direct axios calls
+- `lib/services.ts` — higher-level service helpers
+- `lib/websocket.ts` — WebSocket client for voice coaching
 
 **Extended component props (non-obvious):**
-- `SkillRadar` (`components/ui/skill-radar.tsx`) — accepts optional `metrics?: SkillRadarMetrics` (exported type). When provided, renders a KPI summary row, animated score breakdown bars (showing the 0.55/0.25/0.20 formula), skill tally, and AI rationale below the radar chart.
-- `GapTable` (`components/gap-table.tsx`) — accepts `hoveredSkill?: string | null` and `onHoverSkill?: (skill: string | null) => void` for bidirectional hover sync between the table and Recharts bar charts (pass `onMouseEnter`/`onMouseLeave` on `<Bar>` using index to look up skill).
-- `AIResponse` (`components/ui/ai-response.tsx`) — accepts `streaming?: boolean`, `content?: string`, `model?: string`. Shows bot avatar + hover actions (copy, regenerate, thumbs). Use `streaming={false}` for static display.
+- `SkillRadar` (`components/ui/skill-radar.tsx`) — accepts optional `metrics?: SkillRadarMetrics`. When provided, renders KPI summary, animated score breakdown bars (0.55/0.25/0.20 formula), skill tally, AI rationale.
+- `GapTable` (`components/gap-table.tsx` or `components/skill-gap/`) — accepts `hoveredSkill?: string | null` and `onHoverSkill?` for bidirectional hover sync with Recharts bar charts.
+- Three.js canvases (`landing/`) — always load via `dynamic(() => import(...), { ssr: false })`. They crash on SSR.
+
+**State pattern**: use `useProfileBuilderStore()` for profile wizard state; use `useModalStore()` to open/close modals. Don't manage modal open state locally in components.
 
 ### Data
 
-- `data/seed/` — `skills_taxonomy.json` (~150+ skills, categories: programming, cloud, data, security, etc.), `job_roles.json` (SGD salary benchmarks), `sctp_courses.json` (SkillsFuture SCTP courses with subsidy fields)
-- Auto-seeding: backend seeds on startup if the `Global` tenant has no skills data
+- `data/seed/` — `skills_taxonomy.json` (~150+ skills), `job_roles.json` (SGD salary benchmarks), `sctp_courses.json` (SkillsFuture SCTP courses with subsidy fields)
+- NestJS seeders in `nestjs-backend/src/seeders/` consume this data.
 
-### Dedicated Lambda Handlers
+### Automation Lambdas (`lambdas/automation/`)
 
-`lambdas/` contains standalone Lambda functions for async/event-driven workloads, separate from the main FastAPI/Mangum handler:
+Python Lambda functions triggered by EventBridge Scheduler. All reuse the backend Docker image via a CMD override. They invoke `/internal/*` NestJS endpoints via Lambda Invoke API (not HTTP), passing `X-Internal-Token` fetched from Secrets Manager.
 
-- `base.py` — shared `bootstrap_env()` that populates env vars from AWS Secrets Manager at cold start (idempotent)
-- `bedrock_orchestrator.py` — AWS Bedrock LLM orchestration
-- `embedding_generator.py` — SageMaker embedding generation
-- `gap_analysis_handler.py` — async skill gap analysis
-- `rag_query_handler.py` — RAG pipeline queries
-- `resume_upload_handler.py` — S3-triggered resume processing
-- `voice_coaching_handler.py` — WebSocket voice coaching pipeline
+- `base_automation.py` — shared `call_internal_endpoint()`, `emit_metric()`, `get_internal_token()` (token cached in module scope across warm invocations)
+- `ssg_sync.py` — SSG course + job role sync (daily 01:00 / 01:30 UTC)
+- `recommendation_refresh.py` — recommendation pre-compute + LLM rationale pre-gen (daily 02:00 / 02:30 UTC; Phase 2 stubs)
+- `cache_cleanup.py` — bulk-delete expired `ssg_cache` rows (daily 03:00 UTC)
+- `market_insights.py` — aggregate market insight metrics (daily 04:00 UTC)
+- `embedding_backfill.py` — Titan embedding backfill (every 6 hours; Phase 2 stub)
+- `lambda_warmup.py` — warm-up ping to `GET /internal/health` (every 5 minutes, optional)
 
 ### Infrastructure
 
-Terraform modules in `terraform/modules/`: `vpc`, `database` (Aurora Serverless v2 + pgvector), `backend` (Lambda + API Gateway), `lambda_backend`, `api_gateway`, `frontend` (S3 + CloudFront), `s3_frontend`, `cloudfront`, `alb`, `ecr`, `ecs`, `rds`, `security_groups`, `storage`, `iam`, `opensearch`, `sagemaker`, `websocket`.
+Terraform modules in `terraform/modules/`: `vpc`, `database` (Aurora Serverless v2 + pgvector), `backend` (Lambda + API Gateway), `lambda_backend`, `api_gateway`, `frontend` (S3 + CloudFront), `ecr`, `ecs`, `rds`, `iam`, `opensearch`, `sagemaker`, `websocket`, `eventbridge` (automation Lambdas + 8 EventBridge Scheduler rules + SQS DLQ + SNS alerts + 6 CloudWatch alarms).
 
-CI/CD: `.github/workflows/deploy-serverless.yml` — active, uses static IAM keys from GitHub environment secrets (`dev`/`prod`), targets `us-east-1`. See Serverless AWS Deployment section for usage.
+CI/CD: `.github/workflows/deploy-serverless.yml` — static IAM keys from GitHub environment secrets (`dev`/`prod`), targets `us-east-1`.
 
 ### n8n Workflows
 
-Automation workflows in `n8n/workflows/` (accessible at port 5678):
+Automation in `n8n/workflows/` (port 5678): `market_simulation.json`, `resume_ingestion.json`, `analysis_notification.json`.
 
-- `market_simulation.json` — Periodic market data updates
-- `resume_ingestion.json` — Resume upload processing pipeline
-- `analysis_notification.json` — Result notification dispatch
+## Serverless AWS Deployment
 
-### Tests
+```bash
+# Quick redeploy (image + frontend only — ~5 min; use after code-only changes)
+gh workflow run deploy-serverless.yml -f environment=dev -f skip_terraform=true
 
-- `backend/tests/` — pytest tests with SQLite in-memory fixtures; `conftest.py` provides `db_session`, `sample_profile`, `sample_role` fixtures
-  - `test_recommender.py`, `test_skill_matcher.py`, `test_skill_gap_logic.py` — core ML/scoring logic
-  - `test_resume_parser.py` — `extract_skills()` with Gemini mocked (tests both Gemini path and keyword fallback)
-  - `test_auth.py`, `test_api_integration.py`, `test_dashboard_history.py` — API layer
-- `tests/` — Integration/endpoint tests (top-level); e.g. `test_dashboard_endpoint.py`
+# Full deploy (clean-slate teardown + Terraform apply — ~35 min; required for infra changes)
+gh workflow run deploy-serverless.yml -f environment=dev
+
+# Get current API endpoint
+cd terraform && terraform output -raw api_endpoint
+
+# Pause NAT Gateway between demos (~$32/month)
+terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.aws_eip.nat'
+```
+
+**Full deploy strategy**: deletes all non-ECR resources before `terraform apply`, so **API Gateway URL and S3 bucket name change** on every full deploy. `skip_terraform=true` preserves existing URLs.
 
 ## Lambda Deployment Gotchas
 
-Critical non-obvious issues discovered in production:
+- **`update-function-code` is not instant**: Warm containers may serve old code for 1–2 minutes after update. Send a few requests to exhaust the warm pool before testing.
 
-- **`Mangum(lifespan="off")` skips FastAPI startup events**: The `@app.lifespan` context manager (which calls `_seed_database()`, `_background_ml_warmup()`, etc.) never runs in Lambda. These are called **explicitly at module level** in `backend/lambda_handler.py` instead. If you add startup logic to `main.py`, also wire it in `lambda_handler.py`.
+- **Docker buildx + Lambda**: Always pass `--provenance=false` to `docker buildx build`. Without it, BuildKit adds SLSA attestations creating an OCI manifest list, which Lambda rejects with `InvalidParameterValueException: image manifest ... not supported`.
 
-- **Docker buildx + Lambda**: Always pass `--provenance=false` to `docker buildx build`. Without it, newer BuildKit adds SLSA attestations creating an OCI manifest list, which Lambda rejects with `InvalidParameterValueException: image manifest ... not supported`.
+- **`skip_terraform=true` Lambda update**: The workflow explicitly calls `aws lambda update-function-code` for all Lambda functions. Without this, the new ECR image is pushed but Lambda keeps the old one.
 
-- **`update-function-code` is not instant**: After calling `aws lambda update-function-code`, warm containers may still serve old code for 1–2 minutes. Wait before testing, or send a few requests to exhaust the warm pool.
+- **Bedrock requires console opt-in**: AWS accounts must enable model access in the Bedrock console (Model access → request Claude 3.5 Sonnet v2). IAM permissions alone are insufficient — a missing opt-in returns `ValidationException: Operation not allowed`.
 
-- **`skip_terraform=true` Lambda update**: The workflow explicitly calls `aws lambda update-function-code` for all 6 functions (`api`, `voice`, `rag-query`, `embed-gen`, `gap-analysis`, `resume-upload`) when `skip_terraform=true`. Without this, the new ECR image is pushed but Lambda keeps the old one.
+- **`trailingSlash: true` breaks S3 routing**: Never set `trailingSlash: true` in `next.config.ts` when `NEXT_OUTPUT=export`. It nests output as `login/index.html` instead of flat `login.html`, breaking the CloudFront routing script.
 
-- **Lambda INIT timeout logging**: Lambda reports `INIT_REPORT Init Duration: 9999ms Phase: init Status: timeout` when module-level imports (PyTorch, spaCy) take >10s. This is a logging threshold only — execution continues. It does NOT mean the Lambda failed.
+- **`/internal/*` endpoints are Lambda Invoke only**: Do NOT add API Gateway routes for them. The `InternalTokenGuard` is a second layer of defence, not the primary one — the primary guard is that they have no public route. The automation Lambdas call `base_automation.call_internal_endpoint()` which constructs a Lambda Invoke payload mimicking an API Gateway event. The NestJS Lambda handler processes it identically to a real HTTP request.
 
-- **Memory**: Lambda is configured to 3008 MB. Sentence Transformers + FAISS index use ~1 GB. Lower values (e.g. 1024 MB) cause OOM 503s on ML endpoints.
-
-- **Auth login is form-encoded**: `POST /api/auth/login` uses OAuth2 `application/x-www-form-urlencoded` with field `username` (not `email`), not JSON. Register requires `password_confirm` and `tenant_name` fields.
-
-- **`extract_skills()` fallback**: When Gemini quota is exhausted or key is absent, `resume_parser.extract_skills()` falls back to regex keyword-matching against the skill taxonomy (150+ skills). `POST /api/jd-match` will still work without a Gemini key.
-
-- **`POST /api/chat` returns SSE, not JSON**: The response is `text/event-stream`. axios delivers the full body as a raw string in `res.data`. Reading `res.data.reply` always returns `undefined`. Correct parsing pattern:
+- **`POST /api/chat` returns SSE**: Response is `text/event-stream`. `res.data.reply` is always `undefined`. Parse as:
   ```typescript
   if (typeof res.data === "string") {
     const lines = res.data.split("\n");
-    const engineLine = lines.find((l) => l.startsWith("[ENGINE:"));
     const reply = lines.filter((l) => !l.startsWith("[ENGINE:")).join("\n").trim();
   }
   ```
-  The first line is optionally `[ENGINE: Google Gemini (gemini-2.0-flash)]` or `[ENGINE: AWS Bedrock (Claude 3.5 Sonnet)]`.
-
-- **Bedrock requires console opt-in**: AWS accounts must explicitly enable model access in the Bedrock console (Bedrock → Model access → request Anthropic Claude 3.5 Sonnet v2) before any API call works. IAM permissions alone are not sufficient. A missing opt-in returns `ValidationException: Operation not allowed`.
-
-- **`trailingSlash: true` breaks S3 routing**: Never set `trailingSlash: true` in `next.config.ts` when `NEXT_OUTPUT=export`. It changes output from flat `login.html` to nested `login/index.html`. The S3 sync pass-3 copies flat HTML to extension-less keys (e.g. `login.html` → `login`) so CloudFront can serve `/login` — this breaks if files are nested.
 
 ## Key Design Decisions
 
 - **Hybrid scoring**: `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
 - **Skill levels**: 0 (missing), 0.5 (partial), 1.0 (strong)
-- **FAISS in-memory** for vector similarity search (rebuilt on startup)
-- **LLM fallback chain**: Gemini API (primary) → AWS Bedrock Claude 3.5 Sonnet (fallback) → HTTP 503 (no local/rule-based fallback — it was intentionally removed). `extract_skills()` independently falls back to taxonomy keyword scan when Gemini fails
-- **Auth is optional**: core features (profile, recommendations, skill gap) work without login
-- **Multi-tenancy**: all data models include `tenant_id`; a `Global` tenant is auto-created on startup
-- **Schema sync**: `_sync_schema()` in `main.py` auto-adds new model columns to existing DB tables (no manual migration needed for column additions)
-- **Startup warmup**: ML model, taxonomy FAISS index, and skill cache are pre-loaded during FastAPI lifespan (local/Docker) and via a daemon thread started at module level in `lambda_handler.py` (Lambda)
-- **Recommendation cache**: in-memory TTL cache (300s) in `recommender.py`
+- **FAISS in-memory** for vector similarity (rebuilt on startup; no external vector store needed)
+- **LLM fallback chain**: Gemini API (primary) → AWS Bedrock Claude 3.5 Sonnet (fallback) → HTTP 503
+- **Auth is optional**: core features work without login
+- **Multi-tenancy**: all entities have `tenant` relation; a `Global` tenant is auto-created on startup
+- **Recommendation cache**: in-memory TTL cache (300s)
 
-## Security
+## Further Reference
 
-- Password complexity: 8+ chars, 1 uppercase, 1 lowercase, 1 digit, 1 special char (validated in Pydantic schemas)
-- File uploads: 10 MB limit (chunked read), MIME type allowlist
-- Account deletion: soft delete (deactivate + PII cleared), not hard delete
-- Token blacklist: bounded OrderedDict with TTL cleanup (max 10K entries)
-- DB pool: `pool_size=5, max_overflow=10, pool_pre_ping=True`
-- CORS: credentials enabled, restricted allowed headers (`Authorization`, `Content-Type`, `Accept`)
-- Profile endpoints: IDOR-protected with `user_id` check on authenticated requests
-- Schema sync: double-quoted SQL identifiers for defense in depth
-- Gemini calls: 30-second timeout
-- Frontend: Next.js middleware for CSP, X-Frame-Options, Permissions-Policy; token refresh uses shared Promise (no race condition); AbortController cleanup on unmount
-- Audit logger: truncates detail values >1000 chars
+- Architecture deep-dive: `docs/architecture.md`
+- ML pipeline details: `docs/ml-pipeline.md`
+- API reference: `docs/api-reference.md`
+- Local setup troubleshooting: `docs/local-setup.md`
 
 ## API Endpoints
 
@@ -253,7 +224,7 @@ Critical non-obvious issues discovered in production:
 | GET    | /api/skill-gap/{id}           | Skill gap analysis                    |
 | GET    | /api/upskilling/{id}          | Upskilling roadmap                    |
 | POST   | /api/jd-match                 | Match profile against job description |
-| POST   | /api/chat                     | Career coach chatbot                  |
+| POST   | /api/chat                     | Career coach chatbot (SSE response)   |
 | POST   | /api/interview                | Mock interview simulator              |
 | GET    | /api/market-insights          | Singapore labor market data           |
 | POST   | /api/compare-roles            | Multi-role comparison                 |
@@ -265,13 +236,26 @@ Critical non-obvious issues discovered in production:
 | GET    | /api/progress/{id}/timeline   | Progress timeline data                |
 | GET    | /api/export/roadmap/{id}      | Export roadmap as PDF                 |
 | GET    | /api/courses                  | List SCTP courses                     |
-| POST   | /api/calculate-subsidy        | Calculate subsidy for a course        |
-| GET    | /api/sso/login                | SSO login (dev only)                  |
-| GET    | /api/sso/callback             | SSO callback (dev only)               |
-| POST   | /api/api-keys/                | Create API key (admin)                |
-| GET    | /api/api-keys/                | List API keys (admin)                 |
-| DELETE | /api/api-keys/{id}            | Revoke API key (admin)                |
-| GET    | /api/audit-logs/              | List audit logs (admin)               |
+| POST   | /api/calculate-subsidy        | Calculate SkillsFuture subsidy        |
 | POST   | /api/rag/query                | RAG-based document retrieval          |
 | POST   | /api/gap-analysis             | Async skill gap analysis              |
 | POST   | /api/voice                    | Voice coaching session                |
+| GET    | /api/dashboard/summary        | Authenticated user's dashboard KPIs   |
+| POST   | /api/resume-rewriter          | Rewrite a resume bullet for a role    |
+| GET    | /api/ssg/courses/search       | Search SkillsFuture courses (paginated; falls back to seeded data) |
+| GET    | /api/ssg/courses/:ref         | Get single SSG course by reference number |
+| GET    | /api/ssg/job-roles            | List WSG SkillsFramework job roles    |
+| POST   | /api/ssg/recommendations      | Personalised SSG courses by skill overlap |
+
+**Internal automation endpoints** (Lambda Invoke only — not on API Gateway; require `X-Internal-Token` header except health):
+
+| Method | Path                                      | Description                                |
+| ------ | ----------------------------------------- | ------------------------------------------ |
+| GET    | /internal/health                          | Warmup health check (no auth)              |
+| POST   | /internal/sync/ssg/courses                | SSG course cache population                |
+| POST   | /internal/sync/ssg/jobroles               | SSG job role cache population              |
+| POST   | /internal/cache/cleanup                   | Bulk-delete expired ssg_cache rows         |
+| POST   | /internal/recommendations/precompute      | Pre-compute recommendation scores (Phase 2)|
+| POST   | /internal/recommendations/rationale-pregen| Pre-gen LLM rationale (Phase 2)           |
+| POST   | /internal/embeddings/backfill             | Titan embedding backfill (Phase 2)         |
+| POST   | /internal/analytics/aggregate             | Pre-compute market insight metrics         |

@@ -1,59 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Download, Route, GraduationCap } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Download, Route, GraduationCap, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import RoadmapTimeline from "@/components/roadmap-timeline";
-import WorkflowStepper from "@/components/workflow-stepper";
-import EmptyState from "@/components/empty-state";
-import SkeletonCard from "@/components/skeleton-card";
+import RoadmapTimeline from "@/components/roadmap/roadmap-timeline";
+import WorkflowStepper from "@/components/ui/workflow-stepper";
+import EmptyState from "@/components/ui/empty-state";
+import SkeletonCard from "@/components/ui/skeleton-card";
 import api from "@/lib/api-client";
-
-interface RoadmapData {
-  total_weeks: number;
-  total_cost: number;
-  total_after_subsidy: number;
-  total_skillsfuture_applicable: number;
-  roadmap: Array<{
-    week_start: number;
-    week_end: number;
-    course_title: string;
-    provider: string;
-    duration_weeks: number;
-    level: string;
-    skill: string;
-    certification?: string;
-    skillsfuture_eligible?: boolean;
-    skillsfuture_credit_amount?: number;
-    course_fee: number;
-    nett_fee_after_subsidy: number;
-    url?: string;
-  }>;
-}
+import type { RoadmapData } from "@/types/api";
 
 export default function Roadmap() {
-  const [data, setData] = useState<RoadmapData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const profileId =
     typeof window !== "undefined" ? localStorage.getItem("profileId") : null;
 
-  useEffect(() => {
-    if (!profileId) {
-      setTimeout(() => setLoading(false), 0);
-      return;
-    }
-    api
-      .get(`/api/upskilling/${profileId}`)
-      .then((res) => setData(res.data))
-      .catch((err) =>
-        setError(err.response?.data?.detail || "Failed to load roadmap"),
-      )
-      .finally(() => setLoading(false));
-  }, [profileId]);
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["roadmap", profileId],
+    queryFn: async () => {
+      const res = await api.get(`/api/upskilling/${profileId}`);
+      return res.data as RoadmapData;
+    },
+    enabled: !!profileId,
+  });
+
+  const error = queryError
+    ? (queryError as { response?: { data?: { detail?: string } } }).response
+        ?.data?.detail || "Failed to load roadmap"
+    : null;
 
   const downloadPdf = () => {
     const base = api.defaults.baseURL || window.location.origin;
@@ -104,6 +83,25 @@ export default function Roadmap() {
           Export PDF
         </Button>
       </div>
+
+      {/* AI Narrative */}
+      {data.narrative && (
+        <Card variant="highlight">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-primary mb-1">
+                  Your Personalised Roadmap
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {data.narrative}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

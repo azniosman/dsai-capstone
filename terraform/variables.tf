@@ -92,3 +92,23 @@ variable "enable_websocket" {
   type        = bool
   default     = true
 }
+
+# ── EventBridge Automation ────────────────────────────────────────────────────
+
+variable "ops_email" {
+  description = "Email to receive CloudWatch automation alarm notifications"
+  type        = string
+  default     = "ops@skillbridge.dev"
+}
+
+variable "internal_automation_token" {
+  description = "Shared secret for X-Internal-Token header on internal automation endpoints. Generate: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+  type        = string
+  sensitive   = true
+}
+
+variable "enable_warmup" {
+  description = "Enable Lambda warm-up ping every 5 minutes (prevents cold starts during demos)"
+  type        = bool
+  default     = true
+}

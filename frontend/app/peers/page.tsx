@@ -5,8 +5,8 @@ import { Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import SkeletonCard from "@/components/skeleton-card";
-import EmptyState from "@/components/empty-state";
+import SkeletonCard from "@/components/ui/skeleton-card";
+import EmptyState from "@/components/ui/empty-state";
 import api from "@/lib/api-client";
 
 interface PeerInsight {
@@ -46,7 +46,8 @@ function CompareBar({
         <span className="text-xs text-muted-foreground data-num">
           You:{" "}
           <span
-            className={`font-bold ${ahead ? "text-primary" : "text-amber-500"}`}
+            className="font-bold"
+            style={{ color: ahead ? undefined : "hsl(40 90% 45%)" }}
           >
             {yours}
           </span>{" "}
@@ -56,8 +57,11 @@ function CompareBar({
       <div className="space-y-1">
         <div className="score-bar-track w-full">
           <div
-            className={`score-bar-fill ${ahead ? "bg-primary" : "bg-amber-500"}`}
-            style={{ width: `${youPct}%` }}
+            className="score-bar-fill"
+            style={{
+              width: `${youPct}%`,
+              backgroundColor: ahead ? undefined : "hsl(40 90% 45%)",
+            }}
           />
         </div>
         <div className="score-bar-track w-full">
@@ -183,7 +187,7 @@ export default function PeerComparison() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   <span className="data-num font-semibold">
-                    {Math.round(peer.career_switcher_pct * 100)}%
+                    {peer.career_switcher_pct}%
                   </span>{" "}
                   are career switchers
                 </p>

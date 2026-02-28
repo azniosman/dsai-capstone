@@ -1,192 +1,143 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { Volume2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/layout/page-header";
-import { VoiceInput } from "@/components/voice-input";
-import { VoiceWebSocketClient, type VoiceMessage } from "@/lib/websocket";
+import { useEffect, useState } from "react";
+import { Mic, Volume2, Brain, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useModalStore } from "@/store/modalStore";
+import { cn } from "@/lib/utils";
 
-const WS_URL = process.env.NEXT_PUBLIC_VOICE_WS_URL ?? "";
-
-interface Turn {
-  role: "user" | "assistant";
-  text: string;
-  audioB64?: string;
-  audioFormat?: string;
-}
+const FEATURES = [
+  {
+    icon: Mic,
+    title: "Speak naturally",
+    description: "Just press Start and talk. No typing required.",
+  },
+  {
+    icon: Brain,
+    title: "AI-powered coaching",
+    description: "Get personalised feedback tailored to your target role.",
+  },
+  {
+    icon: Volume2,
+    title: "Hear the response",
+    description: "Responses are read aloud so you can practise listening too.",
+  },
+  {
+    icon: Zap,
+    title: "Real-time analysis",
+    description: "Transcription and coaching happen in seconds.",
+  },
+];
 
 export default function VoiceCoachPage() {
-  const [status, setStatus] = useState<"connected" | "disconnected" | "error">(
-    "disconnected",
-  );
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [processing, setProcessing] = useState(false);
-  const clientRef = useRef<VoiceWebSocketClient | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const { openModal } = useModalStore();
+  const [hasProfile, setHasProfile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const profileId =
-    typeof window !== "undefined"
-      ? parseInt(localStorage.getItem("profileId") ?? "0", 10) || 0
-      : 0;
-
-  // Connect WebSocket
   useEffect(() => {
-    if (!WS_URL) return;
-    const client = new VoiceWebSocketClient(WS_URL);
-    clientRef.current = client;
-
-    client.onStatusChange = setStatus;
-    client.onMessage = (msg: VoiceMessage) => {
-      if (msg.type === "audio_response") {
-        setTurns((prev) => [
-          ...prev,
-          { role: "user", text: msg.transcript },
-          {
-            role: "assistant",
-            text: msg.response_text,
-            audioB64: msg.audio_base64,
-            audioFormat: msg.audio_format,
-          },
-        ]);
-        // Auto-play audio response
-        if (msg.audio_base64 && audioRef.current) {
-          const src = `data:audio/${msg.audio_format};base64,${msg.audio_base64}`;
-          audioRef.current.src = src;
-          audioRef.current.play().catch(() => null);
-        }
-        setProcessing(false);
-      } else if (msg.type === "error") {
-        setTurns((prev) => [
-          ...prev,
-          { role: "assistant", text: `Error: ${msg.message}` },
-        ]);
-        setProcessing(false);
-      }
-    };
-
-    client.connect();
-    return () => client.disconnect();
+    setTimeout(() => {
+      setMounted(true);
+      setHasProfile(!!localStorage.getItem("profileId"));
+    }, 0);
   }, []);
 
-  // Scroll to bottom on new turns
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [turns]);
-
-  const handleAudioReady = useCallback(
-    (buffer: ArrayBuffer, format: string) => {
-      if (!clientRef.current?.isConnected || !profileId) return;
-      try {
-        setProcessing(true);
-        clientRef.current.sendAudio(buffer, profileId, format);
-      } catch (err) {
-        console.error("Send audio error:", err);
-        setProcessing(false);
-      }
-    },
-    [profileId],
-  );
-
-  const statusColor: Record<
-    typeof status,
-    "success" | "destructive" | "warning"
-  > = {
-    connected: "success",
-    disconnected: "outline" as never,
-    error: "destructive",
-  };
-
-  if (!WS_URL) {
-    return (
-      <div className="flex flex-col gap-6">
-        <PageHeader
-          section="Tools"
-          title="Voice Coach"
-          description="Real-time AI career coaching via voice"
-        />
-        <Card variant="elevated" className="p-8 text-center">
-          <p className="text-muted-foreground text-sm">
-            Voice Coach requires{" "}
-            <code className="font-mono">NEXT_PUBLIC_VOICE_WS_URL</code> to be
-            configured. Deploy the WebSocket API Gateway and set the environment
-            variable.
-          </p>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-6 h-full">
-      <PageHeader
-        section="Tools"
-        title="Voice Coach"
-        description="Speak to your AI career coach and hear personalised guidance"
-        action={
-          <Badge variant={statusColor[status] as never} className="capitalize">
-            {status}
-          </Badge>
-        }
-      />
+    <div className="max-w-2xl mx-auto space-y-8">
+      {/* Header */}
+      <header>
+        <p className="section-label mb-1">Tools</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">Voice Coach</h1>
+        <p className="text-sm text-muted-foreground mt-1.5">
+          Practise speaking about your career with a real-time AI coach. Get
+          instant verbal feedback on your answers and delivery.
+        </p>
+      </header>
 
-      {/* Conversation */}
-      <Card variant="elevated" className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {turns.length === 0 && (
-            <p className="text-center text-muted-foreground text-sm py-12">
-              Press <strong>Record</strong> and ask anything about your career
-              journey.
-            </p>
-          )}
-          {turns.map((turn, i) => (
-            <div
-              key={i}
-              className={`flex gap-3 ${turn.role === "user" ? "justify-end" : "justify-start"}`}
+      {/* Profile required notice */}
+      {mounted && !hasProfile && (
+        <Alert>
+          <AlertDescription className="flex items-center justify-between gap-4 flex-wrap">
+            <span>
+              Create a profile first so the coach can personalise its feedback
+              to your goals.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openModal("profile")}
             >
-              {turn.role === "assistant" && (
-                <div className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
-                  <Volume2 className="h-4 w-4 text-primary" />
-                </div>
-              )}
-              <div
-                className={`max-w-[70%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                  turn.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground"
-                }`}
-              >
-                {turn.text}
+              Build Profile
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* CTA card */}
+      <Card variant="elevated" className="overflow-hidden">
+        <CardContent className="p-0">
+          {/* Visual header strip */}
+          <div className="relative bg-primary/5 border-b border-border/40 px-8 py-10 flex flex-col items-center gap-5">
+            {/* Animated mic orb */}
+            <div className="relative flex items-center justify-center">
+              <span className="absolute inset-0 rounded-full bg-primary/10 animate-ping" />
+              <span className="absolute inset-2 rounded-full bg-primary/8" />
+              <div className="relative z-10 w-20 h-20 rounded-full bg-background border border-border/60 shadow-lg flex items-center justify-center">
+                <Mic className="h-9 w-9 text-primary" />
               </div>
             </div>
-          ))}
-          <div ref={bottomRef} />
-        </div>
 
-        {/* Input area */}
-        <div className="border-t border-border p-4 flex items-center gap-4">
-          <audio ref={audioRef} className="hidden" />
-          <VoiceInput
-            onAudioReady={handleAudioReady}
-            disabled={status !== "connected" || processing || !profileId}
-          />
-          {processing && (
-            <span className="text-xs text-muted-foreground flex items-center gap-2">
-              <span className="animate-typing-dot inline-block h-1.5 w-1.5 rounded-full bg-primary" />
-              <span className="animate-typing-dot inline-block h-1.5 w-1.5 rounded-full bg-primary [animation-delay:0.2s]" />
-              <span className="animate-typing-dot inline-block h-1.5 w-1.5 rounded-full bg-primary [animation-delay:0.4s]" />
-              Processing…
-            </span>
-          )}
-          {!profileId && (
-            <span className="text-xs text-muted-foreground">
-              Create a profile first to use Voice Coach.
-            </span>
-          )}
-        </div>
+            <div className="text-center">
+              <p className="font-bold text-base">Ready when you are</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Opens a focused session so you can concentrate on speaking.
+              </p>
+            </div>
+
+            <Button
+              size="xl"
+              className="gap-2.5 px-8"
+              disabled={mounted && !hasProfile}
+              onClick={() => openModal("voiceCoach")}
+            >
+              <Mic className="h-5 w-5" />
+              Start Voice Session
+            </Button>
+          </div>
+
+          {/* Feature grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-border/30">
+            {FEATURES.map(({ icon: Icon, title, description }) => (
+              <div
+                key={title}
+                className={cn(
+                  "flex items-start gap-3 p-5 bg-card",
+                )}
+              >
+                <div className="mt-0.5 p-2 rounded-lg bg-primary/8 text-primary shrink-0">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    {description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
       </Card>
+
+      {/* Tips */}
+      <div className="text-xs text-muted-foreground space-y-1 pb-4">
+        <p className="font-semibold text-foreground/70 mb-2">Tips for best results</p>
+        <p>• Use a quiet environment and allow microphone access when prompted.</p>
+        <p>• Speak clearly and at a natural pace — no need to rush.</p>
+        <p>• Answer as if in a real interview; the coach responds in character.</p>
+        <p>• Sessions are not recorded; close the modal when you are done.</p>
+      </div>
     </div>
   );
 }

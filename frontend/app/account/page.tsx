@@ -16,8 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
 import { extractApiError } from "@/lib/utils";
-import SkeletonCard from "@/components/skeleton-card";
-import ProfileForm from "@/components/profile-form";
+import SkeletonCard from "@/components/ui/skeleton-card";
+import ProfileForm from "@/components/profile/profile-form";
 
 const FIELD_LABEL = "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
 

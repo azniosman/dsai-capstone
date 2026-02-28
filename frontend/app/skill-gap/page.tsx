@@ -1,247 +1,90 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
+import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  Legend,
-} from "recharts";
-import GapTable from "@/components/gap-table";
-import WorkflowStepper from "@/components/workflow-stepper";
-import EmptyState from "@/components/empty-state";
-import SkeletonCard from "@/components/skeleton-card";
+import GapTable from "@/components/skill-gap/gap-table";
+import WorkflowStepper from "@/components/ui/workflow-stepper";
+import EmptyState from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api-client";
 import { extractApiError } from "@/lib/utils";
 
-// Gap severity colors — semantic palette, consistent with status utilities
-const GAP_COLORS: Record<string, string> = {
-  none: "hsl(145 60% 36%)", // green — no gap
-  low: "hsl(220 80% 55%)", // blue  — small gap
-  medium: "hsl(40 90% 45%)", // amber — medium gap
-  high: "hsl(5 78% 50%)", // red   — critical gap
-};
-
-// Recharts tooltip style — matches card bg/border in light mode
-const CHART_STYLE = {
-  contentStyle: {
-    backgroundColor: "oklch(0.9699 0.0013 106.4238)",
-    border: "1px solid oklch(0.8687 0.0043 56.366)",
-    borderRadius: "12px",
-    fontSize: "12px",
-    color: "oklch(0.2795 0.0368 260.031)",
-    boxShadow: "2px 2px 10px 4px hsl(240 4% 60% / 0.18)",
+const SkillGapChart = dynamic(
+  () =>
+    import("@/components/dashboard/charts/SkillGapChart").then(
+      (mod) => mod.SkillGapChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[350px] w-full bg-card/40 animate-pulse rounded-xl" />
+    ),
   },
-};
+);
 
-interface GapItem {
-  skill: string;
-  user_level: number;
-  required_level: string;
-  user_level_label: string;
-  gap_severity: string;
-  priority: string;
-}
-
-interface RoleGap {
-  role_title: string;
-  match_score: number;
-  gaps: GapItem[];
-}
+import type { RoleGap } from "@/types/api";
 
 function SkillGapView({ gap }: { gap: RoleGap }) {
-  const [chartType, setChartType] = useState("radar");
-  const [hoveredSkill, setHoveredSkill] = useState<string | null>(null);
   const score = Math.round(gap.match_score * 100);
-
-  const handleHoverSkill = useCallback((skill: string | null) => {
-    setHoveredSkill(skill);
-  }, []);
-
-  const chartData = gap.gaps.map((g) => ({
-    skill: g.skill,
-    level: g.user_level,
-    required: g.required_level === "required" ? 1.0 : 0.7,
-    severity: g.gap_severity,
-  }));
-
-  const radarData = gap.gaps.slice(0, 10).map((g) => ({
-    skill: g.skill.length > 12 ? g.skill.slice(0, 12) + "…" : g.skill,
-    "Your Level": Math.round(g.user_level * 100),
-    Required: g.required_level === "required" ? 100 : 70,
-  }));
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Score + chart toggle */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold">{gap.role_title}</span>
-          <Badge
-            variant={
-              score >= 70 ? "success" : score >= 40 ? "warning" : "destructive"
-            }
-            className="data-num"
-          >
-            {score}% Match
-          </Badge>
-        </div>
-        <ToggleGroup
-          type="single"
-          value={chartType}
-          onValueChange={(v) => v && setChartType(v)}
-          size="sm"
+      {/* Score header */}
+      <div className="flex items-center gap-2">
+        <BarChart3 className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">{gap.role_title}</span>
+        <Badge
+          variant={
+            score >= 70 ? "success" : score >= 40 ? "warning" : "destructive"
+          }
+          className="data-num"
         >
-          <ToggleGroupItem value="radar">Radar</ToggleGroupItem>
-          <ToggleGroupItem value="bar">Bar</ToggleGroupItem>
-        </ToggleGroup>
+          {score}% Match
+        </Badge>
       </div>
 
-      {/* Chart */}
-      <Card variant="data">
-        <CardContent className="p-4">
-          <div
-            className="h-[350px]"
-            role="img"
-            aria-label="Chart comparing your skill levels to required levels"
-          >
-            <ResponsiveContainer>
-              {chartType === "radar" ? (
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="#d9d4cc" />
-                  <PolarAngleAxis
-                    dataKey="skill"
-                    tick={{ fill: "#374151", fontSize: 11 }}
-                  />
-                  <PolarRadiusAxis
-                    domain={[0, 100]}
-                    tick={{ fill: "#6b7280", fontSize: 10 }}
-                  />
-                  <Radar
-                    name="Your Level"
-                    dataKey="Your Level"
-                    stroke="#00BFFF"
-                    fill="#00BFFF"
-                    fillOpacity={0.3}
-                  />
-                  <Radar
-                    name="Required"
-                    dataKey="Required"
-                    stroke="#e8562a"
-                    fill="#e8562a"
-                    fillOpacity={0.1}
-                  />
-                  <Legend
-                    wrapperStyle={{ color: "#374151", fontSize: "12px" }}
-                  />
-                </RadarChart>
-              ) : (
-                <BarChart
-                  data={chartData}
-                  layout="vertical"
-                  margin={{ left: 100 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#d9d4cc" />
-                  <XAxis
-                    type="number"
-                    domain={[0, 1]}
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="skill"
-                    width={100}
-                    tick={{ fill: "#374151", fontSize: 11 }}
-                  />
-                  <Tooltip
-                    formatter={(v) => `${Math.round(Number(v) * 100)}%`}
-                    contentStyle={CHART_STYLE.contentStyle}
-                  />
-                  <Bar
-                    dataKey="level"
-                    name="Your Level"
-                    radius={[0, 3, 3, 0]}
-                    onMouseEnter={(_: unknown, index: number) => handleHoverSkill(chartData[index]?.skill ?? null)}
-                    onMouseLeave={() => handleHoverSkill(null)}
-                  >
-                    {chartData.map((entry) => (
-                      <Cell
-                        key={entry.skill}
-                        fill={GAP_COLORS[entry.severity]}
-                        opacity={
-                          hoveredSkill === null || hoveredSkill === entry.skill
-                            ? 1
-                            : 0.35
-                        }
-                        strokeWidth={hoveredSkill === entry.skill ? 2 : 0}
-                        stroke={hoveredSkill === entry.skill ? "#fff" : "none"}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Chart — Radar/Bar toggle handled inside SkillGapChart */}
+      <SkillGapChart gaps={gap.gaps} />
 
-      <GapTable
-        gaps={gap.gaps}
-        hoveredSkill={hoveredSkill}
-        onHoverSkill={handleHoverSkill}
-      />
+      <GapTable gaps={gap.gaps} hoveredSkill={null} onHoverSkill={() => {}} />
     </div>
   );
 }
 
 export default function SkillGap() {
-  const [gaps, setGaps] = useState<RoleGap[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasProfile, setHasProfile] = useState(false);
-  // Initial tab is "0" (string)
   const [tab, setTab] = useState("0");
 
-  useEffect(() => {
-    const profileId = localStorage.getItem("profileId");
-    if (!profileId) {
-      setTimeout(() => {
-        setHasProfile(false);
-        setLoading(false);
-      }, 0);
-      return;
-    }
-    setTimeout(() => setHasProfile(true), 0);
-    api
-      .get(`/api/skill-gap/${profileId}`)
-      .then((res) => setGaps(res.data.gaps))
-      .catch((err: unknown) =>
-        setError(extractApiError(err, "Failed to load skill gaps")),
-      )
-      .finally(() => setLoading(false));
-  }, []);
+  const profileId =
+    typeof window !== "undefined" ? localStorage.getItem("profileId") : null;
+
+  const {
+    data: gaps = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["skill-gap", profileId],
+    queryFn: async () => {
+      const res = await api.get(`/api/skill-gap/${profileId}`);
+      return res.data.gaps as RoleGap[];
+    },
+    enabled: !!profileId,
+  });
+
+  const error = queryError
+    ? extractApiError(queryError, "Failed to load skill gaps")
+    : null;
+  const hasProfile = !!profileId;
 
   if (loading)
     return (
-      <div>
-        <WorkflowStepper />
-        <SkeletonCard count={2} />
+      <div className="space-y-4">
+        <Skeleton className="h-40 w-full rounded-2xl" />
+        <Skeleton className="h-96 w-full rounded-2xl" />
       </div>
     );
   if (error)
@@ -296,19 +139,25 @@ export default function SkillGap() {
           ))}
         </div>
 
-        {/* Content Area */}
-        {gaps.map((gap, i) => (
-          <div
-            key={i}
-            className={
-              tab === String(i)
-                ? "block animate-in fade-in slide-in-from-left-1 duration-300"
-                : "hidden"
-            }
-          >
-            <SkillGapView gap={gap} />
-          </div>
-        ))}
+        {/* Content Area — AnimatePresence re-mounts active tab so charts re-animate */}
+        <AnimatePresence mode="wait">
+          {gaps.map((gap, i) =>
+            tab === String(i) ? (
+              <motion.div
+                key={gap.role_title}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{
+                  duration: 0.22,
+                  ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+                }}
+              >
+                <SkillGapView gap={gap} />
+              </motion.div>
+            ) : null,
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

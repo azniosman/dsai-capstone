@@ -197,3 +197,43 @@ module "opensearch" {
   subnet_ids         = [module.vpc.private_subnets[0]]
   security_group_ids = [module.security_groups.opensearch_sg_id]
 }
+
+# 13. EventBridge Automation Layer ─────────────────────────────────────────────
+# Scheduled automation: SSG sync, cache cleanup, recommendation pre-computation,
+# embedding backfill, market insights aggregation, and Lambda keep-alive pings.
+# Marginal cost: ~$3.40/month (effectively within AWS Free Tier at demo scale).
+
+resource "aws_secretsmanager_secret" "internal_token" {
+  name                    = "${var.project_name}/internal-token"
+  description             = "X-Internal-Token shared secret for EventBridge Lambda-to-Lambda automation"
+  recovery_window_in_days = 0 # Immediate deletion for dev/capstone use
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-internal-token"
+    Project     = var.project_name
+    Environment = var.environment
+    Component   = "eventbridge-automation"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "internal_token" {
+  secret_id     = aws_secretsmanager_secret.internal_token.id
+  secret_string = jsonencode({ token = var.internal_automation_token })
+}
+
+module "eventbridge" {
+  source = "./modules/eventbridge"
+
+  project_name               = var.project_name
+  environment                = var.environment
+  aws_region                 = var.aws_region
+  backend_function_name      = module.lambda_backend.lambda_function_name
+  lambda_image_uri           = var.lambda_image_uri != "" ? var.lambda_image_uri : "${module.ecr.backend_repo_url}:latest"
+  automation_lambda_role_arn = module.iam.automation_lambda_role_arn
+  scheduler_role_arn         = module.iam.scheduler_role_arn
+  internal_token_secret_arn  = aws_secretsmanager_secret.internal_token.arn
+  ops_email                  = var.ops_email
+  enable_warmup              = var.enable_warmup
+
+  depends_on = [module.lambda_backend, module.iam]
+}

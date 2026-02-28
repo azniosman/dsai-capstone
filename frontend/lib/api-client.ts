@@ -24,6 +24,7 @@ function clearAuth() {
   localStorage.removeItem("userName");
   localStorage.removeItem("userEmail");
   localStorage.removeItem("profileId");
+  sessionStorage.clear(); // Clear all session data too
 }
 
 async function doRefresh(): Promise<string | null> {
@@ -76,9 +77,14 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
+      console.warn("Unauthorized request detected, clearing auth and redirecting to /login", {
+        url: originalRequest.url,
+        pathname: window.location.pathname
+      });
       clearAuth();
       if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
+        // Use window.location.replace to prevent back-button loops
+        window.location.replace("/login");
       }
     }
     return Promise.reject(error);

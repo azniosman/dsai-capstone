@@ -34,7 +34,7 @@ export default function ResumeRewriter() {
         setLoading(true);
         setError(null);
         try {
-            const res = await api.post("/api/resume/rewrite", {
+            const res = await api.post("/api/resume-rewriter", {
                 target_role: role,
                 bullet_point: bullet,
             });
