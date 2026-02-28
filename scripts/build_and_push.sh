@@ -26,13 +26,15 @@ echo "→ Authenticating with ECR..."
 aws ecr get-login-password --region "${AWS_REGION}" | \
   docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-# Build Lambda container image (Dockerfile.lambda uses project root as context)
+# Build Lambda container image.
+# Dockerfile.lambda lives in the project root; build context is also the root
+# so COPY nestjs-backend/ and COPY lambdas/ resolve correctly.
 echo ""
 echo "→ Building Lambda container image..."
 docker build \
   --platform linux/amd64 \
   --provenance=false \
-  -f backend/Dockerfile.lambda \
+  -f Dockerfile.lambda \
   -t "${ECR_BACKEND}:latest" \
   -t "${ECR_BACKEND}:$(git rev-parse --short HEAD 2>/dev/null || echo 'local')" \
   .

@@ -1,29 +1,50 @@
 #!/bin/bash
-set -e
+# =============================================================================
+# build_lambda.sh — Build the SkillBridge Lambda container image locally.
+#
+# Performs a local Docker build from Dockerfile.lambda (project root) and
+# tags the result as skillbridge-local:latest.  No ECR login or AWS
+# credentials are required.  Use this as a dry-run to verify the build
+# pipeline before running build_and_push.sh (which pushes to ECR).
+#
+# Usage (from project root):
+#   ./scripts/build_lambda.sh
+# =============================================================================
 
-echo "Building Lambda Deployment Package..."
+set -euo pipefail
 
-PROJECT_ROOT=$(pwd)
-BACKEND_DIR="$PROJECT_ROOT/backend"
-BUILD_DIR="$PROJECT_ROOT/build_lambda"
-ZIP_FILE="$PROJECT_ROOT/terraform/function.zip"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+IMAGE_TAG="skillbridge-local:latest"
 
-# Clean up
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR"
+echo "======================================================"
+echo "  SkillBridge Lambda Image — local build dry-run"
+echo "  Dockerfile: ${PROJECT_ROOT}/Dockerfile.lambda"
+echo "  Tag:        ${IMAGE_TAG}"
+echo "======================================================"
 
-# Install dependencies
-echo "Installing dependencies..."
-pip install -r "$BACKEND_DIR/requirements.txt" --target "$BUILD_DIR" --platform manylinux2014_x86_64 --implementation cp --python-version 3.11 --only-binary=:all: --upgrade
+cd "${PROJECT_ROOT}"
 
-# Copy application code
-echo "Copying application code..."
-cp -r "$BACKEND_DIR/app" "$BUILD_DIR/"
-cp "$BACKEND_DIR/lambda_handler.py" "$BUILD_DIR/"
+echo ""
+echo "→ Building Lambda container image (linux/amd64)..."
+docker build \
+  --platform linux/amd64 \
+  --provenance=false \
+  -f Dockerfile.lambda \
+  -t "${IMAGE_TAG}" \
+  .
 
-# Zip it up
-echo "Creating zip file..."
-cd "$BUILD_DIR"
-zip -r "$ZIP_FILE" .
+IMAGE_SIZE=$(docker image inspect "${IMAGE_TAG}" \
+  --format '{{.Size}}' 2>/dev/null || echo 0)
+SIZE_MB=$(echo "scale=1; ${IMAGE_SIZE} / 1048576" | bc 2>/dev/null || echo "?")
 
-echo "Done! Package at $ZIP_FILE"
+echo ""
+echo "✓ Build complete!"
+echo "  Image: ${IMAGE_TAG}  (${SIZE_MB} MB uncompressed)"
+echo ""
+echo "To run the image locally (smoke-test the Lambda handler):"
+echo "  docker run --rm -p 9000:8080 \\"
+echo "    -e PORT=8000 \\"
+echo "    ${IMAGE_TAG}"
+echo ""
+echo "To push this image to ECR, run:"
+echo "  ./scripts/build_and_push.sh [dev|prod] [region]"

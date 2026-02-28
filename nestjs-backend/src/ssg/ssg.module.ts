@@ -11,6 +11,6 @@ import { SsgController } from './ssg.controller';
   imports: [MikroOrmModule.forFeature([SsgCache, SCTPCourse])],
   controllers: [SsgController],
   providers: [SsgClientService, SsgCacheService, SsgService],
-  exports: [SsgService],
+  exports: [SsgService, SsgCacheService],
 })
 export class SsgModule {}

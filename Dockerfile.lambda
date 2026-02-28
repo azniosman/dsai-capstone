@@ -1,0 +1,73 @@
+# =============================================================================
+# Dockerfile.lambda — SkillBridge Lambda container image
+# =============================================================================
+#
+# Strategy
+# --------
+# Stage 1  (nestjs-build): compile the NestJS backend to dist/ using a
+#   full Node.js 20 image so native npm / tsc toolchain is available.
+#
+# Stage 2  (lambda-runtime): Python 3.12 Lambda base image (AL2023) with Node.js
+#   installed so we can:
+#     a) run the compiled NestJS server as a sub-process (via
+#        lambda_handler.py), AND
+#     b) serve pure-Python automation handlers (lambdas/automation/*.py)
+#        via CMD override without any extra image.
+#
+# Build context: project root
+#   docker build --platform linux/amd64 --provenance=false \
+#     -f Dockerfile.lambda -t <ecr-uri>:latest .
+# =============================================================================
+
+# ── Stage 1: compile NestJS ──────────────────────────────────────────────────
+
+FROM node:20-alpine AS nestjs-build
+
+WORKDIR /build
+
+# Install dependencies first (Docker layer caching)
+COPY nestjs-backend/package.json nestjs-backend/package-lock.json ./
+RUN npm ci --legacy-peer-deps
+
+# Copy source and compile
+COPY nestjs-backend/ .
+RUN npm run build
+
+# Remove devDependencies to keep the copied node_modules lean
+RUN npm prune --omit=dev --legacy-peer-deps
+
+
+# ── Stage 2: Lambda runtime ──────────────────────────────────────────────────
+
+# Python 3.12 uses Amazon Linux 2023 as the base, which ships with dnf and
+# a full standard toolset (tar, curl, etc.).  Node.js 18 LTS is available in
+# the AL2023 default repos and fully supports NestJS 10+.
+# (Python 3.11 uses a stripped AL2 image that lacks tar; 3.12 fixes this.)
+FROM public.ecr.aws/lambda/python:3.12
+
+RUN dnf install -y nodejs \
+    && dnf clean all \
+    && node --version \
+    && npm --version
+
+# boto3 is pre-installed in all Lambda Python runtimes.
+# Install 'requests' for the warmup Lambda and any ad-hoc HTTP calls.
+RUN pip install --no-cache-dir requests
+
+# ── Python automation handlers ────────────────────────────────────────────────
+# lambdas/automation/*.py — triggered via CMD override by EventBridge.
+# lambdas/*.py            — specialist handlers (voice, rag, embeddings…).
+COPY lambdas/ ${LAMBDA_TASK_ROOT}/lambdas/
+
+# ── NestJS compiled app ───────────────────────────────────────────────────────
+# Placed under nestjs/ so lambda_handler.py can locate them via a relative path.
+COPY --from=nestjs-build /build/dist         ${LAMBDA_TASK_ROOT}/nestjs/dist/
+COPY --from=nestjs-build /build/node_modules ${LAMBDA_TASK_ROOT}/nestjs/node_modules/
+COPY --from=nestjs-build /build/package.json ${LAMBDA_TASK_ROOT}/nestjs/package.json
+
+# ── Main Lambda entry point ───────────────────────────────────────────────────
+# lambda_handler.py starts the NestJS process on cold start and proxies
+# API Gateway events (both v1 and v2 payload formats) to localhost.
+COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
+
+CMD ["lambda_handler.handler"]

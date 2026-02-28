@@ -22,6 +22,10 @@ export class ResumeParser {
       return result.value;
     }
 
+    if (mimeType === 'text/plain') {
+      return buffer.toString('utf8');
+    }
+
     throw new Error(`Unsupported mime type: ${mimeType}`);
   }
 

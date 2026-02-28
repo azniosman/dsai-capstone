@@ -8,6 +8,10 @@
 #   - 6 CloudWatch Alarms
 # =============================================================================
 
+# Resolve the current AWS account ID so it can be used in source_arn values.
+# Using a wildcard "*" for account ID is rejected by AWS provider >= v5.60.
+data "aws_caller_identity" "current" {}
+
 # ─── SQS Dead Letter Queue ───────────────────────────────────────────────────
 
 resource "aws_sqs_queue" "automation_dlq" {
@@ -63,41 +67,40 @@ resource "aws_sns_topic_subscription" "ops_email" {
 locals {
   automation_lambdas = {
     ssg-sync = {
-      handler = "lambdas.automation.ssg_sync.handler"
-      memory  = 256
-      timeout = 300
-      # Reserved concurrency 1: prevents duplicate SSG OAuth token conflicts
-      reserved_concurrency = 1
+      handler              = "lambdas.automation.ssg_sync.handler"
+      memory               = 256
+      timeout              = 300
+      reserved_concurrency = -1 # Unreserved — dev/capstone account has low concurrency budget
     }
     cache-cleanup = {
       handler              = "lambdas.automation.cache_cleanup.handler"
       memory               = 128
       timeout              = 60
-      reserved_concurrency = 1
+      reserved_concurrency = -1
     }
     recommendation-refresh = {
       handler              = "lambdas.automation.recommendation_refresh.handler"
       memory               = 512
       timeout              = 600
-      reserved_concurrency = 2
+      reserved_concurrency = -1
     }
     embedding-backfill = {
       handler              = "lambdas.automation.embedding_backfill.handler"
       memory               = 512
       timeout              = 600
-      reserved_concurrency = 2
+      reserved_concurrency = -1
     }
     market-insights = {
       handler              = "lambdas.automation.market_insights.handler"
       memory               = 256
       timeout              = 120
-      reserved_concurrency = 1
+      reserved_concurrency = -1
     }
     warmup = {
       handler              = "lambdas.automation.lambda_warmup.handler"
       memory               = 128
       timeout              = 30
-      reserved_concurrency = -1 # Unreserved — lightweight ping
+      reserved_concurrency = -1
     }
   }
 }
@@ -147,7 +150,7 @@ resource "aws_lambda_permission" "scheduler_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.automation[each.key].function_name
   principal     = "scheduler.amazonaws.com"
-  source_arn    = "arn:aws:scheduler:${var.aws_region}:*:schedule/*"
+  source_arn    = "arn:aws:scheduler:${var.aws_region}:${data.aws_caller_identity.current.account_id}:schedule/*"
 }
 
 # ─── EventBridge Scheduler Rules ─────────────────────────────────────────────
