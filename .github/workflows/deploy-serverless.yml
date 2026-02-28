@@ -284,11 +284,13 @@ jobs:
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 
           echo "=== Step 1: Remove non-ECR modules from Terraform state ==="
+          # module.iam is intentionally kept in state so Terraform updates roles
+          # in place rather than trying to create them (avoids 409 EntityAlreadyExists
+          # when IAM roles survive the AWS cleanup due to attached managed policies).
           for MOD in \
             module.vpc \
             module.security_groups \
             module.rds \
-            module.iam \
             module.lambda_backend \
             module.api_gateway \
             module.s3_frontend \
@@ -300,9 +302,12 @@ jobs:
           terraform state rm 'module.opensearch[0]'  2>/dev/null || true
           terraform state rm 'module.websocket[0]'   2>/dev/null || true
           terraform state rm 'module.sagemaker[0]'   2>/dev/null || true
-          # Uploads bucket (added in fixed main.tf)
-          terraform state rm 'aws_s3_bucket.uploads'             2>/dev/null || true
-          terraform state rm 'aws_s3_bucket_public_access_block.uploads' 2>/dev/null || true
+          # Uploads bucket + internal-token secret (root-level resources)
+          terraform state rm 'aws_s3_bucket.uploads'                          2>/dev/null || true
+          terraform state rm 'aws_s3_bucket_public_access_block.uploads'      2>/dev/null || true
+          terraform state rm 'aws_s3_bucket_server_side_encryption_configuration.uploads' 2>/dev/null || true
+          terraform state rm 'aws_secretsmanager_secret.internal_token'        2>/dev/null || true
+          terraform state rm 'aws_secretsmanager_secret_version.internal_token' 2>/dev/null || true
 
           echo "=== Step 2: Kick off Aurora cluster deletion (async) ==="
           CLUSTER_ID="${P}-${E}-aurora"
@@ -354,29 +359,14 @@ jobs:
             aws logs delete-log-group --log-group-name "$LG" 2>/dev/null || true
           done
 
-          echo "=== Step 4: Delete IAM roles and custom policies ==="
-          for ROLE_NAME in \
-            "${P}-${E}-lambda-exec" \
-            "${P}-${E}-automation-lambda" \
-            "${P}-${E}-eventbridge-scheduler"; do
-            for ARN in $(aws iam list-attached-role-policies \
-              --role-name "$ROLE_NAME" \
-              --query 'AttachedPolicies[].PolicyArn' \
-              --output text 2>/dev/null); do
-              aws iam detach-role-policy \
-                --role-name "$ROLE_NAME" --policy-arn "$ARN" 2>/dev/null || true
-            done
-            aws iam delete-role --role-name "$ROLE_NAME" 2>/dev/null || true
-          done
-          for POLICY in \
-            "${P}-${E}-lambda-policy" \
-            "${P}-${E}-opensearch-policy" \
-            "${P}-${E}-automation-lambda-policy" \
-            "${P}-${E}-eventbridge-scheduler-policy"; do
-            aws iam delete-policy \
-              --policy-arn "arn:aws:iam::${ACCOUNT}:policy/${POLICY}" \
-              2>/dev/null || true
-          done
+          # Step 4: IAM roles and policies are intentionally NOT deleted here.
+          # module.iam is kept in Terraform state (see Step 1 comment) so Terraform
+          # updates roles in place on re-deploy rather than attempting to create them.
+
+          echo "=== Step 4: Delete Secrets Manager secret ==="
+          aws secretsmanager delete-secret \
+            --secret-id "${P}/internal-token" \
+            --force-delete-without-recovery 2>/dev/null || true
 
           echo "=== Step 5: Delete ALL project-tagged VPCs and their dependencies ==="
           for VPC_ID in $(aws ec2 describe-vpcs \
