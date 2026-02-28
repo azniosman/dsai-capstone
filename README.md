@@ -70,19 +70,19 @@ SkillBridge is deployed entirely on AWS serverless infrastructure. The backend i
 
 ### Infrastructure Modules (Terraform)
 
-| Module | Resources |
-|---|---|
-| `vpc` | VPC, public/private subnets, NAT Gateway, Internet Gateway, route tables |
-| `database` | Aurora Serverless v2 cluster + pgvector extension, Secrets Manager secret, subnet group |
+| Module           | Resources                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| `vpc`            | VPC, public/private subnets, NAT Gateway, Internet Gateway, route tables                              |
+| `database`       | Aurora Serverless v2 cluster + pgvector extension, Secrets Manager secret, subnet group               |
 | `lambda_backend` | 6 Lambda functions (same ECR image, different CMD handlers), IAM role + policy, CloudWatch log groups |
-| `api_gateway` | HTTP API v2, `ANY /{proxy+}` route, Lambda integration, CORS, throttling |
-| `websocket` | WebSocket API, `$connect`/`$disconnect`/`$default` routes, binary frame handling |
-| `s3_frontend` | S3 bucket, website configuration, public access policy |
-| `ecr` | ECR repository + lifecycle policy |
-| `iam` | Lambda execution role with Bedrock, RDS, S3, Transcribe, Polly, Secrets Manager permissions |
-| `cloudfront` | CloudFront distribution with OAC (optional, `enable_cloudfront=true`) |
-| `opensearch` | OpenSearch Serverless domain (optional, `enable_opensearch=true`, ~$26/month) |
-| `sagemaker` | SageMaker Serverless endpoint for embeddings (optional, `enable_sagemaker=true`) |
+| `api_gateway`    | HTTP API v2, `ANY /{proxy+}` route, Lambda integration, CORS, throttling                              |
+| `websocket`      | WebSocket API, `$connect`/`$disconnect`/`$default` routes, binary frame handling                      |
+| `s3_frontend`    | S3 bucket, website configuration, public access policy                                                |
+| `ecr`            | ECR repository + lifecycle policy                                                                     |
+| `iam`            | Lambda execution role with Bedrock, RDS, S3, Transcribe, Polly, Secrets Manager permissions           |
+| `cloudfront`     | CloudFront distribution with OAC (optional, `enable_cloudfront=true`)                                 |
+| `opensearch`     | OpenSearch Serverless domain (optional, `enable_opensearch=true`, ~$26/month)                         |
+| `sagemaker`      | SageMaker Serverless endpoint for embeddings (optional, `enable_sagemaker=true`)                      |
 
 ---
 
@@ -90,68 +90,68 @@ SkillBridge is deployed entirely on AWS serverless infrastructure. The backend i
 
 ### Frontend
 
-| Tool | Version | Role |
-|---|---|---|
-| Next.js | 16 (App Router) | React framework, static export (`output: export`) |
-| React | 19 | UI runtime |
-| TypeScript | 5 | Type safety |
-| Tailwind CSS | 4 | Utility-first styling (OKLCH color space) |
-| shadcn/ui | New York style | Component library |
-| Recharts | latest | Skill radar charts, market trend charts |
-| Framer Motion | latest | Page transitions, animated results |
-| Axios | latest | API client with JWT auto-attach and refresh |
+| Tool          | Version         | Role                                              |
+| ------------- | --------------- | ------------------------------------------------- |
+| Next.js       | 16 (App Router) | React framework, static export (`output: export`) |
+| React         | 19              | UI runtime                                        |
+| TypeScript    | 5               | Type safety                                       |
+| Tailwind CSS  | 4               | Utility-first styling (OKLCH color space)         |
+| shadcn/ui     | New York style  | Component library                                 |
+| Recharts      | latest          | Skill radar charts, market trend charts           |
+| Framer Motion | latest          | Page transitions, animated results                |
+| Axios         | latest          | API client with JWT auto-attach and refresh       |
 
 ### Backend
 
-| Tool | Version | Role |
-|---|---|---|
-| Python | 3.11 | Runtime |
-| FastAPI | latest | Web framework |
-| Mangum | latest | ASGI → Lambda adapter |
-| SQLAlchemy | 2 | ORM |
-| Pydantic | v2 | Request/response schemas, settings |
-| python-jose | latest | JWT (HS256, access + refresh tokens) |
-| passlib / bcrypt | latest | Password hashing (12 rounds) |
-| spaCy | 3.7 | NLP library (installed, reserved for future entity extraction) |
-| slowapi | latest | Rate limiting middleware |
+| Tool             | Version | Role                                                           |
+| ---------------- | ------- | -------------------------------------------------------------- |
+| Python           | 3.11    | Runtime                                                        |
+| FastAPI          | latest  | Web framework                                                  |
+| Mangum           | latest  | ASGI → Lambda adapter                                          |
+| SQLAlchemy       | 2       | ORM                                                            |
+| Pydantic         | v2      | Request/response schemas, settings                             |
+| python-jose      | latest  | JWT (HS256, access + refresh tokens)                           |
+| passlib / bcrypt | latest  | Password hashing (12 rounds)                                   |
+| spaCy            | 3.7     | NLP library (installed, reserved for future entity extraction) |
+| slowapi          | latest  | Rate limiting middleware                                       |
 
 ### AI / ML
 
-| Tool | Role |
-|---|---|
-| **AWS Bedrock — Claude 3.5 Sonnet** (`us.anthropic.claude-3-5-sonnet-20241022-v2:0`) | LLM for career coaching, resume parsing, interview simulation, RAG generation |
-| **AWS Bedrock — Titan Embed Text v1** (`amazon.titan-embed-text-v1`) | 1536-dim embeddings for RAG pipeline + pgvector storage |
-| **Sentence Transformers** (`all-MiniLM-L6-v2`, 384-dim) | Local embeddings for FAISS skill taxonomy matching |
-| **FAISS** | In-memory vector index for skill normalization (cosine similarity, threshold 0.75) |
-| **pgvector** | PostgreSQL extension in Aurora for RAG document retrieval (`<->` cosine distance) |
-| **AWS Polly** | Neural TTS (voice: Matthew) for voice coaching responses |
-| **AWS Transcribe** | Batch speech-to-text for voice coaching input |
-| **Google Gemini** (`gemini-2.0-flash`) | Chat fallback when Bedrock is unavailable |
+| Tool                                                                                 | Role                                                                               |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| **AWS Bedrock — Claude 3.5 Sonnet** (`us.anthropic.claude-3-5-sonnet-20241022-v2:0`) | LLM for career coaching, resume parsing, interview simulation, RAG generation      |
+| **AWS Bedrock — Titan Embed Text v1** (`amazon.titan-embed-text-v1`)                 | 1536-dim embeddings for RAG pipeline + pgvector storage                            |
+| **Sentence Transformers** (`all-MiniLM-L6-v2`, 384-dim)                              | Local embeddings for FAISS skill taxonomy matching                                 |
+| **FAISS**                                                                            | In-memory vector index for skill normalization (cosine similarity, threshold 0.75) |
+| **pgvector**                                                                         | PostgreSQL extension in Aurora for RAG document retrieval (`<->` cosine distance)  |
+| **AWS Polly**                                                                        | Neural TTS (voice: Matthew) for voice coaching responses                           |
+| **AWS Transcribe**                                                                   | Batch speech-to-text for voice coaching input                                      |
+| **Google Gemini** (`gemini-2.0-flash`)                                               | Chat fallback when Bedrock is unavailable                                          |
 
 ### Infrastructure
 
-| Service | Role |
-|---|---|
-| AWS Lambda | Compute (6 functions, container image, 3008 MB / 120s) |
-| API Gateway HTTP API v2 | REST interface (29s timeout, proxy integration) |
+| Service                   | Role                                                          |
+| ------------------------- | ------------------------------------------------------------- |
+| AWS Lambda                | Compute (6 functions, container image, 3008 MB / 120s)        |
+| API Gateway HTTP API v2   | REST interface (29s timeout, proxy integration)               |
 | API Gateway WebSocket API | Real-time voice coaching (binary frames, `CONVERT_TO_BINARY`) |
-| Aurora Serverless v2 | Managed PostgreSQL 16 + pgvector (0.5 ACU min, auto-scaling) |
-| Amazon ECR | Container image registry (lifecycle: keep last 5) |
-| Amazon S3 | Frontend static hosting + voice audio temp storage |
-| CloudFront | CDN with OAC (optional) |
-| AWS Secrets Manager | Aurora credentials (auto-rotatable) |
-| Amazon Polly | Neural TTS |
-| Amazon Transcribe | Batch STT |
+| Aurora Serverless v2      | Managed PostgreSQL 16 + pgvector (0.5 ACU min, auto-scaling)  |
+| Amazon ECR                | Container image registry (lifecycle: keep last 5)             |
+| Amazon S3                 | Frontend static hosting + voice audio temp storage            |
+| CloudFront                | CDN with OAC (optional)                                       |
+| AWS Secrets Manager       | Aurora credentials (auto-rotatable)                           |
+| Amazon Polly              | Neural TTS                                                    |
+| Amazon Transcribe         | Batch STT                                                     |
 
 ### DevOps
 
-| Tool | Role |
-|---|---|
-| Terraform 1.9 | Infrastructure as Code (12 modules) |
-| GitHub Actions | CI/CD (manual `workflow_dispatch` only) |
-| Docker Buildx | Multi-platform image build (`linux/amd64`, `--provenance=false` for Lambda) |
-| Docker Compose | Local full-stack environment |
-| n8n | Automation workflows (market updates, resume ingestion, notifications) |
+| Tool           | Role                                                                        |
+| -------------- | --------------------------------------------------------------------------- |
+| Terraform 1.9  | Infrastructure as Code (12 modules)                                         |
+| GitHub Actions | CI/CD (manual `workflow_dispatch` only)                                     |
+| Docker Buildx  | Multi-platform image build (`linux/amd64`, `--provenance=false` for Lambda) |
+| Docker Compose | Local full-stack environment                                                |
+| n8n            | Automation workflows (market updates, resume ingestion, notifications)      |
 
 ---
 
@@ -198,6 +198,7 @@ Response + source embedding IDs          ← Source tracking for attribution
 ```
 
 **Stored document types (`text_type`):**
+
 - `"resume"` — extracted resume text (ingested via S3 trigger or upload endpoint)
 - `"query"` — past user queries (enables personalized retrieval)
 - `"jd"` — job description text (from JD match endpoint)
@@ -235,6 +236,7 @@ The system prompt explicitly instructs the model to base its answer on retrieved
 **2. Structured Profile Context (Career Coach)**
 
 Every chat request injects the user's verified data into the system prompt:
+
 - Full profile (skills, experience, education, age)
 - Top 3 recommended roles with match scores
 - Key skill gaps with severity labels
@@ -252,14 +254,14 @@ Every RAG response returns `sources: [embedding_ids]`, enabling callers to trace
 
 All six Lambda functions share a single ECR container image. Handler selection is via CMD override:
 
-| Function | Handler | Timeout | Memory | Purpose |
-|---|---|---|---|---|
-| `{env}-api` | `lambda_handler.handler` | 120s | 3008 MB | Main FastAPI app (all HTTP routes) |
-| `{env}-voice` | `lambdas.voice_coaching_handler.handler` | 120s | 3008 MB | WebSocket voice pipeline |
-| `{env}-rag-query` | `lambdas.rag_query_handler.handler` | 30s | 3008 MB | Direct RAG query invocation |
-| `{env}-embed-gen` | `lambdas.embedding_generator.handler` | 30s | 3008 MB | Store new embeddings in pgvector |
-| `{env}-gap-analysis` | `lambdas.gap_analysis_handler.handler` | 60s | 3008 MB | Skill gap computation |
-| `{env}-resume-upload` | `lambdas.resume_upload_handler.handler` | 30s | 3008 MB | S3-triggered resume processing |
+| Function              | Handler                                  | Timeout | Memory  | Purpose                            |
+| --------------------- | ---------------------------------------- | ------- | ------- | ---------------------------------- |
+| `{env}-api`           | `lambda_handler.handler`                 | 120s    | 3008 MB | Main FastAPI app (all HTTP routes) |
+| `{env}-voice`         | `lambdas.voice_coaching_handler.handler` | 120s    | 3008 MB | WebSocket voice pipeline           |
+| `{env}-rag-query`     | `lambdas.rag_query_handler.handler`      | 30s     | 3008 MB | Direct RAG query invocation        |
+| `{env}-embed-gen`     | `lambdas.embedding_generator.handler`    | 30s     | 3008 MB | Store new embeddings in pgvector   |
+| `{env}-gap-analysis`  | `lambdas.gap_analysis_handler.handler`   | 60s     | 3008 MB | Skill gap computation              |
+| `{env}-resume-upload` | `lambdas.resume_upload_handler.handler`  | 30s     | 3008 MB | S3-triggered resume processing     |
 
 > The 3008 MB allocation is required to load Sentence Transformer + FAISS models at cold start within Lambda's memory constraints.
 
@@ -292,47 +294,56 @@ API Gateway WebSocket → Lambda (voice)
 ## Features
 
 ### Resume Intelligence
+
 - **AI Resume Parsing** — PDF/DOCX upload (10 MB limit) processed by Claude 3.5 Sonnet via AWS Bedrock; returns structured analysis: skills list, readiness score (0–100), strengths, missing skills, suggested roles, recommended courses
 - **Keyword Fallback** — If Bedrock is unavailable, spaCy-ready taxonomy keyword matching ensures skills are always extracted
 - **Embedding Storage** — Resume text is embedded via Titan Embed and stored in pgvector for RAG retrieval
 
 ### Job Matching
+
 - **Hybrid Scoring** — `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
 - **Recommendation Cache** — In-memory TTL cache (300s) prevents redundant scoring on repeated requests
 - **JD Match** — Paste any job description; instantly get match score, matched skills, missing skills, and a severity-ranked gap table
 
 ### Skill Gap Analysis
+
 - **Per-Role Gaps** — Severity-ranked gap items (`high` / `medium` / `none`) for each recommended role
 - **FAISS Taxonomy** — 150+ canonical skills, normalized from free-text via in-memory cosine similarity (threshold 0.75)
 - **Radar Visualization** — Recharts radar chart on the dashboard showing skill breadth
 
 ### AI Career Coach
+
 - **Context-Aware Chat** — LLM knows your full profile, skill gaps, SCTP courses, and live Singapore market data before answering
 - **Engine priority:** Google Gemini (primary) → AWS Bedrock Claude 3.5 Sonnet (fallback) → HTTP 503
 - **Multi-turn Conversation** — Full message history sent on every request; persistent across page navigation
 - **RAG-Augmented Responses** — Career coach can draw from your stored resume embeddings via the RAG pipeline
 
 ### Mock Interview Simulator
+
 - **Role-specific questions** generated by Bedrock Claude, targeting your identified skill gaps
 - **Configurable difficulty** — `beginner`, `intermediate`, `advanced`
 - **Multi-turn session** — Tracks question number and conversation history
 
 ### Voice Coaching
+
 - **Real-time WebSocket session** — Low-latency audio-in, audio-out over `wss://`
 - **AWS Transcribe** for speech-to-text, **AWS Polly** (neural, Matthew voice) for text-to-speech
 - **REST fallback** — `POST /api/voice/interview_turn` for file-upload voice turns
 
 ### Learning & Pathways
+
 - **SCTP Course Database** — 25 validated SkillsFuture Career Transition Programme courses
 - **Subsidy Calculator** — MCES (90% for age 40+), SkillsFuture Credit ($500), Training Allowance ($6,000) computed per course
 - **Learning Pathways** — Skill → Beginner course → Advanced course, scoped to your specific gaps
 
 ### Market Intelligence
+
 - **Singapore 2026 Benchmarks** — 6 role categories (Data & Analytics, Software Engineering, Cloud & DevOps, AI/ML, Cybersecurity, Product) with avg SGD salary, YoY growth %, and demand level
 - **Market Simulator** — Stochastic daily fluctuation simulation with trend injection (±5% randomness)
 - **Peer Comparison** — Anonymized cohort benchmarking against users with similar profiles
 
 ### Progress & Portfolio
+
 - **ProfileSnapshot model** — Point-in-time records of skills count, gap count, readiness score for historical tracking
 - **Project Suggestions** — LLM-generated portfolio project ideas scoped to your gap skills
 - **Resume Rewriter** — Rewrites resume bullet points for target role impact
@@ -353,6 +364,7 @@ API Gateway WebSocket → Lambda (voice)
    - Without this step, all Bedrock calls return `ValidationException: Operation not allowed`
 
 3. **Use cross-region inference profile ID** (not the direct model ID):
+
    ```
    # Correct (cross-region inference profile — ACTIVE)
    BEDROCK_MODEL_ID=us.anthropic.claude-3-5-sonnet-20241022-v2:0
@@ -363,13 +375,13 @@ API Gateway WebSocket → Lambda (voice)
 
 4. **GitHub repository secrets** (set in repo → Settings → Secrets → Actions, environment: `dev`):
 
-   | Secret | Value |
-   |---|---|
-   | `AWS_ACCESS_KEY_ID` | IAM user access key |
-   | `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
-   | `DB_PASSWORD` | Aurora master password (alphanumeric only — no `/`, `@`, `"`, or spaces) |
-   | `SECRET_KEY` | JWT signing secret (min 32 hex chars: `openssl rand -hex 32`) |
-   | `GEMINI_API_KEY` | Google AI Studio API key (optional, used as chat fallback) |
+   | Secret                  | Value                                                                    |
+   | ----------------------- | ------------------------------------------------------------------------ |
+   | `AWS_ACCESS_KEY_ID`     | IAM user access key                                                      |
+   | `AWS_SECRET_ACCESS_KEY` | IAM user secret key                                                      |
+   | `DB_PASSWORD`           | Aurora master password (alphanumeric only — no `/`, `@`, `"`, or spaces) |
+   | `SECRET_KEY`            | JWT signing secret (min 32 hex chars: `openssl rand -hex 32`)            |
+   | `GEMINI_API_KEY`        | Google AI Studio API key (optional, used as chat fallback)               |
 
 ### CI/CD via GitHub Actions
 
@@ -391,17 +403,17 @@ gh workflow run deploy-serverless.yml \
 
 **What the workflow does (full deploy):**
 
-| Step | Action |
-|---|---|
-| 1 | Create ECR repository (import if exists) |
-| 2 | Build Docker image (`linux/amd64`, `--provenance=false`) and push to ECR |
-| 3 | Clean up existing AWS resources (Aurora, Lambda, API GW, VPC, ENIs, NAT GW) — with retry loops and 15-min Aurora wait |
-| 4 | Re-import ECR into Terraform state |
-| 5 | `terraform plan` then `terraform apply` — full infrastructure rebuild |
-| 6 | Build Next.js static export with `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_VOICE_WS_URL` baked in |
-| 7 | S3 sync (3 passes: immutable JS/CSS → no-cache HTML → extension-less routing copies) |
-| 8 | CloudFront invalidation (if `enable_cloudfront=true`) |
-| 9 | Smoke test: poll `/health` up to 30×10s (5 min) for Lambda cold start + DB init |
+| Step | Action                                                                                                                |
+| ---- | --------------------------------------------------------------------------------------------------------------------- |
+| 1    | Create ECR repository (import if exists)                                                                              |
+| 2    | Build Docker image (`linux/amd64`, `--provenance=false`) and push to ECR                                              |
+| 3    | Clean up existing AWS resources (Aurora, Lambda, API GW, VPC, ENIs, NAT GW) — with retry loops and 15-min Aurora wait |
+| 4    | Re-import ECR into Terraform state                                                                                    |
+| 5    | `terraform plan` then `terraform apply` — full infrastructure rebuild                                                 |
+| 6    | Build Next.js static export with `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_VOICE_WS_URL` baked in                        |
+| 7    | S3 sync (3 passes: immutable JS/CSS → no-cache HTML → extension-less routing copies)                                  |
+| 8    | CloudFront invalidation (if `enable_cloudfront=true`)                                                                 |
+| 9    | Smoke test: poll `/health` up to 30×10s (5 min) for Lambda cold start + DB init                                       |
 
 **S3 routing strategy (Pass 3):** Next.js static export generates flat `login.html` files. S3 website hosting only serves `/login.html` at the exact key, not at `/login`. Pass 3 copies each route HTML to an extension-less key (`login.html` → `login`) with `Content-Type: text/html` so clean URLs work without CloudFront.
 
@@ -452,11 +464,11 @@ cp .env.example .env        # fill in secrets
 bash scripts/deploy.sh      # wraps: docker compose up -d --build
 ```
 
-| Service | URL |
-|---|---|
-| Frontend | http://localhost:3000 |
+| Service              | URL                        |
+| -------------------- | -------------------------- |
+| Frontend             | http://localhost:3000      |
 | Backend + Swagger UI | http://localhost:8000/docs |
-| n8n Automation | http://localhost:5678 |
+| n8n Automation       | http://localhost:5678      |
 
 ### Backend (standalone)
 
@@ -554,70 +566,70 @@ All endpoints are prefixed `/api`. The main Lambda handler routes all requests t
 
 ### Authentication
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/auth/register` | Register user — body: `{email, password, password_confirm, name, tenant_name}` |
-| `POST` | `/api/auth/login` | Login — **form-encoded** (`application/x-www-form-urlencoded`), returns `{access_token, refresh_token}` |
-| `GET` | `/api/auth/me` | Current user info — requires Bearer token |
+| Method | Path                 | Description                                                                                             |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------- |
+| `POST` | `/api/auth/register` | Register user — body: `{email, password, password_confirm, name, tenant_name}`                          |
+| `POST` | `/api/auth/login`    | Login — **form-encoded** (`application/x-www-form-urlencoded`), returns `{access_token, refresh_token}` |
+| `GET`  | `/api/auth/me`       | Current user info — requires Bearer token                                                               |
 
 > Auth is **optional** for core features. Profile creation, recommendations, and skill gap analysis work without a token. When a token is present, data is scoped to the authenticated user + tenant.
 
 ### Profile & Resume
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/profile` | Create/update profile — `{name, education, years_experience, skills, resume_text, …}` |
-| `GET` | `/api/profile/me` | Fetch authenticated user's profile |
+| Method | Path                 | Description                                                                                     |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------- |
+| `POST` | `/api/profile`       | Create/update profile — `{name, education, years_experience, skills, resume_text, …}`           |
+| `GET`  | `/api/profile/me`    | Fetch authenticated user's profile                                                              |
 | `POST` | `/api/upload-resume` | Upload PDF/DOCX (multipart) — returns `{skills, readiness_score, strengths, missing_skills, …}` |
-| `POST` | `/api/jd-match` | Match profile against job description — returns match score, gaps, matched/missing skills |
+| `POST` | `/api/jd-match`      | Match profile against job description — returns match score, gaps, matched/missing skills       |
 
 ### AI Features
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/chat` | Career coach — body: `{profile_id?, messages: [{role, content}]}` — returns `text/event-stream` (SSE) |
-| `POST` | `/api/interview` | Mock interview — body: `{profile_id, role_title, messages, difficulty}` |
-| `POST` | `/api/resume/rewrite` | Rewrite bullet point — body: `{target_role, bullet_point}` |
-| `GET` | `/api/project-suggestions/{id}` | Portfolio project ideas for a profile |
-| `POST` | `/api/voice/interview_turn` | Voice interview turn (file upload → transcribe → respond → TTS) |
-| `POST` | `/api/voice/speak` | Text-to-speech only (returns MP3) |
+| Method | Path                            | Description                                                                                           |
+| ------ | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `POST` | `/api/chat`                     | Career coach — body: `{profile_id?, messages: [{role, content}]}` — returns `text/event-stream` (SSE) |
+| `POST` | `/api/interview`                | Mock interview — body: `{profile_id, role_title, messages, difficulty}`                               |
+| `POST` | `/api/resume/rewrite`           | Rewrite bullet point — body: `{target_role, bullet_point}`                                            |
+| `GET`  | `/api/project-suggestions/{id}` | Portfolio project ideas for a profile                                                                 |
+| `POST` | `/api/voice/interview_turn`     | Voice interview turn (file upload → transcribe → respond → TTS)                                       |
+| `POST` | `/api/voice/speak`              | Text-to-speech only (returns MP3)                                                                     |
 
 ### Recommendations & Analysis
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/recommend` | Hybrid job recommendations — body: `{profile_id}` |
-| `GET` | `/api/skill-gap/{id}` | Severity-ranked skill gaps per recommended role |
-| `GET` | `/api/upskilling/{id}` | Personalized upskilling roadmap |
-| `GET` | `/api/roles` | All 50 job roles with SGD salary benchmarks |
-| `POST` | `/api/compare-roles` | Side-by-side multi-role comparison |
-| `GET` | `/api/peer-comparison/{id}` | Anonymized cohort benchmarking |
+| Method | Path                        | Description                                       |
+| ------ | --------------------------- | ------------------------------------------------- |
+| `POST` | `/api/recommend`            | Hybrid job recommendations — body: `{profile_id}` |
+| `GET`  | `/api/skill-gap/{id}`       | Severity-ranked skill gaps per recommended role   |
+| `GET`  | `/api/upskilling/{id}`      | Personalized upskilling roadmap                   |
+| `GET`  | `/api/roles`                | All 50 job roles with SGD salary benchmarks       |
+| `POST` | `/api/compare-roles`        | Side-by-side multi-role comparison                |
+| `GET`  | `/api/peer-comparison/{id}` | Anonymized cohort benchmarking                    |
 
 ### Market & Courses
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/market-insights` | Singapore 2026 salary + demand data |
-| `POST` | `/api/simulate` | Run market stochastic simulator |
-| `GET` | `/api/courses` | SCTP courses with fee, subsidy, and nett payable |
-| `POST` | `/api/pathways` | Learning pathways — body: `{skills_needed: []}` |
-| `POST` | `/api/calculate-subsidy` | Calculate MCES/SFC subsidy for a course |
+| Method | Path                     | Description                                      |
+| ------ | ------------------------ | ------------------------------------------------ |
+| `GET`  | `/api/market-insights`   | Singapore 2026 salary + demand data              |
+| `POST` | `/api/simulate`          | Run market stochastic simulator                  |
+| `GET`  | `/api/courses`           | SCTP courses with fee, subsidy, and nett payable |
+| `POST` | `/api/pathways`          | Learning pathways — body: `{skills_needed: []}`  |
+| `POST` | `/api/calculate-subsidy` | Calculate MCES/SFC subsidy for a course          |
 
 ### Progress & Export
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/progress` | Record skill progress checkpoint |
-| `GET` | `/api/progress/{id}` | Progress dashboard data |
-| `GET` | `/api/progress/{id}/timeline` | Progress timeline for charting |
-| `GET` | `/api/export/roadmap/{id}` | Download roadmap as PDF |
+| Method | Path                          | Description                      |
+| ------ | ----------------------------- | -------------------------------- |
+| `POST` | `/api/progress`               | Record skill progress checkpoint |
+| `GET`  | `/api/progress/{id}`          | Progress dashboard data          |
+| `GET`  | `/api/progress/{id}/timeline` | Progress timeline for charting   |
+| `GET`  | `/api/export/roadmap/{id}`    | Download roadmap as PDF          |
 
 ### System
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Health check — returns `{"status": "ok"}` |
-| `GET` | `/api/auth/me` | Auth probe |
+| Method | Path           | Description                               |
+| ------ | -------------- | ----------------------------------------- |
+| `GET`  | `/health`      | Health check — returns `{"status": "ok"}` |
+| `GET`  | `/api/auth/me` | Auth probe                                |
 
 ### WebSocket
 
@@ -669,15 +681,15 @@ Frames:
 
 ## Cost Model
 
-| Resource | Monthly Cost | Notes |
-|---|---|---|
-| Aurora Serverless v2 | ~$43 | 0.5 ACU minimum; pgvector included |
-| NAT Gateway | ~$32 | Required for Lambda→internet (Bedrock API); can be destroyed between demos |
-| Lambda | ~$0–2 | Pay-per-invocation; negligible at demo scale |
-| S3 + CloudFront | ~$1–5 | Frontend static hosting |
-| ECR | ~$0.50 | Container image storage |
-| **Total (with NAT)** | **~$80/month** | |
-| **Total (paused NAT)** | **~$48/month** | Pause when not presenting |
+| Resource               | Monthly Cost   | Notes                                                                      |
+| ---------------------- | -------------- | -------------------------------------------------------------------------- |
+| Aurora Serverless v2   | ~$43           | 0.5 ACU minimum; pgvector included                                         |
+| NAT Gateway            | ~$32           | Required for Lambda→internet (Bedrock API); can be destroyed between demos |
+| Lambda                 | ~$0–2          | Pay-per-invocation; negligible at demo scale                               |
+| S3 + CloudFront        | ~$1–5          | Frontend static hosting                                                    |
+| ECR                    | ~$0.50         | Container image storage                                                    |
+| **Total (with NAT)**   | **~$80/month** |                                                                            |
+| **Total (paused NAT)** | **~$48/month** | Pause when not presenting                                                  |
 
 ```bash
 # Pause NAT Gateway between demos
@@ -773,4 +785,4 @@ MIT — see `LICENSE`.
 
 ---
 
-*SkillBridge — Empowering Singapore's Workforce*
+_SkillBridge — Empowering Singapore's Workforce_
