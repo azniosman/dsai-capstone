@@ -642,10 +642,10 @@ export default function Dashboard() {
               ))}
             </div>
             <Link
-              href="/market"
+              href="/skill-gap"
               className="flex items-center gap-1 mt-3 text-xs text-muted-foreground hover:text-primary transition-colors"
             >
-              View market data <ChevronRight className="h-3 w-3" />
+              View skill matrix <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
         </div>

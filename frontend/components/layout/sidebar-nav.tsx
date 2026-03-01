@@ -11,7 +11,6 @@ import {
   BookOpen,
   FileText,
   MessageSquare,
-  Mic,
   Settings,
   Sun,
   Moon,
@@ -19,7 +18,7 @@ import {
   ChevronRight,
   Command,
   LogOut,
-  Target,
+  GitCompare,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -43,8 +42,7 @@ const CORE_NAV = [
 const TOOLS_NAV = [
   { label: "JD Match", path: "/jd-match", icon: FileText },
   { label: "Career Coach", path: "/chat", icon: MessageSquare },
-  { label: "Interview Prep", path: "/interview", icon: Target },
-  { label: "Voice Coach", path: "/voice-coach", icon: Mic },
+  { label: "Compare Roles", path: "/roadmap", icon: GitCompare },
 ];
 
 interface SidebarNavProps {
