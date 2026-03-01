@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { AppModal } from "@/components/ui/AppModal";
+import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useModalStore } from "@/store/modalStore";
 import {
@@ -72,6 +73,8 @@ export default function RoleMatchModal() {
 
   return (
     <AppModal isOpen={isOpen} onClose={closeModal} size="lg" noPadding>
+      <DialogTitle className="sr-only">{rec.title} — Role Match</DialogTitle>
+      <DialogDescription className="sr-only">Skill match breakdown for {rec.title}</DialogDescription>
       {/* SkillRadar handles: KPI row, radar chart, score breakdown, rationale */}
       <SkillRadar data={radarData} roleName={rec.title} metrics={metrics} />
 

@@ -58,6 +58,14 @@ const DEFAULT_SUGGESTIONS = [
 // Sub-components
 // ─────────────────────────────────────────────
 
+/** UUID generation with fallback for non-secure contexts / older browsers */
+function genId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return genId();
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
 /** Animated three-dot typing indicator */
 function TypingDots() {
   return (
@@ -164,13 +172,13 @@ export default function ChatCoach({
     if (!text.trim() || isLoading) return;
 
     const userMsg: Message = {
-      id: crypto.randomUUID(),
+      id: genId(),
       role: "user",
       content: text.trim(),
       timestamp: new Date(),
     };
 
-    const loadingMsgId = crypto.randomUUID();
+    const loadingMsgId = genId();
     const loadingMsg: Message = {
       id: loadingMsgId,
       role: "assistant",
