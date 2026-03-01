@@ -48,7 +48,8 @@ resource "aws_lambda_function" "api" {
       GEMINI_API_KEY   = var.gemini_api_key
       GEMINI_MODEL     = "gemini-2.0-flash"
 
-      # Auth
+      # Auth — NestJS reads JWT_SECRET; SECRET_KEY kept for backward-compat
+      JWT_SECRET                  = var.secret_key
       SECRET_KEY                  = var.secret_key
       JWT_ALGORITHM               = "HS256"
       ACCESS_TOKEN_EXPIRE_MINUTES = "1440"
