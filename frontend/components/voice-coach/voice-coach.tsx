@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mic, Square, Loader2 } from "lucide-react";
-import { services } from "@/lib/services";
+import api from "@/lib/api-client";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -127,7 +127,16 @@ export function VoiceCoach({ profileId }: VoiceCoachProps) {
 
   const processAudio = async (blob: Blob) => {
     try {
-      const result = await services.processInterviewTurn(blob, profileId);
+      const formData = new FormData();
+      formData.append("audio", blob, "recording.webm");
+      if (profileId) formData.append("profile_id", profileId.toString());
+      const { data: result } = await api.post<{
+        transcript: string;
+        reply_text: string;
+        audio_base64?: string;
+      }>("/api/voice/interview_turn", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       setTranscript(result.transcript);
       setReplyText(result.reply_text);
 
