@@ -65,6 +65,9 @@ COPY --from=nestjs-build /build/dist         ${LAMBDA_TASK_ROOT}/nestjs/dist/
 COPY --from=nestjs-build /build/node_modules ${LAMBDA_TASK_ROOT}/nestjs/node_modules/
 COPY --from=nestjs-build /build/package.json ${LAMBDA_TASK_ROOT}/nestjs/package.json
 
+# ── Seed data (JSON files read by DatabaseSeeder on cold start) ───────────────
+COPY data/ ${LAMBDA_TASK_ROOT}/data/
+
 # ── Main Lambda entry point ───────────────────────────────────────────────────
 # lambda_handler.py starts the NestJS process on cold start and proxies
 # API Gateway events (both v1 and v2 payload formats) to localhost.
