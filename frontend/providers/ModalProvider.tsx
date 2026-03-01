@@ -24,32 +24,28 @@ const SkillGapModal = dynamic(
 const AIChatModal = dynamic(() => import("@/components/modals/AIChatModal"), {
   ssr: false,
 });
-const ProfileModal = dynamic(
-  () => import("@/components/modals/ProfileModal"),
-  { ssr: false },
-);
+const ProfileModal = dynamic(() => import("@/components/modals/ProfileModal"), {
+  ssr: false,
+});
 const BuildProfileModal = dynamic(
   () => import("@/components/modals/BuildProfileModal"),
   { ssr: false },
 );
-const VoiceCoachModal = dynamic(
-  () => import("@/components/modals/VoiceCoachModal"),
-  { ssr: false },
-);
-const JDMatchModal = dynamic(
-  () => import("@/components/modals/JDMatchModal"),
-  { ssr: false },
-);
-const InterviewModal = dynamic(
-  () => import("@/components/modals/InterviewModal"),
-  { ssr: false },
-);
+
+const JDMatchModal = dynamic(() => import("@/components/modals/JDMatchModal"), {
+  ssr: false,
+});
+
 const RoleMatchModal = dynamic(
   () => import("@/components/modals/RoleMatchModal"),
   { ssr: false },
 );
 const SkillsFutureCoursesModalAdapter = dynamic(
   () => import("@/components/modals/SkillsFutureCoursesModalAdapter"),
+  { ssr: false },
+);
+const MatchIntelligenceModal = dynamic(
+  () => import("@/components/modals/MatchIntelligenceModal"),
   { ssr: false },
 );
 
@@ -76,11 +72,14 @@ export function ModalProvider() {
       {type === "skillGap" && isOpen && <SkillGapModal />}
       {type === "aiChat" && isOpen && <AIChatModal />}
       {type === "profile" && isOpen && <ProfileModal />}
-      {type === "voiceCoach" && isOpen && <VoiceCoachModal />}
+
       {type === "jdMatch" && isOpen && <JDMatchModal />}
-      {type === "interview" && isOpen && <InterviewModal />}
+
       {type === "roleMatch" && isOpen && <RoleMatchModal />}
-      {type === "skillsFutureCourses" && isOpen && <SkillsFutureCoursesModalAdapter />}
+      {type === "skillsFutureCourses" && isOpen && (
+        <SkillsFutureCoursesModalAdapter />
+      )}
+      {type === "matchIntelligence" && isOpen && <MatchIntelligenceModal />}
       {isProfileBuilderOpen && <BuildProfileModal />}
     </>
   );

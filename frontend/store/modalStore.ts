@@ -7,11 +7,10 @@ export type ModalType =
   | "skillGap"
   | "aiChat"
   | "profile"
-  | "voiceCoach"
   | "jdMatch"
-  | "interview"
   | "roleMatch"
   | "skillsFutureCourses"
+  | "matchIntelligence"
   | null;
 
 interface ModalStore {
