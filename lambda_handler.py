@@ -33,6 +33,57 @@ from typing import Any
 logger = logging.getLogger(__name__)
 logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
 
+# ── DB credentials bootstrap ──────────────────────────────────────────────────
+# The Lambda receives DB_SECRET_ARN.  NestJS/MikroORM reads DATABASE_URL (or
+# DATABASE_HOST / DATABASE_USER / DATABASE_PASSWORD / DATABASE_NAME).
+# Fetch the secret once at module load so the env var is available to the
+# NestJS child process on cold start.
+
+def _bootstrap_db_env() -> None:
+    """Fetch DB credentials from Secrets Manager and set DATABASE_URL."""
+    secret_arn = os.environ.get("DB_SECRET_ARN")
+    if not secret_arn:
+        return  # Local dev without Secrets Manager — env vars already set
+    if os.environ.get("DATABASE_URL"):
+        return  # Already set (e.g. by a previous warm invocation or local .env)
+
+    try:
+        import urllib.request as _req
+        import urllib.parse as _parse
+
+        # Use the AWS SDK via a minimal boto3-free approach: call the
+        # Secrets Manager endpoint using the Lambda's IAM role credentials.
+        # boto3 is available in all Lambda Python runtimes.
+        import boto3  # noqa: PLC0415
+
+        client = boto3.client("secretsmanager", region_name=os.environ.get("AWS_REGION_ID", "us-east-1"))
+        resp = client.get_secret_value(SecretId=secret_arn)
+        secret = json.loads(resp["SecretString"])
+
+        # The RDS Terraform module stores a 'url' field with the full
+        # postgresql://user:pass@host:5432/dbname connection string.
+        db_url = secret.get("url")
+        if not db_url:
+            # Fallback: build from individual fields
+            db_url = (
+                f"postgresql://{secret['username']}:{secret['password']}"
+                f"@{secret['host']}:{secret.get('port', 5432)}/{secret['dbname']}"
+            )
+        os.environ["DATABASE_URL"] = db_url
+        # Also set individual vars for libraries that prefer them
+        os.environ.setdefault("DATABASE_HOST", secret.get("host", ""))
+        os.environ.setdefault("DATABASE_USER", secret.get("username", ""))
+        os.environ.setdefault("DATABASE_PASSWORD", secret.get("password", ""))
+        os.environ.setdefault("DATABASE_NAME", secret.get("dbname", ""))
+        os.environ.setdefault("DATABASE_PORT", str(secret.get("port", 5432)))
+        logger.info("DB credentials loaded from Secrets Manager (host=%s)", secret.get("host"))
+    except Exception as exc:
+        logger.error("Failed to load DB credentials from Secrets Manager: %s", exc)
+        # Do not raise — NestJS will fail at DB init with a clearer error
+
+
+_bootstrap_db_env()
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 NESTJS_PORT: int = int(os.environ.get("NESTJS_PORT", "8000"))
@@ -43,7 +94,9 @@ _TASK_ROOT: str = os.environ.get("LAMBDA_TASK_ROOT", os.path.dirname(__file__))
 NESTJS_APP_DIR: str = os.path.join(_TASK_ROOT, "nestjs")
 
 # Maximum seconds to wait for NestJS to become ready on cold start.
-NESTJS_STARTUP_TIMEOUT: float = float(os.environ.get("NESTJS_STARTUP_TIMEOUT", "25"))
+# NestJS connects to Aurora on first boot (DB + migrations + seeding).
+# 90 s gives enough headroom for Aurora Serverless v2 cold-start + NestJS init.
+NESTJS_STARTUP_TIMEOUT: float = float(os.environ.get("NESTJS_STARTUP_TIMEOUT", "90"))
 
 # Upstream request timeout (must be < Lambda function timeout of 29 s).
 PROXY_TIMEOUT: float = float(os.environ.get("PROXY_TIMEOUT", "27"))
