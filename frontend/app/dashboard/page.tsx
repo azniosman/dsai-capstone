@@ -226,7 +226,6 @@ export default function Dashboard() {
     }));
 
     return [...missingPoints, ...matchedPoints];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summary, recs, hoveredRecIdx]);
 
   return (

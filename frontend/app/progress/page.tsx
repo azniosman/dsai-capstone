@@ -16,7 +16,6 @@ import {
   BookOpen,
   Target,
   Calendar,
-  Trophy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";

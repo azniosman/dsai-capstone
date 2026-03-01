@@ -22,7 +22,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useState, useEffect } from "react";
+
 import { ChartCard } from "./chart-card";
 
 interface SkillData {

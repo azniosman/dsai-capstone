@@ -29,7 +29,8 @@ export default function GlobalError({
               Something went wrong
             </h2>
             <p className="text-muted-foreground text-sm">
-              We've encountered an unexpected error. Our team has been notified.
+              We&apos;ve encountered an unexpected error. Our team has been
+              notified.
             </p>
           </div>
           <div className="p-4 bg-muted/50 rounded-lg text-left overflow-hidden">
@@ -37,11 +38,7 @@ export default function GlobalError({
               {error.message || "An unknown error occurred"}
             </p>
           </div>
-          <Button
-            onClick={() => reset()}
-            className="w-full gap-2"
-            size="lg"
-          >
+          <Button onClick={() => reset()} className="w-full gap-2" size="lg">
             <RotateCcw className="w-4 h-4" />
             Try again
           </Button>
