@@ -74,7 +74,7 @@ export default function MarketInsights() {
   const radarData = useMemo(
     () =>
       (data?.insights ?? []).map((i) => ({
-        category: i.role_category.replace("&", "\n&"),
+        category: (i.role_category ?? "").replace("&", "\n&"),
         demand: i.hiring_volume / 40,
         growth: i.yoy_growth_pct,
         salary: i.avg_salary_sgd / 200,
