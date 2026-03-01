@@ -143,6 +143,21 @@ def _ensure_nestjs() -> None:
 
     logger.info("Cold start: launching NestJS on port %d …", NESTJS_PORT)
 
+    # ── Quick TCP connectivity check to Aurora before starting NestJS ─────────
+    db_url = os.environ.get("DATABASE_URL", "")
+    if db_url:
+        try:
+            import re as _re
+            _m = _re.match(r"postgresql://[^@]+@([^:/]+):?(\d+)?/", db_url)
+            if _m:
+                _db_host, _db_port = _m.group(1), int(_m.group(2) or 5432)
+                _t0 = time.monotonic()
+                with socket.create_connection((_db_host, _db_port), timeout=10.0):
+                    pass
+                logger.info("TCP to Aurora %s:%d succeeded in %.1fs", _db_host, _db_port, time.monotonic() - _t0)
+        except Exception as _e:
+            logger.error("TCP connectivity check to Aurora FAILED: %s", _e)
+
     env: dict[str, str] = {
         **os.environ,
         "PORT": str(NESTJS_PORT),
@@ -164,7 +179,7 @@ def _ensure_nestjs() -> None:
         _nestjs_proc.terminate()
         try:
             out, _ = _nestjs_proc.communicate(timeout=5)
-            snippet = out.decode("utf-8", errors="replace")[:800] if out else "(no output)"
+            snippet = out.decode("utf-8", errors="replace")[-3000:] if out else "(no output)"
         except Exception:
             snippet = "(could not read output)"
         raise RuntimeError(
