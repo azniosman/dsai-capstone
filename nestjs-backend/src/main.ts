@@ -1,11 +1,30 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from '@app/common/filters/all-exceptions.filter';
 import { TransformInterceptor } from '@app/common/interceptors/transform.interceptor';
+import { MikroORM } from '@mikro-orm/core';
+import { DatabaseSeeder } from './seeders/DatabaseSeeder';
+
+const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Create/update DB schema from entities, then seed reference data.
+  // updateSchema() is additive-only (never drops tables/columns) so it is
+  // safe to run on every cold start. The seeder guards every insert with
+  // findOne(), making it idempotent as well.
+  const orm = app.get(MikroORM);
+  try {
+    await orm.getSchemaGenerator().updateSchema();
+    logger.log('Schema up to date');
+    const seeder = orm.getSeeder();
+    await seeder.seed(DatabaseSeeder);
+    logger.log('Seed complete');
+  } catch (err) {
+    logger.error('Schema/seed failed — continuing anyway', err);
+  }
 
   app.setGlobalPrefix('api');
 
