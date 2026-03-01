@@ -75,16 +75,16 @@ describe('ProfileService', () => {
   });
 
   describe('parseResume', () => {
-    it('should return mocked skill extraction array', () => {
+    it('should extract skills from plain resume text', () => {
       // Arrange
       const inputResumeText = 'I am a software engineer skilled in python.';
-      const expectedResult = { skills: ['placeholder_skill'] };
+      const expectedSkills = ['Python'];
 
       // Act
       const actualResult = service.parseResume(inputResumeText);
 
       // Assert
-      expect(actualResult).toEqual(expectedResult);
+      expect(actualResult.skills).toEqual(expectedSkills);
     });
   });
 });

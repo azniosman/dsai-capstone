@@ -4,7 +4,6 @@ import { ConfigModule } from '@nestjs/config';
 import { IntelligenceService } from './intelligence.service';
 import { IntelligenceController } from './intelligence.controller';
 import { UploadController } from './upload.controller';
-import { StubsController } from './stubs.controller';
 import { LlmService } from './llm.service';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { JobRole } from '@app/entities/job-role.entity';
@@ -16,8 +15,9 @@ import { DomainModule } from '../domain/domain.module';
     MikroOrmModule.forFeature([UserProfile, JobRole]),
     DomainModule,
   ],
-  controllers: [IntelligenceController, UploadController, StubsController],
+  controllers: [IntelligenceController, UploadController],
   providers: [IntelligenceService, LlmService],
   exports: [IntelligenceService, LlmService],
 })
 export class IntelligenceModule {}
+

@@ -1,15 +1,12 @@
 import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
-import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
-  }
-
+  /**
+   * Lightweight health check — used by load balancers and ECS health probes.
+   *
+   * @returns Status indicator and current timestamp.
+   */
   @Get('health')
   @HttpCode(HttpStatus.OK)
   health(): { status: string; timestamp: string } {

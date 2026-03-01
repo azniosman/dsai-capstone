@@ -10,7 +10,6 @@ import {
 import { InternalTokenGuard } from '@app/common/guards/internal-token.guard';
 import { SsgService } from '../ssg/ssg.service';
 import { SsgCacheService } from '../ssg/ssg-cache.service';
-import { IntelligenceService } from '../intelligence/intelligence.service';
 import { DomainService } from '../domain/domain.service';
 
 /** Response shape for cache sync operations. */
@@ -51,7 +50,6 @@ export class InternalController {
   constructor(
     private readonly ssgService: SsgService,
     private readonly ssgCacheService: SsgCacheService,
-    private readonly intelligenceService: IntelligenceService,
     private readonly domainService: DomainService,
   ) {}
 
@@ -179,69 +177,6 @@ export class InternalController {
     return { deleted, duration_ms: Date.now() - start };
   }
 
-  // ─── Recommendations ───────────────────────────────────────────────────────
-
-  /**
-   * Pre-computes recommendation scores for all active profiles.
-   * Triggered nightly by EventBridge (cron 02:00 UTC).
-   * Phase 2 implementation — returns a feature-not-yet-implemented stub
-   * during Phase 1. Full implementation is in AUTOMATION_TASK_LIST task #5.
-   *
-   * POST /internal/recommendations/precompute
-   */
-  @Post('recommendations/precompute')
-  @UseGuards(InternalTokenGuard)
-  @HttpCode(HttpStatus.OK)
-  precomputeRecommendations(
-    @Body() body: { batch_size?: number },
-  ): { scheduled: boolean; batch_size: number; message: string } {
-    // Phase 2: Full implementation will iterate UserProfile repository,
-    // score each against all JobRole entities, and write to profile_snapshot.
-    return {
-      scheduled: true,
-      batch_size: body?.batch_size ?? 50,
-      message: 'Recommendation precompute scheduled. Full implementation in Phase 2.',
-    };
-  }
-
-  /**
-   * Pre-generates Gemini LLM rationale for top-3 role matches per profile.
-   * Triggered nightly by EventBridge (cron 02:30 UTC, after precompute).
-   * Phase 2 stub.
-   *
-   * POST /internal/recommendations/rationale-pregen
-   */
-  @Post('recommendations/rationale-pregen')
-  @UseGuards(InternalTokenGuard)
-  @HttpCode(HttpStatus.OK)
-  pregenRationale(): { scheduled: boolean; message: string } {
-    return {
-      scheduled: true,
-      message: 'Rationale pre-generation scheduled. Full implementation in Phase 2.',
-    };
-  }
-
-  // ─── Embeddings ────────────────────────────────────────────────────────────
-
-  /**
-   * Generates Titan embeddings for profiles without vector representations.
-   * Triggered every 6 hours by EventBridge.
-   * Phase 2 stub.
-   *
-   * POST /internal/embeddings/backfill
-   */
-  @Post('embeddings/backfill')
-  @UseGuards(InternalTokenGuard)
-  @HttpCode(HttpStatus.OK)
-  backfillEmbeddings(
-    @Body() body: { limit?: number },
-  ): { scheduled: boolean; limit: number; message: string } {
-    return {
-      scheduled: true,
-      limit: body?.limit ?? 100,
-      message: 'Embedding backfill scheduled. Full implementation in Phase 2.',
-    };
-  }
 
   // ─── Analytics ─────────────────────────────────────────────────────────────
 
@@ -260,8 +195,6 @@ export class InternalController {
     duration_ms: number;
   }> {
     const start = Date.now();
-    // Tenant IDs 1..3 cover the demo tenants. In Phase 2 this will read
-    // all tenants from the Tenant entity repository.
     const tenantIds = [1, 2, 3];
     let processed = 0;
 

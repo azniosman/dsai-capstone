@@ -20,6 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@aws-sdk/client-bedrock-runtime": "^3.999.0",
     "@google/generative-ai": "^0.24.1",
     "@mikro-orm/core": "^6.6.7",

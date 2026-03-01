@@ -125,9 +125,16 @@ export class IntelligenceService {
       (profileContext ? ` User profile context: ${profileContext}` : '');
 
     const reply = await this.llmService.chat(payload.messages, systemPrompt);
+    const providerUsed = this.llmService.getLastUsedProvider();
+    const engineLabel = {
+      bedrock: 'AWS Bedrock (Claude)',
+      claude: 'Anthropic Claude',
+      gemini: 'Google Gemini',
+    }[providerUsed ?? 'bedrock'] ?? 'LLM Router';
+
     return {
       reply,
-      engine: 'Google Gemini (gemini-2.0-flash)',
+      engine: engineLabel,
     };
   }
 

@@ -1,187 +1,187 @@
+/**
+ * @file llm.service.ts
+ * @description NestJS service providing a unified, env-driven multi-provider LLM
+ * routing layer.
+ *
+ * Provider priority is configured via environment variables:
+ * - `PRIMARY_LLM`   — first provider to try  (default: `bedrock`)
+ * - `SECONDARY_LLM` — second provider to try (default: `claude`)
+ * - `TERTIARY_LLM`  — third provider to try  (default: `gemini`)
+ *
+ * Supported provider values: `bedrock` | `claude` | `gemini`
+ *
+ * The router attempts providers in priority order, logging each attempt and
+ * any fallbacks. If every configured provider fails, a
+ * `ServiceUnavailableException` is thrown.
+ */
+
 import {
   Injectable,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  BedrockRuntimeClient,
-  InvokeModelCommand,
-} from '@aws-sdk/client-bedrock-runtime';
 
-type ChatMessage = { role: string; content: string };
+import type { LlmProvider, LlmProviderName, ChatMessage } from './providers/llm-provider.interface';
+import { BedrockProvider } from './providers/bedrock.provider';
+import { ClaudeProvider } from './providers/claude.provider';
+import { GeminiProvider } from './providers/gemini.provider';
+
+/** Re-export for consumers that imported `ChatMessage` from this module. */
+export type { ChatMessage };
 
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
-  private geminiClient: any = null;
-  private bedrockClient: BedrockRuntimeClient | null = null;
-  private readonly bedrockModelId: string;
+
+  /** Ordered list of providers to attempt for each request. */
+  private readonly providerChain: LlmProvider[];
+
+  /**
+   * Name of the provider that handled the most recent request.
+   * Used by `IntelligenceService` to report the active engine to the client.
+   */
+  private lastUsedProvider: LlmProviderName | null = null;
 
   constructor(private readonly configService: ConfigService) {
-    // --- Gemini init ---
-    const geminiKey = this.configService.get<string>('GEMINI_API_KEY');
-    if (geminiKey) {
-      try {
-        const { GoogleGenerativeAI } = require('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(geminiKey);
-        this.geminiClient = genAI.getGenerativeModel({
-          model:
-            this.configService.get<string>('GEMINI_MODEL') ??
-            'gemini-2.0-flash',
-        });
-        this.logger.log('Gemini client initialised');
-      } catch {
-        this.logger.warn(
-          'Failed to initialise Gemini client — @google/generative-ai may not be installed',
-        );
-      }
-    }
-
-    // --- Bedrock init ---
+    // ── Build individual providers ─────────────────────────────────────────
     const region =
       this.configService.get<string>('AWS_REGION') ?? 'ap-southeast-1';
-    this.bedrockModelId =
+    const bedrockModelId =
       this.configService.get<string>('BEDROCK_MODEL_ID') ??
-      'anthropic.claude-3-5-sonnet-20240620-v1:0';
+      'anthropic.claude-3-haiku-20240307-v1:0';
 
-    try {
-      this.bedrockClient = new BedrockRuntimeClient({ region });
-      this.logger.log(
-        `Bedrock client initialised (region=${region}, model=${this.bedrockModelId})`,
+    const claudeApiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
+    const claudeModel =
+      this.configService.get<string>('CLAUDE_MODEL') ??
+      'claude-3-5-sonnet-20241022';
+
+    const geminiApiKey = this.configService.get<string>('GEMINI_API_KEY');
+    const geminiModel =
+      this.configService.get<string>('GEMINI_MODEL') ?? 'gemini-2.0-flash';
+
+    const allProviders: Record<LlmProviderName, LlmProvider> = {
+      bedrock: new BedrockProvider(region, bedrockModelId),
+      claude: new ClaudeProvider(claudeApiKey, claudeModel),
+      gemini: new GeminiProvider(geminiApiKey, geminiModel),
+    };
+
+    // ── Build ordered chain from env ───────────────────────────────────────
+    const primaryName =
+      (this.configService.get<string>('PRIMARY_LLM') as LlmProviderName) ??
+      'bedrock';
+    const secondaryName =
+      (this.configService.get<string>('SECONDARY_LLM') as LlmProviderName) ??
+      'claude';
+    const tertiaryName =
+      (this.configService.get<string>('TERTIARY_LLM') as LlmProviderName) ??
+      'gemini';
+
+    this.providerChain = [primaryName, secondaryName, tertiaryName]
+      .map((name) => allProviders[name])
+      .filter((p): p is LlmProvider => p !== undefined && p.isAvailable());
+
+    const chainNames = this.providerChain.map((p) => p.name).join(' → ');
+    if (this.providerChain.length === 0) {
+      this.logger.warn(
+        'LLM router: no providers are available. Configure at least one of: ' +
+          'AWS credentials (bedrock), ANTHROPIC_API_KEY (claude), GEMINI_API_KEY (gemini).',
       );
-    } catch (err) {
-      this.logger.warn('Failed to initialise Bedrock client', err);
-      this.bedrockClient = null;
+    } else {
+      this.logger.log(`Provider chain: ${chainNames}`);
     }
   }
 
-  // ─── Helpers ────────────────────────────────────────────────
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  private get hasGemini(): boolean {
-    return this.geminiClient !== null;
-  }
-
-  private get hasBedrock(): boolean {
-    return this.bedrockClient !== null;
+  /**
+   * Returns the name of the LLM provider that served the most recent request.
+   * Used by `IntelligenceService` to populate the `engine` field in responses.
+   *
+   * @returns Provider name string or `null` if no request has been made yet.
+   */
+  getLastUsedProvider(): LlmProviderName | null {
+    return this.lastUsedProvider;
   }
 
   /**
-   * Invoke Bedrock Claude with the Anthropic Messages API format.
+   * Iterates the provider chain in priority order, attempting each provider
+   * in turn. Records latency and logs each attempt and fallback.
+   *
+   * @param label - Short label used in log messages (e.g. `"chat"`).
+   * @param messages - Conversation history passed to the provider.
+   * @param systemPrompt - System instruction passed to the provider.
+   * @returns The first successful provider response.
+   * @throws `ServiceUnavailableException` when all providers fail.
    */
-  private async invokeBedrockClaude(
-    messages: { role: string; content: string }[],
+  private async withFallback(
+    label: string,
+    messages: ChatMessage[],
     systemPrompt: string,
   ): Promise<string> {
-    if (!this.bedrockClient) {
-      throw new Error('Bedrock client not available');
+    if (this.providerChain.length === 0) {
+      throw new ServiceUnavailableException(
+        'No LLM providers are configured. Set AWS credentials, ANTHROPIC_API_KEY, or GEMINI_API_KEY.',
+      );
     }
 
-    const bedrockMessages = messages.map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
-    }));
-
-    const body = JSON.stringify({
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: 2048,
-      system: systemPrompt,
-      messages: bedrockMessages,
-    });
-
-    const command = new InvokeModelCommand({
-      modelId: this.bedrockModelId,
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: new TextEncoder().encode(body),
-    });
-
-    const response = await this.bedrockClient.send(command);
-    const decoded = new TextDecoder().decode(response.body);
-    const parsed = JSON.parse(decoded);
-
-    // Anthropic Claude returns { content: [{ type: 'text', text: '...' }] }
-    return parsed.content?.[0]?.text ?? '';
-  }
-
-  /**
-   * Invoke Bedrock Claude with a single prompt string (no multi-turn).
-   */
-  private async invokeBedrockSinglePrompt(prompt: string): Promise<string> {
-    return this.invokeBedrockClaude(
-      [{ role: 'user', content: prompt }],
-      'You are a helpful assistant. Respond concisely.',
-    );
-  }
-
-  /**
-   * Fallback-aware wrapper: try Gemini first, then Bedrock, then throw 503.
-   */
-  private async withFallback<T>(
-    label: string,
-    geminiCall: () => Promise<T>,
-    bedrockCall: () => Promise<T>,
-  ): Promise<T> {
-    // Try Gemini
-    if (this.hasGemini) {
+    for (const provider of this.providerChain) {
+      const start = Date.now();
       try {
-        const result = await geminiCall();
-        this.logger.debug(`[${label}] served by Gemini`);
+        const result = await provider.generate(messages, systemPrompt);
+        const latencyMs = Date.now() - start;
+        this.logger.log(
+          `[${label}] Using provider: ${provider.name} (${latencyMs}ms)`,
+        );
+        this.lastUsedProvider = provider.name;
         return result;
       } catch (err) {
-        this.logger.warn(
-          `[${label}] Gemini failed, falling back to Bedrock`,
-          (err as Error).message,
-        );
-      }
-    }
-
-    // Try Bedrock
-    if (this.hasBedrock) {
-      try {
-        const result = await bedrockCall();
-        this.logger.debug(`[${label}] served by Bedrock`);
-        return result;
-      } catch (err) {
-        this.logger.error(
-          `[${label}] Bedrock also failed`,
-          (err as Error).message,
-        );
+        const latencyMs = Date.now() - start;
+        const nextProvider = this.providerChain[
+          this.providerChain.indexOf(provider) + 1
+        ];
+        if (nextProvider) {
+          this.logger.warn(
+            `[${label}] ${provider.name} failed after ${latencyMs}ms (${(err as Error).message}), ` +
+              `trying ${nextProvider.name}`,
+          );
+        } else {
+          this.logger.error(
+            `[${label}] All providers failed. Last error from ${provider.name}: ${(err as Error).message}`,
+          );
+        }
       }
     }
 
     throw new ServiceUnavailableException(
-      `LLM unavailable for ${label}. Configure GEMINI_API_KEY or AWS Bedrock credentials.`,
+      `LLM unavailable for "${label}". All configured providers failed.`,
     );
   }
 
-  // ─── Public API ─────────────────────────────────────────────
+  // ─── Public API ───────────────────────────────────────────────────────────
 
+  /**
+   * Sends a multi-turn chat conversation to the active LLM provider.
+   *
+   * @param messages - Ordered conversation history.
+   * @param systemPrompt - System-level instruction for the model.
+   * @returns The model's text reply.
+   */
   async chat(messages: ChatMessage[], systemPrompt: string): Promise<string> {
-    return this.withFallback(
-      'chat',
-      // Gemini
-      async () => {
-        const history = messages.slice(0, -1).map((m) => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
-        }));
-        const lastMessage = messages[messages.length - 1];
-        const chat = this.geminiClient.startChat({
-          history,
-          systemInstruction: {
-            role: 'system',
-            parts: [{ text: systemPrompt }],
-          },
-        });
-        const result = await chat.sendMessage(lastMessage?.content ?? '');
-        return result.response.text();
-      },
-      // Bedrock
-      async () => this.invokeBedrockClaude(messages, systemPrompt),
-    );
+    return this.withFallback('chat', messages, systemPrompt);
   }
 
+  /**
+   * Generates a next interview question or an end-of-interview feedback
+   * summary for the mock interview feature.
+   *
+   * @param roleTitle - Job role being practised (e.g. `"Data Engineer"`).
+   * @param difficulty - Difficulty level (`"easy"` | `"medium"` | `"hard"`).
+   * @param previousMessages - Prior conversation turns.
+   * @param targetSkill - Skill currently being probed.
+   * @param isComplete - When `true`, generates feedback instead of a question.
+   * @returns An object with `reply` (and optional `feedback` when complete).
+   */
   async generateInterviewQuestion(
     roleTitle: string,
     difficulty: string,
@@ -189,126 +189,89 @@ export class LlmService {
     targetSkill: string,
     isComplete: boolean,
   ): Promise<{ reply: string; feedback?: string }> {
-    return this.withFallback(
-      'interview',
-      // Gemini
-      async () => {
-        if (isComplete) {
-          const transcript = previousMessages
-            .map(
-              (m) =>
-                `${m.role === 'assistant' ? 'Interviewer' : 'Candidate'}: ${m.content}`,
-            )
-            .join('\n');
-          const summaryPrompt =
-            `You are conducting a mock interview for a ${roleTitle} role (difficulty: ${difficulty}). ` +
-            `Based on the interview transcript below, provide concise constructive feedback (3-4 sentences) ` +
-            `highlighting strengths and areas to improve.\n\nTranscript:\n${transcript}`;
-          const result = await this.geminiClient.generateContent(summaryPrompt);
-          return {
-            reply:
-              'Great effort throughout the interview! Here is your personalised feedback.',
-            feedback: result.response.text(),
-          };
-        }
+    if (isComplete) {
+      const transcript = previousMessages
+        .map(
+          (m) =>
+            `${m.role === 'assistant' ? 'Interviewer' : 'Candidate'}: ${m.content}`,
+        )
+        .join('\n');
+      const systemPrompt =
+        `You are conducting a mock interview for a ${roleTitle} role (difficulty: ${difficulty}). ` +
+        `Based on the interview transcript below, provide concise constructive feedback (3-4 sentences) ` +
+        `highlighting strengths and areas to improve.\n\nTranscript:\n${transcript}`;
+      const feedback = await this.withFallback(
+        'interview-feedback',
+        [{ role: 'user', content: 'Provide interview feedback.' }],
+        systemPrompt,
+      );
+      return {
+        reply:
+          'Great effort throughout the interview! Here is your personalised feedback.',
+        feedback,
+      };
+    }
 
-        const history = previousMessages.map((m) => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
-        }));
-        const systemPrompt =
-          `You are a technical interviewer for a ${roleTitle} position (difficulty: ${difficulty}). ` +
-          `Ask ONE concise, specific interview question targeting the skill: "${targetSkill}". ` +
-          `Do not reveal which skill you are testing. Only output the question, nothing else.`;
-        const chat = this.geminiClient.startChat({
-          history,
-          systemInstruction: {
-            role: 'system',
-            parts: [{ text: systemPrompt }],
-          },
-        });
-        const result = await chat.sendMessage(
-          `Ask a ${difficulty} interview question about ${targetSkill} for ${roleTitle}.`,
-        );
-        return { reply: result.response.text() };
-      },
-      // Bedrock
-      async () => {
-        if (isComplete) {
-          const transcript = previousMessages
-            .map(
-              (m) =>
-                `${m.role === 'assistant' ? 'Interviewer' : 'Candidate'}: ${m.content}`,
-            )
-            .join('\n');
-          const prompt =
-            `You are conducting a mock interview for a ${roleTitle} role (difficulty: ${difficulty}). ` +
-            `Based on the interview transcript below, provide concise constructive feedback (3-4 sentences) ` +
-            `highlighting strengths and areas to improve.\n\nTranscript:\n${transcript}`;
-          const feedback = await this.invokeBedrockSinglePrompt(prompt);
-          return {
-            reply:
-              'Great effort throughout the interview! Here is your personalised feedback.',
-            feedback,
-          };
-        }
+    const systemPrompt =
+      `You are a technical interviewer for a ${roleTitle} position (difficulty: ${difficulty}). ` +
+      `Ask ONE concise, specific interview question targeting the skill: "${targetSkill}". ` +
+      `Do not reveal which skill you are testing. Only output the question, nothing else.`;
 
-        const systemPrompt =
-          `You are a technical interviewer for a ${roleTitle} position (difficulty: ${difficulty}). ` +
-          `Ask ONE concise, specific interview question targeting the skill: "${targetSkill}". ` +
-          `Do not reveal which skill you are testing. Only output the question, nothing else.`;
-        const reply = await this.invokeBedrockClaude(
-          [
-            ...previousMessages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-            {
-              role: 'user',
-              content: `Ask a ${difficulty} interview question about ${targetSkill} for ${roleTitle}.`,
-            },
-          ],
-          systemPrompt,
-        );
-        return { reply };
+    const questionMessages: ChatMessage[] = [
+      ...previousMessages,
+      {
+        role: 'user',
+        content: `Ask a ${difficulty} interview question about ${targetSkill} for ${roleTitle}.`,
       },
+    ];
+
+    const reply = await this.withFallback(
+      'interview-question',
+      questionMessages,
+      systemPrompt,
     );
+    return { reply };
   }
 
+  /**
+   * Rewrites a resume bullet point to be more impactful for the target role.
+   *
+   * @param targetRole - Role title the bullet should be tailored towards.
+   * @param bulletPoint - The original resume bullet text.
+   * @returns An object with `rewritten` text and `improvement_notes`.
+   */
   async rewriteBullet(
     targetRole: string,
     bulletPoint: string,
   ): Promise<{ rewritten: string; improvement_notes: string }> {
-    const prompt =
-      `You are a professional resume writer. Rewrite the following resume bullet point to be more ` +
-      `impactful and relevant for a ${targetRole} role. Use strong action verbs and quantify where possible.\n\n` +
+    const systemPrompt =
+      'You are a professional resume writer. Respond only in the JSON format requested.';
+    const userPrompt =
+      `Rewrite the following resume bullet point to be more impactful and relevant for a ${targetRole} role. ` +
+      `Use strong action verbs and quantify where possible.\n\n` +
       `Original: "${bulletPoint}"\n\n` +
       `Respond in JSON format: { "rewritten": "...", "improvement_notes": "1-2 sentences explaining improvements" }`;
 
-    return this.withFallback(
+    const text = await this.withFallback(
       'rewriteBullet',
-      // Gemini
-      async () => {
-        const result = await this.geminiClient.generateContent(prompt);
-        const text = result.response.text().trim();
-        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          text,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
-      // Bedrock
-      async () => {
-        const text = await this.invokeBedrockSinglePrompt(prompt);
-        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          text,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
+      [{ role: 'user', content: userPrompt }],
+      systemPrompt,
     );
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
+      null,
+      text,
+    ];
+    return JSON.parse(jsonMatch[1].trim());
   }
 
+  /**
+   * Analyses a job description and computes a skill match score against the
+   * candidate's profile.
+   *
+   * @param jdText - Raw job description text (truncated to 3 000 chars).
+   * @param profileSkills - List of skills from the candidate's profile.
+   * @returns Extracted skills, match score, and skill gaps.
+   */
   async analyzeJobDescription(
     jdText: string,
     profileSkills: string[],
@@ -317,40 +280,34 @@ export class LlmService {
     match_score: number;
     gaps: string[];
   }> {
-    const prompt =
-      `You are a career analyst. Analyse this job description and extract the required technical and soft skills.\n\n` +
+    const systemPrompt =
+      'You are a career analyst. Respond only in the JSON format requested.';
+    const userPrompt =
+      `Analyse this job description and extract the required technical and soft skills.\n\n` +
       `Job Description:\n${jdText.substring(0, 3000)}\n\n` +
       `Candidate's current skills: ${profileSkills.join(', ')}\n\n` +
       `Respond in JSON format:\n` +
       `{ "extracted_skills": ["skill1", "skill2", ...], "match_score": 0.0-1.0, "gaps": ["missing_skill1", ...] }\n` +
       `match_score is the fraction of extracted_skills present in candidate's skills.`;
 
-    return this.withFallback(
+    const text = await this.withFallback(
       'analyzeJD',
-      // Gemini
-      async () => {
-        const result = await this.geminiClient.generateContent(prompt);
-        const text = result.response.text().trim();
-        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          text,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
-      // Bedrock
-      async () => {
-        const text = await this.invokeBedrockSinglePrompt(prompt);
-        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          text,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
+      [{ role: 'user', content: userPrompt }],
+      systemPrompt,
     );
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
+      null,
+      text,
+    ];
+    return JSON.parse(jsonMatch[1].trim());
   }
 
-  // ─── Phase 2: LLM-enhanced resume parsing ───────────────────
-
+  /**
+   * Parses a plain-text resume into structured profile fields using the LLM.
+   *
+   * @param text - Raw resume text (truncated to 4 000 chars).
+   * @returns Parsed profile: name, email, phone, skills, experience years.
+   */
   async parseResume(text: string): Promise<{
     name: string;
     email: string;
@@ -358,40 +315,33 @@ export class LlmService {
     skills: string[];
     experience_years: number;
   }> {
-    const prompt =
-      `You are an expert resume parser. Extract structured data from the following resume text.\n\n` +
+    const systemPrompt =
+      'You are an expert resume parser. Respond only in the JSON format requested.';
+    const userPrompt =
+      `Extract structured data from the following resume text.\n\n` +
       `Resume:\n${text.substring(0, 4000)}\n\n` +
       `Respond in JSON format:\n` +
       `{ "name": "Full Name", "email": "email@example.com", "phone": "+65...", ` +
       `"skills": ["skill1", "skill2", ...], "experience_years": <number> }\n` +
       `If a field is not found, use empty string for strings, empty array for skills, and 0 for experience_years.`;
 
-    return this.withFallback(
+    const raw = await this.withFallback(
       'parseResume',
-      // Gemini
-      async () => {
-        const result = await this.geminiClient.generateContent(prompt);
-        const raw = result.response.text().trim();
-        const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          raw,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
-      // Bedrock
-      async () => {
-        const raw = await this.invokeBedrockSinglePrompt(prompt);
-        const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          raw,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
+      [{ role: 'user', content: userPrompt }],
+      systemPrompt,
     );
+    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
+    return JSON.parse(jsonMatch[1].trim());
   }
 
-  // ─── Phase 3: LLM-enhanced enrichment helpers ───────────────
-
+  /**
+   * Generates a short personalised rationale sentence for each of the top
+   * matched roles.
+   *
+   * @param profileSummary - Brief text summary of the candidate's profile.
+   * @param topRoles - List of top role matches with score and skill details.
+   * @returns Array of rationale strings (one per role, in the same order).
+   */
   async generateRationale(
     profileSummary: string,
     topRoles: {
@@ -408,34 +358,30 @@ export class LlmService {
       )
       .join('\n');
 
-    const prompt =
-      `You are a Singapore career advisor for SCTP learners. Given the profile summary and role matches below, ` +
-      `write ONE short personalised rationale sentence for each role explaining why it is a good fit and what to focus on.\n\n` +
+    const systemPrompt =
+      'You are a Singapore career advisor for SCTP learners. Respond only in the JSON format requested.';
+    const userPrompt =
+      `Given the profile summary and role matches below, write ONE short personalised rationale sentence ` +
+      `for each role explaining why it is a good fit and what to focus on.\n\n` +
       `Profile: ${profileSummary}\n\nRoles:\n${rolesBlock}\n\n` +
       `Respond as a JSON array of strings — one rationale per role in the same order. No markdown, only JSON.`;
 
-    return this.withFallback(
+    const raw = await this.withFallback(
       'generateRationale',
-      async () => {
-        const result = await this.geminiClient.generateContent(prompt);
-        const raw = result.response.text().trim();
-        const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          raw,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
-      async () => {
-        const raw = await this.invokeBedrockSinglePrompt(prompt);
-        const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          raw,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
+      [{ role: 'user', content: userPrompt }],
+      systemPrompt,
     );
+    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
+    return JSON.parse(jsonMatch[1].trim());
   }
 
+  /**
+   * Generates practical, one-sentence learning tips for each skill gap.
+   *
+   * @param roleTitle - Target job role title.
+   * @param gaps - List of skill gaps with severity labels.
+   * @returns Array of tip strings (one per gap, in the same order).
+   */
   async generateSkillGapAdvice(
     roleTitle: string,
     gaps: { skill: string; gap_severity: string }[],
@@ -443,54 +389,53 @@ export class LlmService {
     const gapsList = gaps
       .map((g) => `${g.skill} (${g.gap_severity} priority)`)
       .join(', ');
-    const prompt =
-      `You are a Singapore career advisor. For a candidate targeting a ${roleTitle} role, ` +
+
+    const systemPrompt =
+      'You are a Singapore career advisor. Respond only in the JSON format requested.';
+    const userPrompt =
+      `For a candidate targeting a ${roleTitle} role, ` +
       `provide ONE practical learning tip (1 sentence) for each skill gap below.\n\n` +
       `Gaps: ${gapsList}\n\n` +
       `Respond as a JSON array of strings — one tip per gap in the same order. No markdown, only JSON.`;
 
-    return this.withFallback(
+    const raw = await this.withFallback(
       'skillGapAdvice',
-      async () => {
-        const result = await this.geminiClient.generateContent(prompt);
-        const raw = result.response.text().trim();
-        const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          raw,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
-      async () => {
-        const raw = await this.invokeBedrockSinglePrompt(prompt);
-        const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-          null,
-          raw,
-        ];
-        return JSON.parse(jsonMatch[1].trim());
-      },
+      [{ role: 'user', content: userPrompt }],
+      systemPrompt,
     );
+    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
+    return JSON.parse(jsonMatch[1].trim());
   }
 
+  /**
+   * Generates a short motivating narrative paragraph for a personalised
+   * upskilling roadmap.
+   *
+   * @param profileSkills - Current skills of the candidate.
+   * @param targetRole - Target job role title.
+   * @param gapCount - Number of skill gaps to bridge.
+   * @param courseTitles - Recommended course titles for the roadmap.
+   * @returns A motivating 3–4 sentence paragraph as a plain string.
+   */
   async generateRoadmapNarrative(
     profileSkills: string[],
     targetRole: string,
     gapCount: number,
     courseTitles: string[],
   ): Promise<string> {
-    const prompt =
-      `You are a Singapore career advisor for SCTP learners. Write a brief motivating paragraph (3-4 sentences) ` +
-      `about why this upskilling roadmap will help bridge ${gapCount} skill gaps for the ${targetRole} role.\n\n` +
+    const systemPrompt =
+      'You are a Singapore career advisor for SCTP learners. Respond with plain text only, no markdown.';
+    const userPrompt =
+      `Write a brief motivating paragraph (3-4 sentences) about why this upskilling roadmap ` +
+      `will help bridge ${gapCount} skill gaps for the ${targetRole} role.\n\n` +
       `Current skills: ${profileSkills.join(', ')}\n` +
       `Recommended courses: ${courseTitles.join(', ')}\n\n` +
-      `Be encouraging and mention SkillsFuture support where relevant. Output only the paragraph, no markdown.`;
+      `Be encouraging and mention SkillsFuture support where relevant. Output only the paragraph.`;
 
     return this.withFallback(
       'roadmapNarrative',
-      async () => {
-        const result = await this.geminiClient.generateContent(prompt);
-        return result.response.text().trim();
-      },
-      async () => this.invokeBedrockSinglePrompt(prompt),
+      [{ role: 'user', content: userPrompt }],
+      systemPrompt,
     );
   }
 }

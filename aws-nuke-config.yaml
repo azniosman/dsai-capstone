@@ -1,0 +1,122 @@
+---
+# AWS Nuke configuration for SkillBridge
+# ⚠️  WARNING: This will DELETE ALL resources matching these filters
+
+regions:
+  - us-east-1  # Primary region for SkillBridge serverless deployment
+  - ap-southeast-1  # Secondary region if used
+
+account-blocklist:
+  - "999999999999"  # Replace with production account ID to prevent accidental deletion
+
+accounts:
+  "322759476919":  # Your AWS account ID
+    filters:
+      # Preserve ECR repositories (optional - comment out to delete)
+      ECRRepository:
+        - type: contains
+          value: "skillbridge"
+      
+      # Preserve S3 buckets with important data (optional)
+      S3Bucket:
+        - type: contains
+          value: "terraform-state"
+      
+      # Delete CloudFormation stacks
+      CloudFormationStack:
+        - type: dateOlderThan
+          value: "0s"
+      
+      # Delete Lambda functions
+      LambdaFunction:
+        - type: dateOlderThan
+          value: "0s"
+      
+      # Delete API Gateway resources
+      APIGatewayRestAPI:
+        - type: dateOlderThan
+          value: "0s"
+      
+      APIGatewayV2API:
+        - type: dateOlderThan
+          value: "0s"
+      
+      # Delete RDS/Aurora resources
+      RDSInstance:
+        - type: dateOlderThan
+          value: "0s"
+      
+      RDSCluster:
+        - type: dateOlderThan
+          value: "0s"
+      
+      # Delete VPC resources
+      EC2VPC:
+        - type: dateOlderThan
+          value: "0s"
+      
+      EC2Subnet:
+        - type: dateOlderThan
+          value: "0s"
+      
+      EC2InternetGateway:
+        - type: dateOlderThan
+          value: "0s"
+      
+      EC2NATGateway:
+        - type: dateOlderThan
+          value: "0s"
+      
+      # Delete CloudFront distributions
+      CloudFrontDistribution:
+        - type: dateOlderThan
+          value: "0s"
+      
+      # Delete EventBridge rules
+      EventsRule:
+        - type: dateOlderThan
+          value: "0s"
+      
+      # Delete Secrets Manager secrets
+      SecretsManagerSecret:
+        - type: dateOlderThan
+          value: "0s"
+      
+      # Delete IAM roles (be careful!)
+      IAMRole:
+        - type: contains
+          value: "skillbridge"
+      
+      # Delete CloudWatch Log Groups
+      CloudWatchLogsLogGroup:
+        - type: dateOlderThan
+          value: "0s"
+
+# Resource types to target (all Terraform-created resources)
+resource-types:
+  includes:
+    - S3Bucket
+    - S3Object
+    - CloudFrontDistribution
+    - LambdaFunction
+    - LambdaEventSourceMapping
+    - APIGatewayRestAPI
+    - APIGatewayV2API
+    - RDSInstance
+    - RDSCluster
+    - RDSSubnetGroup
+    - EC2VPC
+    - EC2Subnet
+    - EC2RouteTable
+    - EC2InternetGateway
+    - EC2NATGateway
+    - EC2SecurityGroup
+    - EC2NetworkInterface
+    - CloudFormationStack
+    - IAMRole
+    - IAMRolePolicy
+    - IAMPolicy
+    - CloudWatchLogsLogGroup
+    - EventsRule
+    - SecretsManagerSecret
+    - ECRRepository

@@ -51,16 +51,20 @@ export class EnvironmentVariables {
   @IsOptional()
   readonly SSG_CACHE_TTL_SECONDS?: string;
 
-  // Google Gemini — optional; if absent, LLM-powered endpoints return 503
+  // LLM Router — provider priority (bedrock | claude | gemini)
   @IsString()
   @IsOptional()
-  readonly GEMINI_API_KEY?: string;
+  readonly PRIMARY_LLM?: string;
 
   @IsString()
   @IsOptional()
-  readonly GEMINI_MODEL?: string;
+  readonly SECONDARY_LLM?: string;
 
-  // AWS Bedrock — optional fallback LLM provider
+  @IsString()
+  @IsOptional()
+  readonly TERTIARY_LLM?: string;
+
+  // AWS Bedrock
   @IsString()
   @IsOptional()
   readonly AWS_REGION?: string;
@@ -68,6 +72,24 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   readonly BEDROCK_MODEL_ID?: string;
+
+  // Anthropic Claude direct API
+  @IsString()
+  @IsOptional()
+  readonly ANTHROPIC_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  readonly CLAUDE_MODEL?: string;
+
+  // Google Gemini
+  @IsString()
+  @IsOptional()
+  readonly GEMINI_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  readonly GEMINI_MODEL?: string;
 
   // Internal automation — shared secret for EventBridge Lambda-to-Lambda calls
   @IsString()
