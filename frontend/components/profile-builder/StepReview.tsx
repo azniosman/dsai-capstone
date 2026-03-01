@@ -28,6 +28,16 @@ export default function StepReview() {
         skills: store.skills,
       };
 
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        // Unauthenticated — persist profile data and send user to register
+        localStorage.setItem("pending_profile", JSON.stringify(payload));
+        store.close();
+        router.push("/login?tab=register");
+        return;
+      }
+
       const profile = await profileApi.create(payload);
       localStorage.setItem("profileId", String(profile.id));
 
@@ -35,12 +45,8 @@ export default function StepReview() {
         description: "Your personalized dashboard is ready.",
       });
 
-      // Dispatch event for UI refreshes
       window.dispatchEvent(new Event("profile-updated"));
-
       store.close();
-
-      // Navigate to dashboard
       router.push("/dashboard");
     } catch (err: unknown) {
       const errorMsg =

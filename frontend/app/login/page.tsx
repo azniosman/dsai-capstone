@@ -108,16 +108,34 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Read pending profile data (set by BuildProfileModal for unauthenticated users)
+  const pendingProfile =
+    typeof window !== "undefined"
+      ? (() => {
+          try {
+            const raw = localStorage.getItem("pending_profile");
+            return raw ? JSON.parse(raw) : null;
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
   // Login Form Hook
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
-  // Register Form Hook
+  // Register Form Hook — prefill name/email from pending profile if present
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", password: "", password_confirm: "" },
+    defaultValues: {
+      name: pendingProfile?.name || "",
+      email: pendingProfile?.email || "",
+      password: "",
+      password_confirm: "",
+    },
   });
 
   const token =
@@ -164,7 +182,6 @@ function LoginForm() {
   const onRegisterSubmit = async (data: RegisterFormValues) => {
     setLoading(true);
     setError(null);
-    const profileId = searchParams.get("profileId");
 
     try {
       await api.post("/api/auth/register", {
@@ -173,10 +190,48 @@ function LoginForm() {
         passwordConfirm: data.password_confirm,
         name: data.name,
         tenantName: "Global",
-        profileId: profileId ? parseInt(profileId) : undefined,
       });
-      toast.success("Account created! Please log in.");
-      setTab("login");
+
+      // Auto-login immediately after registration
+      const params = new URLSearchParams();
+      params.append("username", data.email);
+      params.append("password", data.password);
+      const loginRes = await api.post("/api/auth/login", params, {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+
+      localStorage.setItem("token", loginRes.data.access_token);
+      if (loginRes.data.refresh_token)
+        localStorage.setItem("refreshToken", loginRes.data.refresh_token);
+
+      const me = await api.get("/api/auth/me", {
+        headers: { Authorization: `Bearer ${loginRes.data.access_token}` },
+      });
+      localStorage.setItem("userName", me.data.name);
+      localStorage.setItem("userEmail", me.data.email);
+
+      // If BuildProfileModal left pending profile data, create it now
+      const pendingRaw = localStorage.getItem("pending_profile");
+      if (pendingRaw) {
+        try {
+          const pending = JSON.parse(pendingRaw);
+          const profileRes = await api.post("/api/profile", pending, {
+            headers: {
+              Authorization: `Bearer ${loginRes.data.access_token}`,
+            },
+          });
+          localStorage.setItem("profileId", String(profileRes.data.id));
+          localStorage.removeItem("pending_profile");
+          toast.success("Welcome to SkillBridge! Your profile is ready.");
+        } catch {
+          localStorage.removeItem("pending_profile");
+          toast.success(`Welcome, ${me.data.name}! Account created.`);
+        }
+      } else {
+        toast.success(`Welcome, ${me.data.name}! Account created.`);
+      }
+
+      router.push("/dashboard");
     } catch (err: unknown) {
       setError(extractApiError(err, "Registration failed"));
     } finally {
@@ -349,7 +404,7 @@ function LoginForm() {
             <p className="text-sm text-muted-foreground mt-1">
               {tab === "login"
                 ? "Welcome back. Enter your credentials to continue."
-                : searchParams.get("profileId")
+                : pendingProfile
                   ? "Your profile is ready. Create a free account to unlock your personalised recommendations."
                   : "Start your career acceleration journey."}
             </p>

@@ -23,10 +23,6 @@ export default function BuildProfileModal() {
   const { isOpen, close, step } = useProfileBuilderStore();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    console.log("BuildProfileModal isOpen:", isOpen, "step:", step);
-  }, [isOpen, step]);
-
   // Prevent hydration mismatch
   useEffect(() => {
     setTimeout(() => {
