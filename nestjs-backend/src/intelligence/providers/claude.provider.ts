@@ -39,7 +39,7 @@ export class ClaudeProvider implements LlmProvider {
 
     try {
       // Use dynamic require so Jest module mocking intercepts the constructor.
-      // The SDK exposes both a named `Anthropic` export and a `default` export.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const sdk = require('@anthropic-ai/sdk');
       const AnthropicClass = sdk.Anthropic ?? sdk.default;
       this.client = new AnthropicClass({ apiKey });

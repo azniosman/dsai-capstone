@@ -1,7 +1,5 @@
 import { Options, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { EnvironmentVariables } from '@app/common/config/env.validation';
 import * as dotenv from 'dotenv';
 
 dotenv.config();

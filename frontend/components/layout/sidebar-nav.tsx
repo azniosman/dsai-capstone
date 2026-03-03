@@ -41,7 +41,7 @@ const CORE_NAV = [
 const TOOLS_NAV = [
   { label: "JD Match", path: "/jd-match", icon: FileText },
   { label: "Career Coach", path: "/chat", icon: MessageSquare },
-  { label: "Compare Roles", path: "/roadmap", icon: GitCompare },
+  { label: "Road Map", path: "/roadmap", icon: GitCompare },
   { label: "Market Intel", path: "/market-intel", icon: TrendingUp },
 ];
 

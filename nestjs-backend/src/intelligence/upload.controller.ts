@@ -27,7 +27,7 @@ export class UploadController {
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
-  async uploadResume(@UploadedFile() file: any) {
+  async uploadResume(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -35,7 +35,8 @@ export class UploadController {
     try {
       const text = await ResumeParser.extractText(file.buffer, file.mimetype);
       return this.intelligenceService.parseResume(text);
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       this.logger.error(
         'Resume upload/parse error',
         error?.stack ?? error?.message,

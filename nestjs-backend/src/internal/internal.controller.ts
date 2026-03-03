@@ -26,13 +26,6 @@ interface CleanupResult {
   duration_ms: number;
 }
 
-/** Response shape for batch pre-computation operations. */
-interface BatchResult {
-  profiles_processed: number;
-  errors: number;
-  duration_ms: number;
-}
-
 /**
  * Controller that exposes internal automation endpoints.
  *

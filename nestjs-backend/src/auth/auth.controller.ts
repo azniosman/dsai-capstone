@@ -16,8 +16,12 @@ import { UsersService } from '../users/users.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { AuthenticatedRequest } from '../types/auth-request.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -28,11 +32,22 @@ export class AuthController {
     private configService: ConfigService,
   ) {}
 
+  /**
+   * Health and smoke test for the Auth controller.
+   * @returns Controller operational status.
+   */
   @Get('admin/test')
   smokeTest() {
     return { status: 'Auth Controller OK' };
   }
 
+  /**
+   * Register a new user and assign a tenant and role.
+   * Internally hashes the provided password.
+   *
+   * @param registerDto Contains registration payload (email, pw, etc.)
+   * @returns User payload with stripped secrets.
+   */
   @Post('register')
   async register(@Body() registerDto: RegisterDto): Promise<any> {
     const hashedPassword = await this.authService.hashPassword(
@@ -51,24 +66,44 @@ export class AuthController {
     return result;
   }
 
+  /**
+   * Login using a local strategy utilizing passport strategies.
+   * Emits a JWT upon successful cred checking.
+   *
+   * @param req The authenticated request bearing the resolved user.
+   * @returns A signed JWT token for session maintenance.
+   */
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Request() req: any) {
+  login(@Request() req: AuthenticatedRequest) {
     return this.authService.login(req.user);
   }
 
+  /**
+   * Fetch the active and authenticated user metadata.
+   *
+   * @param req Request injected with JWT auth strategy resolved User context.
+   * @returns Current user entity representation sans passwords.
+   */
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  getProfile(@Request() req: any) {
+  getProfile(@Request() req: AuthenticatedRequest) {
     return req.user;
   }
 
+  /**
+   * Allow users to mutate self-managed metadata (e.g., Name, Email).
+   *
+   * @param req Resolves identity executing the mutation.
+   * @param body Payload comprising `name` or `email` deltas.
+   * @returns Validated user entity.
+   */
   @UseGuards(JwtAuthGuard)
   @Patch('me')
   async updateMe(
-    @Request() req: any,
-    @Body() body: { name?: string; email?: string },
+    @Request() req: AuthenticatedRequest,
+    @Body() body: UpdateMeDto,
   ) {
     const user = await this.usersService.updateUser(req.user.id, body);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -76,12 +111,19 @@ export class AuthController {
     return result;
   }
 
+  /**
+   * Safely rotate or change a user's password utilizing current verification.
+   *
+   * @param req Verified authenticated request triggering mutation.
+   * @param body Payload defining the old vs new password structures.
+   * @returns Success message structure.
+   */
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   async changePassword(
-    @Request() req: any,
-    @Body() body: { current_password: string; new_password: string },
+    @Request() req: AuthenticatedRequest,
+    @Body() body: ChangePasswordDto,
   ) {
     await this.usersService.changePassword(
       req.user.id,
@@ -91,30 +133,49 @@ export class AuthController {
     return { message: 'Password changed successfully' };
   }
 
+  /**
+   * Suspends and deactivates the user identity requesting the action.
+   *
+   * @param req Requisition initiating self-destruction.
+   * @returns Verification of deactivation message.
+   */
   @UseGuards(JwtAuthGuard)
   @Delete('me')
   @HttpCode(HttpStatus.OK)
-  async deleteMe(@Request() req: any) {
+  async deleteMe(@Request() req: AuthenticatedRequest) {
     await this.usersService.deactivateUser(req.user.id);
     return { message: 'Account deactivated' };
   }
 
+  /**
+   * Ends an active identity session implicitly handling cache or invalidation.
+   * Currently mocked to always succeed on request.
+   *
+   * @returns Safe disconnect statement.
+   */
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Body() body: any) {
+  logout() {
     // In a full implementation, we would blacklist the refresh token
     return { message: 'Logged out successfully' };
   }
 
+  /**
+   * Takes a refresh JWT token and exchanges it for an entirely new active signed JWT.
+   * Verify it utilizing the original JWT configurations safely.
+   *
+   * @param body Requires a raw `refresh_token` string body.
+   * @returns New functional JWT payload dictionary.
+   */
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body() body: { refresh_token: string }) {
+  async refresh(@Body() body: RefreshTokenDto) {
     const token = body?.refresh_token;
     if (!token) {
       throw new UnauthorizedException('refresh_token is required');
     }
 
-    let payload: any;
+    let payload: Record<string, string>;
     try {
       const secret = this.configService.get<string>('JWT_SECRET');
       if (!secret)

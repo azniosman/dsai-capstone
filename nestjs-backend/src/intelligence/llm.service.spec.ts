@@ -63,12 +63,15 @@ jest.mock('@google/generative-ai', () => {
 // ── Mock accessors ─────────────────────────────────────────────────────────
 
 const getBedrockSend = (): jest.Mock =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@aws-sdk/client-bedrock-runtime').__mockSend;
 
 const getClaudeCreate = (): jest.Mock =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@anthropic-ai/sdk').__mockCreate;
 
 const getGeminiMocks = () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mocks = require('@google/generative-ai');
   return {
     sendMessage: mocks.__mockSendMessage as jest.Mock,
@@ -89,11 +92,6 @@ const bedrockResponse = (text: string): { body: Uint8Array } => ({
 /** Builds an Anthropic SDK-style response. */
 const claudeResponse = (text: string) => ({
   content: [{ type: 'text', text }],
-});
-
-/** Builds a Gemini chat sendMessage response. */
-const geminiChatResponse = (text: string) => ({
-  response: { text: () => text },
 });
 
 /** Builds a Gemini generateContent response. */

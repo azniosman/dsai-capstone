@@ -2,7 +2,6 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { User } from '@app/entities/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -21,14 +20,18 @@ export class AuthService {
       if (!user.isActive) {
         throw new UnauthorizedException('Account is deactivated');
       }
-      const { hashedPassword, ...result } = user;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { hashedPassword: _, ...result } = user as any;
       return result;
     }
     return null;
   }
 
-  async login(user: User) {
-    const payload = { sub: user.id.toString() };
+  login(user: any) {
+    const payload = {
+      username: user.email,
+      sub: user.id.toString(),
+    };
     return {
       access_token: this.jwtService.sign(payload),
       refresh_token: this.jwtService.sign(payload, { expiresIn: '7d' }), // Simplified for now

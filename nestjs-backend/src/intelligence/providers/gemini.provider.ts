@@ -34,7 +34,7 @@ export class GeminiProvider implements LlmProvider {
     }
 
     try {
-      // Dynamic require so missing package doesn't crash the module on import.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { GoogleGenerativeAI } = require('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(apiKey);
       this.geminiClient = genAI.getGenerativeModel({ model: modelId });
@@ -77,6 +77,10 @@ export class GeminiProvider implements LlmProvider {
     if (messages.length === 1) {
       // Single-turn: use generateContent with system instruction prepended.
       const prompt = `${systemPrompt}\n\n${messages[0]?.content ?? ''}`;
+      // The following lines from the user's edit appear to be incomplete or incorrect in this context.
+      // They are commented out to maintain syntactical correctness of the file.
+      // const rawBody = await response.text();
+      // const body = JSON.parse(rawBody);string;
       const result = await this.geminiClient.generateContent(prompt);
       return result.response.text() as string;
     }

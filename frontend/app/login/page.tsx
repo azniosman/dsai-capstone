@@ -317,7 +317,7 @@ function LoginForm() {
             <h1 className="text-2xl font-bold tracking-tighter text-center uppercase leading-none text-slate-100">
               Secure Connection
               <br />
-              <span className="text-primary">_SKLBR</span>
+              <span className="text-primary">** SKLBR **</span>
             </h1>
             <p className="font-mono text-[10px] text-primary/40 mt-4 tracking-[0.2em]">
               ENCRYPTION: AES-256-GCM
@@ -555,7 +555,7 @@ function LoginForm() {
                   href="#"
                 >
                   <span className="font-mono text-[11px] text-primary/70 group-hover:text-primary transition-colors">
-                    GITHUB_SYNC
+                    SKLBR_SYNC
                   </span>
                   <ArrowRight className="text-primary/30 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </a>

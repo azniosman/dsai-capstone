@@ -115,14 +115,14 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('should return access_token and refresh_token', async () => {
+    it('should return access_token and refresh_token', () => {
       // Arrange
       const inputUser = { id: 1 } as User;
       const expectedToken = 'jwt_token_string';
       mockJwtService.sign.mockReturnValue(expectedToken);
 
       // Act
-      const actualResult = await authService.login(inputUser);
+      const actualResult = authService.login(inputUser);
 
       // Assert
       expect(mockJwtService.sign).toHaveBeenCalledWith({ sub: '1' });

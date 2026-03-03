@@ -159,7 +159,14 @@ export class SsgClientService implements OnModuleInit {
                 `SSG API ${res.statusCode}: ${raw.substring(0, 200)}`,
               );
               e.statusCode = res.statusCode;
-              return reject(e);
+              // Attempt to parse raw as JSON for error details, otherwise use raw string
+              let errorResponse: any;
+              try {
+                errorResponse = JSON.parse(raw);
+              } catch {
+                errorResponse = raw;
+              }
+              return reject(new Error(JSON.stringify(errorResponse)));
             }
             try {
               resolve(JSON.parse(raw) as T);

@@ -8,14 +8,12 @@ declare module 'pdf-parse' {
     version: string;
   }
 
-  function render_page(pageData: any): string;
-
-  interface PDFOptions {
-    pagerender?: typeof render_page;
+  export interface PdfParseOptions {
+    pagerender?: (pageData: any) => string;
     max?: number;
   }
 
-  function pdf(dataBuffer: Buffer, options?: PDFOptions): Promise<PDFData>;
+  function pdf(dataBuffer: Buffer, options?: PdfParseOptions): Promise<PDFData>;
 
   export = pdf;
 }
