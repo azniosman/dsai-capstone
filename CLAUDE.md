@@ -9,8 +9,8 @@ SkillBridge — Job Recommendation & Skill Gap Analysis System for SCTP learners
 ## Tech Stack
 
 - **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + Recharts + Framer Motion + Three.js
-- **Backend**: NestJS 10 + TypeScript + MikroORM + Passport.js (replacing Python FastAPI — migration in progress)
-- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, Google Gemini, AWS Bedrock (Claude 3.5 Sonnet) — `IntelligenceModule` wired via `LlmService`; fallback chain: Gemini → Bedrock → 503
+- **Backend**: NestJS 10 + TypeScript + MikroORM + Passport.js
+- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, configurable LLM chain via `LlmService` (default: Bedrock → Claude API → Gemini → 503)
 - **Database**: PostgreSQL 16 + pgvector
 - **Automation**: n8n workflows
 - **Deployment (capstone)**: Docker Compose locally; AWS Lambda + Aurora Serverless v2 + S3/CloudFront via Terraform
@@ -26,12 +26,14 @@ docker compose up
 cd nestjs-backend
 npm install
 npm run start:dev     # watch mode, runs on :8000
+npm run start:debug   # watch mode with Node inspector
 npm run build         # compile to dist/
 npm run lint          # ESLint
+npm run format        # Prettier
 
 # NestJS backend tests
-cd nestjs-backend
 npm run test          # unit tests (Jest)
+npm run test:watch    # Jest watch mode
 npm run test:e2e      # e2e tests
 npm run test:cov      # coverage report
 
@@ -44,7 +46,7 @@ npm run build         # production build (must pass before PR)
 
 # Database seeding (via MikroORM seeder)
 cd nestjs-backend
-npm run seed          # if wired; or via MikroORM CLI: npx mikro-orm seeder:run
+npm run seed          # or: npx mikro-orm seeder:run
 
 # AWS deployment scripts
 bash scripts/build_and_push.sh      # builds Docker images and pushes to ECR
@@ -57,11 +59,13 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `DATABASE_URL` — full Postgres connection string (overrides individual vars)
 - `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME` — individual DB fields (defaults: `capstone`/`changeme`/`localhost`/`5432`/`capstone`)
 - `JWT_SECRET` — JWT signing key
-- `GEMINI_API_KEY`, `GEMINI_MODEL` — optional, for LLM features (default: `gemini-2.0-flash`)
+- `GEMINI_API_KEY`, `GEMINI_MODEL` — optional (default: `gemini-2.0-flash`)
+- `ANTHROPIC_API_KEY`, `CLAUDE_MODEL` — optional; direct Anthropic API (distinct from Bedrock)
 - `AWS_REGION` — AWS region (default `ap-southeast-1`)
-- `BEDROCK_MODEL_ID` — Bedrock model (must use cross-region inference profile ID, not direct model ID)
+- `BEDROCK_MODEL_ID` — must be a **cross-region inference profile ID** (default: `us.anthropic.claude-3-5-sonnet-20241022-v2:0`; note the `us.` prefix — direct model IDs are rejected)
+- `PRIMARY_LLM`, `SECONDARY_LLM`, `TERTIARY_LLM` — LLM dispatch order; valid values: `bedrock | claude | gemini`; defaults: `bedrock`/`claude`/`gemini`
 - `NEXT_PUBLIC_API_URL` — frontend env var pointing to backend (default `http://localhost:8000`)
-- `CORS_ALLOWED_ORIGINS` — JSON array of allowed origins (default `["http://localhost:3000","http://localhost:5173"]`)
+- `CORS_ALLOWED_ORIGINS` — allowed origins; accepts a JSON array string or comma-separated string (default `["http://localhost:3000","http://localhost:5173"]`)
 - `SSG_CLIENT_ID`, `SSG_CLIENT_SECRET` — optional; SkillsFuture/WSG API credentials. If absent, SSG module falls back to seeded SCTP data
 - `SSG_API_BASE_URL`, `SSG_TOKEN_URL` — SSG API endpoints (optional)
 - `SSG_CACHE_TTL_SECONDS` — how long to cache SSG responses in PostgreSQL (optional)
@@ -71,8 +75,10 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 
 ### Backend (NestJS — `nestjs-backend/`)
 
-**Entry point**: `src/main.ts` — bootstraps NestJS app on port 8000.
-**ORM config**: `src/mikro-orm.config.ts` — MikroORM with PostgreSQL driver; entities at `src/entities/*.entity.ts`.
+**Entry point**: `src/main.ts` — bootstraps NestJS app on port 8000. On every cold start, `orm.getSchemaGenerator().updateSchema()` runs automatically — this is **additive-only** (adds missing tables/columns, never drops), safe to run on Lambda cold start.
+
+**ORM config**: `src/mikro-orm.config.ts` — MikroORM with PostgreSQL driver; entities at `src/entities/*.entity.ts`; migrations source at `src/migrations/`, compiled to `dist/migrations/`.
+
 **App config/validation**: `src/common/config/env.validation.ts` — class-validator schema for env vars.
 
 **Entities** (`src/entities/`): `user.entity.ts`, `user-profile.entity.ts`, `skill.entity.ts`, `job-role.entity.ts`, `sctp-course.entity.ts`, `skill-progress.entity.ts`, `market-insight.entity.ts`, `profile-snapshot.entity.ts`, `tenant.entity.ts`, `ssg-cache.entity.ts`
@@ -93,9 +99,11 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `common/` — shared config, filters, interceptors, utils (`resume-parser.util.ts`)
 - `seeders/` — MikroORM seed data
 
-**Auth flow**: `POST /auth/login` accepts JSON `{ username, password }` via Local strategy → returns JWT. Token attached as `Authorization: Bearer <token>`. JWT strategy validates subsequent requests.
+**Auth flow**: `POST /auth/login` accepts `{ username, password }` via Local strategy → returns JWT. Subsequent requests attach `Authorization: Bearer <token>`. Two guards exist:
+- `JwtAuthGuard` — requires valid JWT; throws 401 on failure
+- `OptionalJwtAuthGuard` — silently returns `null` user if JWT is absent/invalid; used on public endpoints (`/recommend`, `/skill-gap`, `/chat`, `/jd-match`). These endpoints default unauthenticated callers to tenant ID `1` (Global tenant).
 
-**LLM wiring**: `LlmService` (`intelligence/llm.service.ts`) handles Gemini/Bedrock dispatch. Fallback chain: Gemini API → Bedrock Claude 3.5 Sonnet → HTTP 503. The `resume-rewriter` endpoint (`POST /api/resume-rewriter`) also lives in `IntelligenceController`.
+**LLM wiring**: `LlmService` (`intelligence/llm.service.ts`) dispatches to providers in the order defined by `PRIMARY_LLM` → `SECONDARY_LLM` → `TERTIARY_LLM` env vars (defaults: `bedrock`/`claude`/`gemini`). Each provider is tried in sequence; the chain terminates with HTTP 503 if all fail. The `resume-rewriter` endpoint (`POST /api/resume-rewriter`) also lives in `IntelligenceController`.
 
 ### Frontend (`frontend/`)
 
@@ -106,24 +114,18 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
   - `landing/` — Three.js canvas components: `bg-canvas.tsx` (flow-field, loaded via `dynamic()`), `neuron-canvas.tsx`
   - `modals/` — feature modals (`AIChatModal.tsx`, `BuildProfileModal.tsx`, `CareerAnalysisModal.tsx`, `ProfileModal.tsx`, `ResumeUploadModal.tsx`, `ResumePreviewModal.tsx`, `SkillGapModal.tsx`)
   - `profile-builder/` — multi-step wizard (`StepUploadResume`, `StepPersonalInfo`, `StepSkills`, `StepReview`)
-  - `profile/` — profile form
-  - `chat/` — `ChatCoach.tsx` embeddable chat panel
-  - `roadmap/`, `skill-gap/`, `voice-coach/` — feature-specific components
-- `store/` — Zustand stores:
-  - `modalStore.ts` — global modal open/close state
-  - `profileBuilderStore.ts` — profile wizard state (step, resume file, parsed data, personal info, skills)
-- `providers/` — React providers:
-  - `ModalProvider.tsx` — renders modal portals based on `modalStore`
-  - `QueryProvider.tsx` — React Query client wrapper
+  - `sections/operations/` — Three.js 3D architecture diagram (`architecture-scene.tsx`, `service-node-3d.tsx`, `flow-line-3d.tsx`); all THREE objects must be memoized with `useMemo` to prevent WebGL context loss
+- `store/` — Zustand stores: `modalStore.ts` (global modal state), `profileBuilderStore.ts` (wizard state)
+- `providers/` — `ModalProvider.tsx`, `QueryProvider.tsx`
 - `lib/api-client.ts` — Axios instance; JWT auto-attach + refresh (shared Promise prevents race conditions); redirects to `/login` on 401
 - `lib/api.ts` — typed service layer; always use these functions in pages, not direct axios calls
-- `lib/services.ts` — higher-level service helpers
-- `lib/websocket.ts` — WebSocket client for voice coaching
+
+**Static export mode**: When `NEXT_OUTPUT=export` is set, the frontend builds as flat HTML/CSS/JS for S3. API rewrites are disabled — `NEXT_PUBLIC_API_URL` must point directly to the Lambda API Gateway URL. Images are unoptimized.
 
 **Extended component props (non-obvious):**
 - `SkillRadar` (`components/ui/skill-radar.tsx`) — accepts optional `metrics?: SkillRadarMetrics`. When provided, renders KPI summary, animated score breakdown bars (0.55/0.25/0.20 formula), skill tally, AI rationale.
-- `GapTable` (`components/gap-table.tsx` or `components/skill-gap/`) — accepts `hoveredSkill?: string | null` and `onHoverSkill?` for bidirectional hover sync with Recharts bar charts.
-- Three.js canvases (`landing/`) — always load via `dynamic(() => import(...), { ssr: false })`. They crash on SSR.
+- `GapTable` (`components/gap-table.tsx`) — accepts `hoveredSkill?: string | null` and `onHoverSkill?` for bidirectional hover sync with Recharts bar charts.
+- Three.js canvases (`landing/`, `sections/operations/`) — always load via `dynamic(() => import(...), { ssr: false })`. They crash on SSR.
 
 **State pattern**: use `useProfileBuilderStore()` for profile wizard state; use `useModalStore()` to open/close modals. Don't manage modal open state locally in components.
 
@@ -148,7 +150,7 @@ Python Lambda functions triggered by EventBridge Scheduler. All reuse the backen
 
 Terraform modules in `terraform/modules/`: `vpc`, `database` (Aurora Serverless v2 + pgvector), `backend` (Lambda + API Gateway), `lambda_backend`, `api_gateway`, `frontend` (S3 + CloudFront), `ecr`, `ecs`, `rds`, `iam`, `opensearch`, `sagemaker`, `websocket`, `eventbridge` (automation Lambdas + 8 EventBridge Scheduler rules + SQS DLQ + SNS alerts + 6 CloudWatch alarms).
 
-CI/CD: `.github/workflows/deploy-serverless.yml` — static IAM keys from GitHub environment secrets (`dev`/`prod`), targets `us-east-1`.
+CI/CD: `.github/workflows/deploy-serverless.yml` — static IAM keys from GitHub environment secrets (`dev`/`prod`), targets `us-east-1`. Workflow dispatch inputs: `environment` (dev/prod), `skip_terraform` (bool), `enable_cloudfront` (bool), `enable_custom_domain` (bool), `custom_domain` (string, e.g. `sklbr.co`). All inputs pass through as `TF_VAR_*`.
 
 ### n8n Workflows
 
@@ -163,6 +165,12 @@ gh workflow run deploy-serverless.yml -f environment=dev -f skip_terraform=true
 # Full deploy (clean-slate teardown + Terraform apply — ~35 min; required for infra changes)
 gh workflow run deploy-serverless.yml -f environment=dev
 
+# Full deploy with custom domain, no CloudFront (HTTP only)
+gh workflow run deploy-serverless.yml -f environment=dev -f enable_custom_domain=true -f custom_domain=sklbr.co
+
+# Full deploy with custom domain + CloudFront (HTTPS)
+gh workflow run deploy-serverless.yml -f environment=dev -f enable_cloudfront=true -f enable_custom_domain=true -f custom_domain=sklbr.co
+
 # Get current API endpoint
 cd terraform && terraform output -raw api_endpoint
 
@@ -171,6 +179,8 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 ```
 
 **Full deploy strategy**: deletes all non-ECR resources before `terraform apply`, so **API Gateway URL and S3 bucket name change** on every full deploy. `skip_terraform=true` preserves existing URLs.
+
+**Custom domain + HTTPS requires CloudFront**: S3 website endpoints are HTTP-only. `enable_cloudfront=true` is required for HTTPS at a custom domain.
 
 ## Lambda Deployment Gotchas
 
@@ -194,15 +204,20 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
   }
   ```
 
+- **`OMP_NUM_THREADS=1` in Docker**: The docker-compose backend sets `OMP_NUM_THREADS=1`. Without this, FAISS and sentence-transformer model loading can exhaust container memory or hang. Set this env var in any container or Lambda that runs ML inference.
+
+- **Aurora master password restrictions**: The password must not contain `/ @ " ` or spaces. The CI workflow strips these characters automatically, but local `.env` files must comply too.
+
 ## Key Design Decisions
 
 - **Hybrid scoring**: `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
 - **Skill levels**: 0 (missing), 0.5 (partial), 1.0 (strong)
 - **FAISS in-memory** for vector similarity (rebuilt on startup; no external vector store needed)
-- **LLM fallback chain**: Gemini API (primary) → AWS Bedrock Claude 3.5 Sonnet (fallback) → HTTP 503
-- **Auth is optional**: core features work without login
+- **LLM provider chain**: configurable via `PRIMARY_LLM` / `SECONDARY_LLM` / `TERTIARY_LLM` env vars (default order: Bedrock → Claude API → Gemini → HTTP 503). All three providers are optional; the chain skips unconfigured providers.
+- **Auth is optional**: core features work without login via `OptionalJwtAuthGuard`; unauthenticated requests default to the Global tenant (ID `1`)
 - **Multi-tenancy**: all entities have `tenant` relation; a `Global` tenant is auto-created on startup
 - **Recommendation cache**: in-memory TTL cache (300s)
+- **Schema migrations**: `updateSchema()` runs on every cold start (additive-only — never drops). Write new migrations to `nestjs-backend/src/migrations/` for destructive changes.
 
 ## Further Reference
 
@@ -210,6 +225,7 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 - ML pipeline details: `docs/ml-pipeline.md`
 - API reference: `docs/api-reference.md`
 - Local setup troubleshooting: `docs/local-setup.md`
+- Frontend-specific patterns: `frontend/CLAUDE.md`
 
 ## API Endpoints
 
