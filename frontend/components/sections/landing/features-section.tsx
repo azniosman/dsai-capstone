@@ -4,22 +4,22 @@ export function FeaturesSection() {
   const features = [
     {
       icon: Code2,
-      title: "Syntax & Logic Analysis",
+      title: "SYNTAX_ANALYSIS_ENGINE",
       desc: "Deep parsing of code repositories to establish baseline logic metrics.",
     },
     {
       icon: Network,
-      title: "Neural Talent Matching",
+      title: "NEURAL_TALENT_GRAPH",
       desc: "Advanced graph matching algorithms to pair candidates with ideal roles.",
     },
     {
       icon: Database,
-      title: "Data Lake Integration",
+      title: "SKILLBRIDGE_SYNC_NODE",
       desc: "Seamless synchronization with government and enterprise datasets.",
     },
     {
       icon: Cpu,
-      title: "Real-time Processing",
+      title: "REAL_TIME_PIPELINE",
       desc: "Low-latency evaluation pipelines running on cutting-edge compute grids.",
     },
   ];
@@ -33,32 +33,35 @@ export function FeaturesSection() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 relative z-10">
-        <div className="text-center mb-16 space-y-4">
-          <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-slate-100">
-            System Modules
+        <div className="mb-16 space-y-4">
+          <div className="tactical-label text-[#00f2f2]">
+            INTELLIGENCE_MODULES
+          </div>
+          <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter text-slate-100">
+            ENGINE_COMPONENTS
           </h2>
-          <div className="h-1 w-16 bg-primary mx-auto" />
-          <p className="text-primary/60 font-mono text-xs uppercase tracking-widest">
-            Architecture breakdown of the intelligence engine
-          </p>
+          <div className="h-0.5 w-24 bg-[#00f2f2]" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-white/5 border border-white/5">
           {features.map((feature, i) => (
             <div
               key={i}
-              className="flex gap-6 p-6 border border-white/5 bg-slate-900/50 hover:bg-primary/5 hover:border-primary/30 transition-all rounded-lg group"
+              className="flex gap-8 p-10 bg-background hover:bg-[#00f2f2]/5 transition-all group relative"
             >
-              <div className="w-12 h-12 shrink-0 flex items-center justify-center bg-background-dark border border-primary/20 text-primary group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(37,157,244,0.1)]">
-                <feature.icon className="w-6 h-6" />
+              <div className="w-16 h-16 shrink-0 flex items-center justify-center border border-white/10 text-[#00f2f2] group-hover:border-[#00f2f2] group-hover:shadow-[0_0_15px_rgba(0,242,242,0.2)] transition-all">
+                <feature.icon className="w-8 h-8" />
               </div>
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold text-slate-200 uppercase tracking-tight group-hover:text-primary transition-colors">
+              <div className="space-y-4">
+                <h3 className="text-xl font-black text-slate-200 uppercase tracking-widest group-hover:text-[#00f2f2] transition-colors">
                   {feature.title}
                 </h3>
-                <p className="text-sm font-mono text-slate-400 leading-relaxed">
+                <p className="text-[13px] font-sans text-slate-500 leading-relaxed uppercase tracking-wider">
                   {feature.desc}
                 </p>
+              </div>
+              <div className="absolute top-4 right-4 tactical-label text-white/10">
+                0{i + 1}
               </div>
             </div>
           ))}

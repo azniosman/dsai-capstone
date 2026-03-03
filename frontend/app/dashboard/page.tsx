@@ -535,7 +535,7 @@ export default function Dashboard() {
                     <span className="text-primary font-bold mr-2">
                       [Hiring]
                     </span>{" "}
-                    GovTech SG opened fresh associate track (200 slots)
+                    Skillbridge SG opened fresh associate track (200 slots)
                   </span>
                 </div>
               </div>

@@ -281,7 +281,7 @@ export default function Recommendations() {
                             {rec.title}
                           </h3>
                           <p className="text-[10px] text-slate-400 font-mono mt-1 w-[180px] wrap-break-word truncate">
-                            GovTech Singapore • Mapletree{" "}
+                            SkillBridge Singapore • Mapletree{" "}
                           </p>
                         </div>
                         <div className="text-right shrink-0 ml-2">

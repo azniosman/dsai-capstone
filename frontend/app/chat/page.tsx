@@ -23,7 +23,7 @@ export default function ChatPage() {
         <>
           <span className="text-primary">ALIGNMENT_QUERY:</span> 98% MATCH
           DETECTED FOR{" "}
-          <span className="text-primary underline">GOVTECH_NODE</span>
+          <span className="text-primary underline">SKILLBRIDGE_NODE</span>
           .<br />
           <br />
           DATA_SYNOPSIS: Candidate profile matches structural requirements for

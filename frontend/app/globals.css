@@ -139,6 +139,12 @@
 
   /* ── Accent Coral (maps to destructive red) ── */
   --accent-coral: #ef4444;
+  
+  /* ── Tactical Color Pallet ── */
+  --tactical-cyan: #00f2f2;
+  --tactical-blue: #259df4;
+  --tactical-red: #ff3b3b;
+  --tactical-dim: rgba(255, 255, 255, 0.1);
 
   /* ── Slate Custom (zinc scale aliases) ── */
   --slate-custom-50: #fafafa;
@@ -556,5 +562,27 @@
   }
   .glow-primary-lg {
     box-shadow: 0 0 20px rgba(37, 157, 244, 0.5);
+  }
+
+  /* ── Geospatial Utilities ── */
+  .map-vignette {
+    background: radial-gradient(circle, transparent 20%, rgba(9, 9, 11, 0.9) 100%);
+  }
+
+  .tactical-border {
+    border: 1px solid rgba(0, 242, 242, 0.3);
+    background: rgba(0, 242, 242, 0.05);
+  }
+
+  .tactical-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 10px rgba(0, 242, 242, 0.5);
   }
 }
