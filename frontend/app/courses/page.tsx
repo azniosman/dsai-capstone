@@ -109,7 +109,7 @@ export default function CourseBrowser() {
           <div className="flex items-center gap-3 text-primary">
             <BarChart className="w-8 h-8" />
             <h1 className="text-lg font-bold tracking-tight text-slate-custom-900 dark:text-white uppercase">
-              CertTrack Pro{" "}
+              Learning Path{" "}
               <span className="text-xs font-normal text-slate-custom-400">
                 v4.2.0
               </span>

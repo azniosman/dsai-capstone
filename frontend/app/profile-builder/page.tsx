@@ -20,48 +20,28 @@ import {
 
 /* ─── Step metadata ─── */
 const STEPS = [
-  {
-    id: 1,
-    label: "Step 1",
-    title: "Upload Resume",
-    icon: FileText,
-  },
-  {
-    id: 2,
-    label: "Step 2",
-    title: "Personal Details",
-    icon: User,
-  },
-  {
-    id: 3,
-    label: "Step 3",
-    title: "Skills & Expertise",
-    icon: Brain,
-  },
-  {
-    id: 4,
-    label: "Step 4",
-    title: "Review & Finish",
-    icon: Target,
-  },
-];
+  { id: 1, label: "Step 1", title: "Upload Resume", icon: FileText },
+  { id: 2, label: "Step 2", title: "Personal Details", icon: User },
+  { id: 3, label: "Step 3", title: "Skills & Expertise", icon: Brain },
+  { id: 4, label: "Step 4", title: "Review & Finish", icon: Target },
+] as const;
 
 /* ─── Progress Ring ─── */
 function ProgressRing({ score }: { score: number }) {
   return (
-    <div className="absolute top-6 right-6 flex flex-col items-center z-10 hidden sm:flex">
+    <div className="absolute top-4 right-4 flex flex-col items-center z-10 hidden sm:flex">
       <div
-        className="relative w-16 h-16 rounded-full p-1"
+        className="relative w-12 h-12 rounded-full p-1 border border-border/50 bg-card/30 backdrop-blur-sm"
         style={{
-          background: `conic-gradient(from 0deg, var(--primary) 0% ${score}%, var(--border) ${score}% 100%)`,
+          background: `conic-gradient(from 0deg, var(--primary) 0% ${score}%, transparent ${score}% 100%)`,
         }}
       >
         <div className="w-full h-full rounded-full bg-background flex items-center justify-center">
-          <span className="text-sm font-bold text-primary">{score}%</span>
+          <span className="text-[10px] font-bold text-primary">{score}%</span>
         </div>
       </div>
-      <p className="text-[10px] font-mono text-muted-foreground mt-2 uppercase tracking-wider">
-        Complete
+      <p className="text-[8px] font-mono text-muted-foreground mt-1 uppercase tracking-widest">
+        Score
       </p>
     </div>
   );
@@ -89,37 +69,30 @@ export default function ProfileBuilderPage() {
     (store.step === 4 ? 25 : 0);
 
   return (
-    <div className="bg-background text-foreground min-h-screen flex flex-col overflow-x-hidden selection:bg-primary/30">
+    <div className="bg-background text-foreground h-full flex flex-col overflow-hidden selection:bg-primary/30">
       {/* Header Section */}
-      <header className="flex items-center justify-between p-6 border-b border-border relative z-20 bg-card/50 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 border border-primary bg-primary/10 flex items-center justify-center text-primary rounded-lg">
-            <TerminalSquare className="w-5 h-5" />
+      <header className="flex items-center justify-between p-3 px-4 border-b border-border relative z-20 bg-card/50 backdrop-blur-md shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 border border-primary bg-primary/10 flex items-center justify-center text-primary rounded-md">
+            <TerminalSquare className="w-4 h-4" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight">
-              Set Up Your Profile
+            <h1 className="text-sm font-bold tracking-tight leading-none mb-1">
+              Profile Setup
             </h1>
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            <p className="text-[9px] uppercase tracking-widest text-muted-foreground leading-none">
               Step {store.step} of {STEPS.length} —{" "}
               {STEPS[store.step - 1].title}
             </p>
           </div>
         </div>
-        <button
-          onClick={() => (window.location.href = "/dashboard")}
-          className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest"
-        >
-          <Server className="w-4 h-4" />
-          <span className="hidden sm:inline">Dashboard</span>
-        </button>
       </header>
 
       {/* Main Content Area: Split Layout */}
-      <main className="flex-1 flex flex-col md:flex-row relative z-10">
+      <main className="flex-1 flex flex-col md:flex-row relative z-10 overflow-hidden">
         {/* Left: Progress Timeline */}
-        <aside className="w-full md:w-56 border-r border-border bg-card/30 backdrop-blur-md p-6 sticky top-0 md:h-[calc(100vh-80px)] overflow-y-auto">
-          <div className="flex flex-col gap-0">
+        <aside className="w-full md:w-48 border-r border-border bg-card/30 backdrop-blur-md p-4 overflow-y-auto shrink-0">
+          <div className="flex flex-col">
             {STEPS.map((step, idx) => {
               const isActive = store.step === step.id;
               const isCompleted = store.step > step.id;
@@ -129,7 +102,7 @@ export default function ProfileBuilderPage() {
               return (
                 <div
                   key={step.id}
-                  className="flex gap-4 cursor-pointer"
+                  className="flex gap-3 cursor-pointer group"
                   onClick={() => store.setStep(step.id)}
                   role="button"
                   tabIndex={0}
@@ -139,7 +112,7 @@ export default function ProfileBuilderPage() {
                   <div className="flex flex-col items-center">
                     <div
                       className={cn(
-                        "w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all",
+                        "w-6 h-6 rounded-full border-[1.5px] flex items-center justify-center transition-all group-hover:border-primary/50",
                         isCompleted
                           ? "border-primary bg-primary text-primary-foreground"
                           : isActive
@@ -148,24 +121,24 @@ export default function ProfileBuilderPage() {
                       )}
                     >
                       {isCompleted ? (
-                        <Check className="w-4 h-4" />
+                        <Check className="w-3 h-3" />
                       ) : (
-                        <StepIcon className="w-4 h-4" />
+                        <StepIcon className="w-3 h-3" />
                       )}
                     </div>
                     {!isLast && (
                       <div
                         className={cn(
-                          "w-0.5 h-10 transition-colors",
+                          "w-0.5 h-6 transition-colors my-1",
                           isCompleted ? "bg-primary" : "bg-border",
                         )}
                       />
                     )}
                   </div>
-                  <div className="pt-1 pb-4">
+                  <div className="pt-1 pb-2">
                     <p
                       className={cn(
-                        "text-xs font-bold tracking-wider leading-none",
+                        "text-[11px] font-bold tracking-wider leading-none",
                         isActive || isCompleted
                           ? "text-foreground"
                           : "text-muted-foreground",
@@ -175,7 +148,7 @@ export default function ProfileBuilderPage() {
                     </p>
                     <p
                       className={cn(
-                        "text-[10px] font-mono mt-1 uppercase",
+                        "text-[9px] font-mono mt-0.5 uppercase",
                         isActive
                           ? "text-primary"
                           : isCompleted
@@ -183,11 +156,7 @@ export default function ProfileBuilderPage() {
                             : "text-muted-foreground/50",
                       )}
                     >
-                      {isActive
-                        ? "In Progress"
-                        : isCompleted
-                          ? "Done"
-                          : "Pending"}
+                      {isActive ? "Active" : isCompleted ? "Done" : "Pending"}
                     </p>
                   </div>
                 </div>
@@ -197,60 +166,56 @@ export default function ProfileBuilderPage() {
         </aside>
 
         {/* Right: Workspace */}
-        <section className="flex-1 p-6 flex flex-col gap-6 relative min-h-[500px]">
-          {/* Integrity Gauge (Circular Graphic) */}
+        <section className="flex-1 p-5 md:p-6 flex flex-col relative overflow-y-auto">
           <ProgressRing score={Math.round(integrityScore)} />
 
           {/* Header Info */}
-          <div className="mt-4 max-w-[calc(100%-100px)]">
-            <span className="inline-block px-2 py-1 rounded-lg bg-primary/10 text-[10px] font-mono text-primary border border-primary/20 mb-2">
-              {STEPS[store.step - 1].label} — {STEPS[store.step - 1].title}
-            </span>
-            <h2 className="text-xl font-bold tracking-tight mb-1">
+          <div className="mb-4 max-w-[calc(100%-60px)] shrink-0">
+            <h2 className="text-lg font-bold tracking-tight mb-0.5">
               {STEPS[store.step - 1].title}
             </h2>
-            <p className="text-muted-foreground text-sm max-w-md">
-              Complete this step to continue building your career profile.
+            <p className="text-muted-foreground text-xs">
+              Complete this step to advance your dossier.
             </p>
           </div>
 
           {/* Dynamic Step Content Area */}
-          <div className="flex-1 flex flex-col justify-center relative">
+          <div className="flex-1 min-h-0 flex flex-col relative">
             <AnimatePresence mode="wait">
               <motion.div
                 key={store.step}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.3 }}
-                className="w-full flex-1"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full flex flex-col"
               >
-                {store.step === 1 && <StepUploadResume />}
-                {store.step === 2 && <StepPersonalInfo />}
-                {store.step === 3 && <StepSkills />}
-                {store.step === 4 && <StepReview />}
+                <div className="flex-1 overflow-y-auto pr-2 pb-4">
+                  {store.step === 1 && <StepUploadResume />}
+                  {store.step === 2 && <StepPersonalInfo />}
+                  {store.step === 3 && <StepSkills />}
+                  {store.step === 4 && <StepReview />}
+                </div>
               </motion.div>
             </AnimatePresence>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-between items-center border-t border-border pt-4 mt-auto shrink-0 relative z-20">
-            <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-2 uppercase tracking-wider">
+          <div className="flex justify-between items-center border-t border-border pt-3 mt-1 shrink-0 bg-background/80 backdrop-blur-sm sticky bottom-0">
+            <p className="text-[9px] font-mono text-muted-foreground flex items-center gap-2 uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              {store.step === 4
-                ? "Ready to submit"
+              {store.step === STEPS.length
+                ? "Ready"
                 : `Step ${store.step} of ${STEPS.length}`}
             </p>
-            <div className="flex gap-2">
-              {store.step > 1 && (
-                <button
-                  onClick={() => store.setStep(store.step - 1)}
-                  className="text-xs font-bold text-muted-foreground hover:text-foreground uppercase tracking-widest transition-colors"
-                >
-                  Back
-                </button>
-              )}
-            </div>
+            {store.step > 1 && (
+              <button
+                onClick={() => store.setStep(store.step - 1)}
+                className="text-[10px] font-bold text-muted-foreground hover:text-foreground uppercase tracking-widest transition-colors py-1 px-3 border border-transparent hover:border-border rounded-sm bg-card/50"
+              >
+                Go Back
+              </button>
+            )}
           </div>
         </section>
       </main>

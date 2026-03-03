@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Map as MapIcon,
@@ -9,9 +10,13 @@ import {
   Plus,
   Minus,
   Navigation,
+  X,
 } from "lucide-react";
+import ProfileBuilderPage from "@/app/profile-builder/page";
 
 export function HeroSection() {
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
   return (
     <section className="relative w-full min-h-screen flex flex-col items-center justify-center overflow-hidden bg-background">
       {/* Background Pre-rendered Map */}
@@ -70,9 +75,29 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.3 }}
         >
-          <button className="h-16 px-8 bg-[#00f2f2] text-black font-black uppercase tracking-widest flex items-center gap-3 hover:bg-white transition-all shadow-[0_0_20px_rgba(0,242,242,0.4)] group">
-            <MousePointer2 className="w-5 h-5 fill-current" />
-            INITIALIZE_DOSSIER_VIA_SKLBR
+          <button
+            onClick={() => setShowProfileModal(true)}
+            className="group relative h-16 px-8 bg-[#00f2f2] text-black font-black uppercase tracking-widest flex items-center gap-3 hover:bg-white transition-all shadow-[0_0_20px_rgba(0,242,242,0.4)] overflow-hidden"
+          >
+            {/* Scanline Effect Animation Layer */}
+            <div className="absolute inset-0 z-0">
+              <div className="w-10 h-full bg-white/40 blur-sm skew-x-[-20deg] animate-[scan_2.5s_ease-in-out_infinite]" />
+            </div>
+
+            <MousePointer2 className="relative z-10 w-5 h-5 fill-current" />
+            <span className="relative z-10">INITIALIZE_DOSSIER_VIA_SKLBR</span>
+
+            {/* Inline keyframes for scan effect */}
+            <style jsx>{`
+              @keyframes scan {
+                0% {
+                  transform: translateX(-150%);
+                }
+                100% {
+                  transform: translateX(350%);
+                }
+              }
+            `}</style>
           </button>
 
           <button className="h-16 px-8 border border-[#00f2f2]/30 text-[#00f2f2] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-[#00f2f2]/10 transition-all backdrop-blur-md">
@@ -141,6 +166,31 @@ export function HeroSection() {
 
       {/* Background scanline effect overlay */}
       <div className="absolute inset-0 pointer-events-none z-30 opacity-[0.03] scanline" />
+
+      {/* Profile Builder Profile Modal Overlay */}
+      <AnimatePresence>
+        {showProfileModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+              className="relative w-full max-w-[1200px] h-[90vh] bg-background border border-[#00f2f2]/30 rounded-xl overflow-hidden shadow-[0_0_50px_rgba(0,242,242,0.15)] flex flex-col"
+            >
+              <button
+                onClick={() => setShowProfileModal(false)}
+                className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-[#00f2f2]/20 text-muted-foreground hover:text-[#00f2f2] border border-white/10 hover:border-[#00f2f2]/50 rounded-full backdrop-blur-md transition-all group"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex-1 w-full h-full overflow-y-auto">
+                <ProfileBuilderPage />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
