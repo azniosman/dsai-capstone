@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -84,6 +85,14 @@ function LoginForm() {
   const userName =
     typeof window !== "undefined" ? localStorage.getItem("userName") : null;
 
+  const { login: authLogin, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, router]);
+
   const onLoginSubmit = async (data: LoginFormValues) => {
     setLoading(true);
     setError(null);
@@ -94,22 +103,33 @@ function LoginForm() {
       const res = await api.post("/api/auth/login", params, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
-      localStorage.setItem("token", res.data.access_token);
-      if (res.data.refresh_token)
-        localStorage.setItem("refreshToken", res.data.refresh_token);
+
+      const resData = res.data;
+
       const me = await api.get("/api/auth/me", {
-        headers: { Authorization: `Bearer ${res.data.access_token}` },
+        headers: { Authorization: `Bearer ${resData.access_token}` },
       });
-      localStorage.setItem("userName", me.data.name);
-      localStorage.setItem("userEmail", me.data.email);
+
+      let profileId: string | undefined = undefined;
       try {
         const profile = await api.get("/api/profile/me", {
-          headers: { Authorization: `Bearer ${res.data.access_token}` },
+          headers: { Authorization: `Bearer ${resData.access_token}` },
         });
-        localStorage.setItem("profileId", profile.data.id);
+        profileId = String(profile.data.id);
       } catch {
         /* No linked profile */
       }
+
+      authLogin(
+        resData.access_token,
+        {
+          name: me.data.name,
+          email: me.data.email,
+          profileId,
+        },
+        resData.refresh_token,
+      );
+
       toast.success(`Access Granted: ${me.data.name}`);
       const redirect = searchParams.get("redirect");
       router.push(redirect || "/dashboard");

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { cn } from "@/lib/utils";
+import { AuthGuard } from "@/components/auth/auth-guard";
 
 // Routes that use the sidebar layout
 const SIDEBAR_ROUTES = [
@@ -46,7 +47,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           collapsed ? "ml-16" : "ml-72",
         )}
       >
-        <main className="flex-1 p-12">{children}</main>
+        <AuthGuard>
+          <main className="flex-1 p-12">{children}</main>
+        </AuthGuard>
       </div>
     </div>
   );

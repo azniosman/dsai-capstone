@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ModalProvider } from "@/providers/ModalProvider";
+import { AuthProvider } from "@/contexts/auth-context";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -44,13 +45,15 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
-            <TenantProvider>
-              <ErrorBoundary>
-                <AppShell>{children}</AppShell>
-                <ModalProvider />
-                <Toaster />
-              </ErrorBoundary>
-            </TenantProvider>
+            <AuthProvider>
+              <TenantProvider>
+                <ErrorBoundary>
+                  <AppShell>{children}</AppShell>
+                  <ModalProvider />
+                  <Toaster />
+                </ErrorBoundary>
+              </TenantProvider>
+            </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>
