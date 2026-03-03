@@ -172,18 +172,19 @@ module "s3_frontend" {
   enable_public_access = !var.enable_cloudfront
 }
 
-# 9. Optional Custom DNS — Route 53 + ACM (us-east-1 strictly required)
+# 9. Optional Custom DNS — Route 53 zone + ACM certificate (us-east-1 required for CloudFront)
+# NOTE: The CloudFront alias Route 53 records are created AFTER the cloudfront module
+# (see aws_route53_record.cf_alias_* below) to avoid a circular dependency.
 module "dns" {
   count  = var.enable_custom_domain && var.custom_domain != "" ? 1 : 0
   source = "./modules/dns"
 
-  project_name           = var.project_name
-  environment            = var.environment
-  domain_name            = var.custom_domain
-  cloudfront_domain_name = var.enable_cloudfront ? module.cloudfront[0].cloudfront_domain_name : ""
+  project_name = var.project_name
+  environment  = var.environment
+  domain_name  = var.custom_domain
 }
 
-# 10. CloudFront — optional CDN distribution (wires DNS SSL if activated)
+# 10. CloudFront — optional CDN distribution (attaches ACM cert when custom domain is enabled)
 module "cloudfront" {
   count  = var.enable_cloudfront ? 1 : 0
   source = "./modules/cloudfront"
@@ -199,7 +200,66 @@ module "cloudfront" {
   custom_domain_aliases = var.enable_custom_domain && var.custom_domain != "" ? [var.custom_domain, "www.${var.custom_domain}"] : []
 }
 
-# 10. OpenSearch — optional, single-node t3.small.search for hybrid vector search
+# 10b. Route 53 → CloudFront alias records (apex + www, A + AAAA)
+# Created after both module.dns and module.cloudfront to avoid a dependency cycle.
+# CloudFront's global Route 53 hosted zone ID is the fixed constant Z2FDTNDATAQYW2.
+resource "aws_route53_record" "cf_alias_root_a" {
+  count           = var.enable_custom_domain && var.custom_domain != "" && var.enable_cloudfront ? 1 : 0
+  allow_overwrite = true
+  zone_id         = module.dns[0].zone_id
+  name            = var.custom_domain
+  type            = "A"
+
+  alias {
+    name                   = module.cloudfront[0].cloudfront_domain_name
+    zone_id                = "Z2FDTNDATAQYW2"
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "cf_alias_root_aaaa" {
+  count           = var.enable_custom_domain && var.custom_domain != "" && var.enable_cloudfront ? 1 : 0
+  allow_overwrite = true
+  zone_id         = module.dns[0].zone_id
+  name            = var.custom_domain
+  type            = "AAAA"
+
+  alias {
+    name                   = module.cloudfront[0].cloudfront_domain_name
+    zone_id                = "Z2FDTNDATAQYW2"
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "cf_alias_www_a" {
+  count           = var.enable_custom_domain && var.custom_domain != "" && var.enable_cloudfront ? 1 : 0
+  allow_overwrite = true
+  zone_id         = module.dns[0].zone_id
+  name            = "www.${var.custom_domain}"
+  type            = "A"
+
+  alias {
+    name                   = module.cloudfront[0].cloudfront_domain_name
+    zone_id                = "Z2FDTNDATAQYW2"
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "cf_alias_www_aaaa" {
+  count           = var.enable_custom_domain && var.custom_domain != "" && var.enable_cloudfront ? 1 : 0
+  allow_overwrite = true
+  zone_id         = module.dns[0].zone_id
+  name            = "www.${var.custom_domain}"
+  type            = "AAAA"
+
+  alias {
+    name                   = module.cloudfront[0].cloudfront_domain_name
+    zone_id                = "Z2FDTNDATAQYW2"
+    evaluate_target_health = false
+  }
+}
+
+# 11. OpenSearch — optional, single-node t3.small.search for hybrid vector search
 module "opensearch" {
   count  = var.enable_opensearch ? 1 : 0
   source = "./modules/opensearch"

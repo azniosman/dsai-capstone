@@ -317,6 +317,13 @@ jobs:
           terraform state rm 'module.opensearch[0]'  2>/dev/null || true
           terraform state rm 'module.websocket[0]'   2>/dev/null || true
           terraform state rm 'module.sagemaker[0]'   2>/dev/null || true
+          # DNS module (Route 53 zone + ACM cert) — zone persists in AWS; re-imported below
+          terraform state rm 'module.dns[0]'         2>/dev/null || true
+          # CloudFront alias records (root-level resources in main.tf)
+          terraform state rm 'aws_route53_record.cf_alias_root_a[0]'    2>/dev/null || true
+          terraform state rm 'aws_route53_record.cf_alias_root_aaaa[0]' 2>/dev/null || true
+          terraform state rm 'aws_route53_record.cf_alias_www_a[0]'     2>/dev/null || true
+          terraform state rm 'aws_route53_record.cf_alias_www_aaaa[0]'  2>/dev/null || true
           # Uploads bucket + internal-token secret (root-level resources)
           terraform state rm 'aws_s3_bucket.uploads'                          2>/dev/null || true
           terraform state rm 'aws_s3_bucket_public_access_block.uploads'      2>/dev/null || true
@@ -671,6 +678,58 @@ jobs:
           import_schedule "module.eventbridge.aws_scheduler_schedule.lambda_warmup[0]"            "${P}-${E}-lambda-warmup-ping"
 
           echo "EventBridge schedule import complete"
+
+      # ── Step 4d: Import DNS resources into Terraform state ────────────────────
+      # When enable_custom_domain=true the Route 53 zone and ACM certificate
+      # survive the cleanup step (AWS doesn't delete them). Re-import them so
+      # Terraform updates in place rather than failing to create duplicates.
+      # Skipped automatically when enable_custom_domain=false (no zone exists).
+      - name: Import DNS into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' && github.event.inputs.enable_custom_domain == 'true' && github.event.inputs.custom_domain != '' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region:                  ${{ env.AWS_REGION }}
+          TF_VAR_environment:                 ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:                 ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key:                  ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront:           ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain:        ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain:               ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token:   ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          DOMAIN="${{ github.event.inputs.custom_domain }}"
+
+          # Import Route 53 hosted zone if one already exists for this domain
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+            --dns-name "${DOMAIN}." \
+            --query "HostedZones[?Name=='${DOMAIN}.'].Id | [0]" \
+            --output text 2>/dev/null | sed 's|/hostedzone/||')
+          if [ -n "$ZONE_ID" ] && [ "$ZONE_ID" != "None" ] && [ "$ZONE_ID" != "null" ]; then
+            echo "Importing Route 53 zone: ${ZONE_ID}"
+            terraform state rm 'module.dns[0].aws_route53_zone.main' 2>/dev/null || true
+            terraform import -input=false \
+              'module.dns[0].aws_route53_zone.main' "${ZONE_ID}" \
+              2>&1 | grep -v "^$" || true
+          else
+            echo "No existing Route 53 zone for ${DOMAIN} — Terraform will create it"
+          fi
+
+          # Import ACM certificate if one already exists for this domain (us-east-1)
+          CERT_ARN=$(aws acm list-certificates \
+            --region us-east-1 \
+            --query "CertificateSummaryList[?DomainName=='${DOMAIN}'].CertificateArn | [0]" \
+            --output text 2>/dev/null)
+          if [ -n "$CERT_ARN" ] && [ "$CERT_ARN" != "None" ] && [ "$CERT_ARN" != "null" ]; then
+            echo "Importing ACM certificate: ${CERT_ARN}"
+            terraform state rm 'module.dns[0].aws_acm_certificate.cert' 2>/dev/null || true
+            terraform import -input=false \
+              'module.dns[0].aws_acm_certificate.cert' "${CERT_ARN}" \
+              2>&1 | grep -v "^$" || true
+          else
+            echo "No existing ACM certificate for ${DOMAIN} — Terraform will create it"
+          fi
+
+          echo "DNS import complete"
 
       # ── Step 5: Terraform Plan + Apply ────────────────────────────────────────
       - name: Terraform Plan
