@@ -22,22 +22,23 @@ resource "aws_acm_certificate" "cert" {
 }
 
 # ── DNS Validation Records ────────────────────────────────────────────────────
+# NOTE: We iterate over statically-known domain names (not domain_validation_options)
+# to avoid the "for_each keys unknown until apply" error that occurs when the ACM
+# certificate doesn't yet exist in state. The map KEYS must be known at plan time;
+# the VALUES (CNAME name/record/type) may be unknown and are computed after apply.
 
 resource "aws_route53_record" "cert_validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.cert.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
-    }
-  }
+  for_each = toset([var.domain_name, "www.${var.domain_name}"])
 
   allow_overwrite = true
-  name            = each.value.name
-  records         = [each.value.record]
-  ttl             = 60
-  type            = each.value.type
-  zone_id         = aws_route53_zone.main.zone_id
+  name = [for dvo in aws_acm_certificate.cert.domain_validation_options :
+  dvo.resource_record_name if dvo.domain_name == each.key][0]
+  records = [[for dvo in aws_acm_certificate.cert.domain_validation_options :
+  dvo.resource_record_value if dvo.domain_name == each.key][0]]
+  ttl = 60
+  type = [for dvo in aws_acm_certificate.cert.domain_validation_options :
+  dvo.resource_record_type if dvo.domain_name == each.key][0]
+  zone_id = aws_route53_zone.main.zone_id
 }
 
 resource "aws_acm_certificate_validation" "cert_validation" {
