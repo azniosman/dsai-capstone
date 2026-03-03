@@ -2,17 +2,14 @@
 
 import { useEffect, useState } from "react";
 import {
-  GraduationCap,
   Search,
-  Clock,
-  Zap,
-  Users,
-  BookOpen,
   Filter,
-  ChevronRight,
-  Star,
+  Download,
+  BarChart,
+  TrendingUp,
+  PlusCircle,
+  GraduationCap,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -64,149 +61,17 @@ function normalizeCourse(raw: Record<string, unknown>): Course {
   };
 }
 
-const LEVEL_COLORS: Record<string, string> = {
-  beginner: "text-green-600 bg-green-50 border-green-200",
-  intermediate: "text-amber-600 bg-amber-50 border-amber-200",
-  advanced: "text-red-600 bg-red-50 border-red-200",
-};
-
-const CATEGORIES = [
-  "All",
-  "Data Science",
-  "Cloud",
-  "Cybersecurity",
-  "AI/ML",
-  "DevOps",
-  "Design",
-];
-
-/* ─── Course card ─── */
-function CourseCard({
-  course,
-  index,
-}: {
-  course: Course;
-  index: number;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const levelClass = LEVEL_COLORS[course.level] ?? "text-muted-foreground bg-muted border-border";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, delay: index * 0.04 }}
-      className="glass-card p-4 hover-lift flex flex-col gap-3"
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-            <span
-              className={cn(
-                "text-[10px] px-1.5 py-0.5 rounded-md border font-semibold",
-                levelClass,
-              )}
-            >
-              {course.level.toUpperCase()}
-            </span>
-            {course.mces_eligible && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-md border text-primary bg-primary/8 border-primary/20 font-semibold">
-                MCES
-              </span>
-            )}
-          </div>
-          <h3 className="text-sm font-bold leading-tight">{course.title}</h3>
-          <p className="micro-type text-[9px] opacity-50 mt-0.5">
-            {course.provider}
-          </p>
-        </div>
-        <div className="text-right shrink-0">
-          <div className="text-base font-black tabular-nums text-primary">
-            ${course.nett_payable.toLocaleString()}
-          </div>
-          <div className="micro-type text-[9px] opacity-40 line-through">
-            ${course.course_fee.toLocaleString()}
-          </div>
-        </div>
-      </div>
-
-      {/* Meta row */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-          <Clock className="h-3 w-3" />
-          {course.duration_weeks}w
-        </span>
-        <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-          <Star className="h-3 w-3" />
-          {course.subsidy_percent}% subsidy
-        </span>
-        {course.certification && (
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <GraduationCap className="h-3 w-3" />
-            {course.certification}
-          </span>
-        )}
-      </div>
-
-      {/* Skills preview */}
-      {course.skills_taught.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {course.skills_taught.slice(0, expanded ? undefined : 4).map((s) => (
-            <span
-              key={s}
-              className="text-[10px] px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground font-medium"
-            >
-              {s}
-            </span>
-          ))}
-          {!expanded && course.skills_taught.length > 4 && (
-            <button
-              onClick={() => setExpanded(true)}
-              className="text-[10px] px-1.5 py-0.5 rounded bg-primary/8 text-primary font-semibold"
-            >
-              +{course.skills_taught.length - 4}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* CTA */}
-      <div className="flex items-center gap-2 pt-1 border-t border-border/40">
-        <div className="flex-1 min-w-0">
-          <div className="flex gap-3 text-[10px]">
-            <span className="text-muted-foreground">
-              SFC: <strong className="text-primary">-${course.sfc_applicable.toLocaleString()}</strong>
-            </span>
-            <span className="text-muted-foreground">
-              Subsidy: <strong className="text-green-600">-${course.subsidy_amount.toLocaleString()}</strong>
-            </span>
-          </div>
-        </div>
-        <Button size="sm" className="clay-btn text-xs h-7 px-3 shrink-0">
-          <Zap className="h-3 w-3 mr-1" /> Deploy
-        </Button>
-      </div>
-    </motion.div>
-  );
-}
-
 export default function CourseBrowser() {
   const { openModal } = useModalStore();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [level, setLevel] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
 
     const params: Record<string, string> = {};
-    if (level) params.level = level;
 
     api
       .get("/api/courses", { params, signal: controller.signal })
@@ -224,7 +89,7 @@ export default function CourseBrowser() {
       });
 
     return () => controller.abort();
-  }, [level]);
+  }, []);
 
   const filtered = courses.filter((c) => {
     const matchSearch =
@@ -233,229 +98,488 @@ export default function CourseBrowser() {
       c.skills_taught.some((s) =>
         s.toLowerCase().includes(search.toLowerCase()),
       );
-    const matchLevel = !level || c.level === level;
-    return matchSearch && matchLevel;
+    return matchSearch;
   });
 
-  // Top course recommendation (highest subsidy)
-  const topCourse = courses.reduce<Course | null>(
-    (best, c) => (!best || c.subsidy_percent > best.subsidy_percent ? c : best),
-    null,
-  );
-
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <header>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="live-dot" />
-          <p className="micro-type text-primary">Learning Path</p>
-        </div>
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">
-              Resource Hub
+    <div className="flex flex-1 flex-col overflow-hidden h-screen -m-12 font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 antialiased">
+      {/* Top Navigation */}
+      <header className="flex h-14 items-center justify-between border-b border-slate-custom-200 bg-white dark:bg-slate-custom-900 px-6 shrink-0 z-10">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 text-primary">
+            <BarChart className="w-8 h-8" />
+            <h1 className="text-lg font-bold tracking-tight text-slate-custom-900 dark:text-white uppercase">
+              CertTrack Pro{" "}
+              <span className="text-xs font-normal text-slate-custom-400">
+                v4.2.0
+              </span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              SkillsFuture SCTP courses with subsidy calculations
-            </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => openModal("skillsFutureCourses")}
-            className="shrink-0"
-          >
-            <Search className="h-3.5 w-3.5 mr-1.5" />
-            Search SSG Live
-          </Button>
+          <nav className="flex items-center gap-1">
+            <a
+              className="px-3 py-1 text-sm font-medium text-primary bg-primary/10 rounded"
+              href="#"
+            >
+              Inventory
+            </a>
+            <a
+              className="px-3 py-1 text-sm font-medium text-slate-custom-600 dark:text-slate-custom-300 hover:bg-slate-custom-50 dark:hover:bg-slate-custom-800 rounded transition-colors"
+              href="#"
+            >
+              Market Intelligence
+            </a>
+            <a
+              className="px-3 py-1 text-sm font-medium text-slate-custom-600 dark:text-slate-custom-300 hover:bg-slate-custom-50 dark:hover:bg-slate-custom-800 rounded transition-colors"
+              href="#"
+            >
+              Local Providers
+            </a>
+            <a
+              className="px-3 py-1 text-sm font-medium text-slate-custom-600 dark:text-slate-custom-300 hover:bg-slate-custom-50 dark:hover:bg-slate-custom-800 rounded transition-colors"
+              href="#"
+            >
+              AI Career Path
+            </a>
+          </nav>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="relative flex items-center">
+            <Search className="absolute left-3 text-slate-custom-400 w-5 h-5 pointer-events-none" />
+            <input
+              className="h-9 w-80 rounded border-slate-custom-200 bg-slate-custom-50 dark:bg-slate-custom-800 dark:border-slate-custom-700 pl-10 text-sm focus:border-primary focus:ring-0 placeholder:text-slate-custom-400"
+              placeholder="Search certifications, domains, providers..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              type="text"
+            />
+          </div>
         </div>
       </header>
 
-      {/* Filter bar */}
-      <div className="glass-card p-3 flex items-center gap-3 flex-wrap">
-        <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-
-        {/* Category pills */}
-        <div className="flex gap-1.5 flex-wrap flex-1">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={cn(
-                "text-xs px-3 py-1 rounded-full font-medium transition-all duration-150",
-                activeCategory === cat
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80",
-              )}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        {/* Level filter */}
-        <div className="flex gap-1">
-          {["", "beginner", "intermediate", "advanced"].map((l) => (
-            <button
-              key={l}
-              onClick={() => setLevel(l)}
-              className={cn(
-                "text-[10px] px-2 py-1 rounded-md font-semibold transition-all duration-150",
-                level === l
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted/60",
-              )}
-            >
-              {l || "All"}
-            </button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div className="relative min-w-[180px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-          <Input
-            placeholder="Search skills..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-7 h-7 text-xs bg-background"
-          />
-        </div>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Main grid + sidebar */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-5">
-        {/* Course grid — 3 cols */}
-        <div className="xl:col-span-3">
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {[...Array(6)].map((_, i) => (
-                <Skeleton key={i} className="h-52 rounded-xl" />
-              ))}
+      <main className="flex flex-1 overflow-hidden">
+        {/* Sidebar Navigation */}
+        <aside className="w-64 border-r border-slate-custom-200 dark:border-slate-custom-800 bg-white dark:bg-slate-custom-900 flex flex-col p-4 shrink-0 overflow-y-auto z-10">
+          <div className="mb-6">
+            <p className="text-[10px] font-bold text-slate-custom-400 uppercase tracking-widest mb-3">
+              Certification Status
+            </p>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between p-2 rounded bg-primary/5 border border-primary/10">
+                <span className="text-sm font-medium text-slate-custom-700 dark:text-slate-custom-300">
+                  AWS Solutions Arch.
+                </span>
+                <span className="text-xs font-bold text-primary font-mono">
+                  84%
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded hover:bg-slate-custom-50 dark:hover:bg-slate-custom-800 border border-transparent transition-colors">
+                <span className="text-sm font-medium text-slate-custom-600 dark:text-slate-custom-400">
+                  CISSP Professional
+                </span>
+                <span className="text-xs font-bold text-slate-custom-400 font-mono">
+                  42%
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded hover:bg-slate-custom-50 dark:hover:bg-slate-custom-800 border border-transparent transition-colors">
+                <span className="text-sm font-medium text-slate-custom-600 dark:text-slate-custom-400">
+                  GCP Cloud Architect
+                </span>
+                <span className="text-xs font-bold text-slate-custom-400 font-mono">
+                  12%
+                </span>
+              </div>
             </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center glass-card">
-              <BookOpen className="h-10 w-10 text-muted-foreground/30 mb-3" />
-              <p className="text-sm font-semibold">No courses found</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Try adjusting your search filters
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 mb-3">
-                <GraduationCap className="h-3.5 w-3.5 text-primary" />
-                <p className="micro-type">
-                  {filtered.length} course{filtered.length !== 1 ? "s" : ""}{" "}
-                  available
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filtered.map((course, i) => (
-                  <CourseCard key={course.id} course={course} index={i} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+          </div>
 
-        {/* Sidebar — 1 col */}
-        <div className="space-y-4">
-          {/* Resume Booster */}
-          {topCourse && (
-            <div className="glass-card p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Zap className="h-3.5 w-3.5 text-primary" />
-                <p className="micro-type">Resume Booster</p>
-              </div>
-              <p className="text-xs text-muted-foreground mb-2">
-                Highest subsidy course for your profile:
-              </p>
-              <div className="p-3 rounded-lg bg-primary/5 border border-primary/15 space-y-1.5">
-                <p className="text-xs font-bold leading-tight">
-                  {topCourse.title}
-                </p>
-                <p className="micro-type text-[9px] opacity-60">
-                  {topCourse.provider}
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="micro-type text-[9px] text-green-600">
-                    {topCourse.subsidy_percent}% subsidised
+          <div className="mb-6">
+            <p className="text-[10px] font-bold text-slate-custom-400 uppercase tracking-widest mb-3">
+              Local Providers (SG)
+            </p>
+            <div className="space-y-3">
+              <div className="p-3 border border-slate-custom-100 dark:border-slate-custom-800 rounded-lg hover:shadow-sm transition-shadow">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-slate-custom-800 dark:text-slate-custom-200">
+                    NTUC LearningHub
                   </span>
-                  <span className="text-sm font-black tabular-nums text-primary">
-                    ${topCourse.nett_payable.toLocaleString()}
+                  <span className="text-[9px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-bold rounded">
+                    SF ELIGIBLE
                   </span>
                 </div>
+                <p className="text-[10px] text-slate-custom-500 leading-tight">
+                  Hybrid Bootcamps, Corporate Training Specialists
+                </p>
               </div>
-              <Button
-                size="sm"
-                className="clay-btn w-full mt-3 text-xs"
-              >
-                Deploy <ChevronRight className="h-3 w-3 ml-1" />
-              </Button>
-            </div>
-          )}
-
-          {/* Course Stream */}
-          <div className="glass-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="h-3.5 w-3.5 text-secondary" />
-              <p className="micro-type">Course Stream</p>
-            </div>
-            <div className="space-y-2">
-              {courses.slice(0, 3).map((c, i) => (
-                <div
-                  key={c.id}
-                  className="flex items-start gap-2 py-2 border-b border-border/30 last:border-0"
-                >
-                  <span className="micro-type text-[9px] text-primary opacity-60 font-mono mt-0.5 shrink-0">
-                    {String(i + 1).padStart(2, "0")}
+              <div className="p-3 border border-slate-custom-100 dark:border-slate-custom-800 rounded-lg hover:shadow-sm transition-shadow">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-slate-custom-800 dark:text-slate-custom-200">
+                    Informatics Academy
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold truncate">{c.title}</p>
-                    <p className="micro-type text-[9px] opacity-50">
-                      {c.duration_weeks}w · {c.level}
-                    </p>
+                  <span className="text-[9px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-bold rounded">
+                    ACCREDITED
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-custom-500 leading-tight">
+                  Specialized Cyber Security & Cloud Degree tracks
+                </p>
+              </div>
+              <div className="p-3 border border-slate-custom-100 dark:border-slate-custom-800 rounded-lg hover:shadow-sm transition-shadow">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-slate-custom-800 dark:text-slate-custom-200">
+                    General Assembly
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-bold rounded">
+                    SF ELIGIBLE
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-custom-500 leading-tight">
+                  Intensive tech immersive programs for mid-career
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-auto p-4 bg-slate-custom-900 dark:bg-slate-custom-800 rounded-xl text-white">
+            <p className="text-xs font-bold mb-1">SkillsFuture Credit</p>
+            <p className="text-lg font-bold font-mono">S$1,240.00</p>
+            <div className="mt-3 h-1 w-full bg-slate-custom-700 rounded-full overflow-hidden">
+              <div className="bg-primary h-full w-3/4"></div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <section className="flex-1 overflow-y-auto bg-slate-custom-50 dark:bg-slate-custom-900/50 p-6 custom-scrollbar">
+          {/* Header Metrics */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="bg-white dark:bg-slate-custom-900 p-4 border border-slate-custom-200 dark:border-slate-custom-800 rounded shadow-sm">
+              <p className="text-[10px] font-bold text-slate-custom-400 uppercase mb-1">
+                Total SG Postings
+              </p>
+              <p className="text-2xl font-bold text-slate-custom-900 dark:text-white font-mono">
+                1,842
+              </p>
+              <p className="text-[10px] text-green-600 font-medium flex items-center gap-1 mt-1">
+                <TrendingUp className="w-3 h-3" /> +12% this month
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-custom-900 p-4 border border-slate-custom-200 dark:border-slate-custom-800 rounded shadow-sm">
+              <p className="text-[10px] font-bold text-slate-custom-400 uppercase mb-1">
+                Avg. Salary Delta
+              </p>
+              <p className="text-2xl font-bold text-slate-custom-900 dark:text-white font-mono">
+                +S$1.4k
+              </p>
+              <p className="text-[10px] text-slate-custom-500 mt-1">
+                Monthly increase projection
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-custom-900 p-4 border border-slate-custom-200 dark:border-slate-custom-800 rounded shadow-sm">
+              <p className="text-[10px] font-bold text-slate-custom-400 uppercase mb-1">
+                Overall Readiness
+              </p>
+              <p className="text-2xl font-bold text-primary font-mono">68.4%</p>
+              <div className="mt-2 h-1.5 w-full bg-slate-custom-100 dark:bg-slate-custom-800 rounded-full overflow-hidden">
+                <div className="bg-primary h-full w-[68%]"></div>
+              </div>
+            </div>
+            <div className="bg-white dark:bg-slate-custom-900 p-4 border border-slate-custom-200 dark:border-slate-custom-800 rounded shadow-sm">
+              <p className="text-[10px] font-bold text-slate-custom-400 uppercase mb-1">
+                AI Recommendation
+              </p>
+              <p className="text-sm font-bold text-slate-custom-800 dark:text-slate-custom-200 leading-tight">
+                Focus on &apos;Security & Compliance&apos; domains
+              </p>
+              <p className="text-[10px] text-primary mt-1 underline cursor-pointer">
+                View Roadmap
+              </p>
+            </div>
+          </div>
+
+          {/* Heatmap View Equivalent */}
+          <div className="bg-white dark:bg-slate-custom-900 border border-slate-custom-200 dark:border-slate-custom-800 rounded shadow-sm mb-6">
+            <div className="border-b border-slate-custom-100 dark:border-slate-custom-800 p-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-custom-800 dark:text-slate-custom-200">
+                  Domain Readiness Heatmap: AWS Certified Solutions Architect -
+                  Associate
+                </h3>
+                <p className="text-[11px] text-slate-custom-500 font-mono uppercase tracking-tighter">
+                  Instance ID: CERT-8829-ASAA | Real-time AI Analysis
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button className="px-3 py-1 text-xs font-bold border border-slate-custom-200 dark:border-slate-custom-700 rounded hover:bg-slate-custom-50 dark:hover:bg-slate-custom-800 transition-colors">
+                  HISTORICAL
+                </button>
+                <button className="px-3 py-1 text-xs font-bold bg-primary text-white rounded hover:bg-primary/90 transition-colors">
+                  LIVE TRACKER
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-5 gap-3 h-48">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-green-500/80 rounded flex flex-col items-center justify-center text-white">
+                    <span className="text-2xl font-black font-mono">94%</span>
+                    <span className="text-[10px] font-bold uppercase text-center px-2">
+                      Design Resilient Architectures
+                    </span>
                   </div>
                 </div>
-              ))}
+                <div className="relative">
+                  <div className="absolute inset-0 bg-green-400 rounded flex flex-col items-center justify-center text-white shadow-sm">
+                    <span className="text-2xl font-black font-mono">81%</span>
+                    <span className="text-[10px] font-bold uppercase text-center px-2">
+                      Design High-Performing Architectures
+                    </span>
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-0 bg-amber-400 rounded flex flex-col items-center justify-center text-white shadow-sm">
+                    <span className="text-2xl font-black font-mono">58%</span>
+                    <span className="text-[10px] font-bold uppercase text-center px-2">
+                      Design Secure Applications & Architectures
+                    </span>
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-0 bg-orange-500 rounded flex flex-col items-center justify-center text-white shadow-sm">
+                    <span className="text-2xl font-black font-mono">32%</span>
+                    <span className="text-[10px] font-bold uppercase text-center px-2">
+                      Design Cost-Optimized Architectures
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-slate-custom-50 dark:bg-slate-custom-800 border-2 border-dashed border-slate-custom-200 dark:border-slate-custom-700 rounded flex flex-col items-center justify-center text-slate-custom-400 hover:bg-slate-custom-100 dark:hover:bg-slate-custom-700 transition-colors cursor-pointer">
+                  <PlusCircle className="w-10 h-10 mb-2 stroke-1" />
+                  <span className="text-[10px] font-bold uppercase">
+                    Add Domain
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Node Connections */}
-          <div className="glass-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
-              <p className="micro-type">Node Connections</p>
+          {/* Certification Inventory Table */}
+          <div className="bg-white dark:bg-slate-custom-900 border border-slate-custom-200 dark:border-slate-custom-800 rounded shadow-sm overflow-hidden">
+            {error && (
+              <div className="p-4 bg-red-50 text-red-600 text-xs font-bold uppercase">
+                {error}
+              </div>
+            )}
+            <div className="p-4 border-b border-slate-custom-100 dark:border-slate-custom-800 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-custom-800 dark:text-slate-custom-200">
+                Global Certification Inventory
+              </h3>
+              <div className="flex gap-2">
+                <button className="p-1 text-slate-custom-400 hover:text-slate-custom-600">
+                  <Filter className="w-5 h-5" />
+                </button>
+                <button className="p-1 text-slate-custom-400 hover:text-slate-custom-600">
+                  <Download className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Connect your skill gaps to targeted courses via the{" "}
-              <a href="/skill-gap" className="text-primary hover:underline">
-                Skill Matrix
-              </a>
-              .
-            </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {["Python", "Cloud", "ML Ops", "SQL", "React"].map((s) => (
-                <span
-                  key={s}
-                  className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+
+            {loading ? (
+              <div className="p-8 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="p-12 text-center text-slate-custom-500 font-bold text-xs uppercase tracking-widest">
+                No certifications found matching query.
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-custom-50 dark:bg-slate-custom-800/50 border-b border-slate-custom-100 dark:border-slate-custom-800">
+                  <tr>
+                    <th className="p-3 text-[10px] font-bold text-slate-custom-400 uppercase tracking-widest">
+                      Certification Name
+                    </th>
+                    <th className="p-3 text-[10px] font-bold text-slate-custom-400 uppercase tracking-widest">
+                      Provider
+                    </th>
+                    <th className="p-3 text-[10px] font-bold text-slate-custom-400 uppercase tracking-widest">
+                      Readiness
+                    </th>
+                    <th className="p-3 text-[10px] font-bold text-slate-custom-400 uppercase tracking-widest text-center">
+                      Nett Fee
+                    </th>
+                    <th className="p-3 text-[10px] font-bold text-slate-custom-400 uppercase tracking-widest text-right">
+                      Avg. Salary Boost
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-custom-100 dark:divide-slate-custom-800">
+                  {filtered.map((course) => (
+                    <tr
+                      key={course.id}
+                      className="hover:bg-slate-custom-50 dark:hover:bg-slate-custom-800/50 transition-colors cursor-pointer group"
+                    >
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="size-8 rounded bg-slate-custom-100 dark:bg-slate-custom-800 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                            <GraduationCap className="text-slate-custom-400 group-hover:text-primary w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-custom-800 dark:text-slate-custom-200">
+                              {course.title}
+                            </p>
+                            {course.mces_eligible && (
+                              <span className="text-[9px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-bold rounded mr-1">
+                                MCES ELIGIBLE
+                              </span>
+                            )}
+                            {course.sfc_applicable > 0 && (
+                              <span className="text-[9px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-bold rounded">
+                                SFC APPLICABLE
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-xs font-medium text-slate-custom-600 dark:text-slate-custom-400">
+                        {course.provider}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-24 h-1.5 bg-slate-custom-100 dark:bg-slate-custom-800 rounded-full overflow-hidden">
+                            <div className="bg-primary h-full w-[42%]"></div>
+                          </div>
+                          <span className="text-[10px] font-bold font-mono">
+                            42%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex justify-center">
+                          <span className="text-[10px] px-2 py-0.5 bg-slate-custom-100 dark:bg-slate-custom-800 text-slate-custom-700 dark:text-slate-custom-300 font-bold rounded-full font-mono">
+                            S${course.nett_payable}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-3 text-right text-xs font-bold font-mono text-slate-custom-800 dark:text-slate-custom-200">
+                        S$1,200 / mo
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div className="bg-slate-custom-50 dark:bg-slate-custom-800/50 p-3 border-t border-slate-custom-100 dark:border-slate-custom-800 flex items-center justify-between">
+              <span className="text-[10px] text-slate-custom-500 font-medium tracking-widest uppercase">
+                Showing {filtered.length} active trackable certifications
+              </span>
+              <div className="flex gap-2">
+                <button
+                  className="px-3 py-1 text-[10px] font-bold border border-slate-custom-200 dark:border-slate-custom-700 rounded hover:bg-slate-custom-100 dark:hover:bg-slate-custom-700 transition-colors uppercase disabled:opacity-50"
+                  disabled
                 >
-                  {s}
-                </span>
-              ))}
+                  Previous
+                </button>
+                <button className="px-3 py-1 text-[10px] font-bold border border-slate-custom-200 dark:border-slate-custom-700 rounded hover:bg-slate-custom-100 dark:hover:bg-slate-custom-700 transition-colors uppercase">
+                  Next
+                </button>
+              </div>
             </div>
           </div>
+        </section>
+
+        {/* Contextual Intelligence Sidebar (Right) */}
+        <aside className="w-80 border-l border-slate-custom-200 dark:border-slate-custom-800 bg-white dark:bg-slate-custom-900 p-6 flex flex-col shrink-0 overflow-y-auto custom-scrollbar z-10">
+          <h3 className="text-xs font-bold text-slate-custom-400 uppercase tracking-widest mb-6">
+            Market Intelligence
+          </h3>
+          <div className="space-y-6">
+            <div>
+              <p className="text-xs font-bold text-slate-custom-800 dark:text-slate-custom-200 mb-3">
+                Salary Projection (SG Region)
+              </p>
+              <div className="relative pt-6 h-32 w-full">
+                <div className="absolute inset-0 bg-primary/5 rounded-lg border border-primary/10"></div>
+                <div className="absolute bottom-4 left-4 right-4 h-1 bg-slate-custom-200 dark:bg-slate-custom-700 rounded-full overflow-hidden">
+                  <div className="bg-primary h-full w-2/3 relative">
+                    <div className="absolute -top-6 right-0 translate-x-1/2 flex flex-col items-center">
+                      <span className="text-[9px] font-bold bg-primary text-white px-1.5 py-0.5 rounded">
+                        YOU
+                      </span>
+                      <div className="w-0.5 h-6 bg-primary"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="absolute bottom-6 left-4 right-4 flex justify-between text-[9px] font-bold text-slate-custom-400 font-mono">
+                  <span>S$4k</span>
+                  <span>S$8k</span>
+                  <span>S$12k+</span>
+                </div>
+                <p className="absolute bottom-1 right-4 text-[8px] font-bold text-slate-custom-400">
+                  MARKET 75th PERCENTILE
+                </p>
+              </div>
+              <p className="text-[10px] text-slate-custom-500 mt-2 italic leading-tight">
+                Projected S$12k increase per annum upon completion of AWS +
+                CISSP stack.
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-slate-custom-800 dark:text-slate-custom-200 mb-3">
+                AI Path Recommendation
+              </p>
+              <div className="space-y-4">
+                <div className="relative pl-6 pb-4 border-l-2 border-slate-custom-100 dark:border-slate-custom-800">
+                  <div className="absolute -left-1.5 top-0 size-3 bg-green-500 rounded-full border-2 border-white dark:border-slate-custom-900 shadow-sm"></div>
+                  <p className="text-xs font-bold text-slate-custom-800 dark:text-slate-custom-200">
+                    Cloud Fundamentals
+                  </p>
+                  <p className="text-[10px] text-slate-custom-500">
+                    Completed via AWS Cloud Practitioner
+                  </p>
+                </div>
+                <div className="relative pl-6 pb-4 border-l-2 border-slate-custom-100 dark:border-slate-custom-800">
+                  <div className="absolute -left-1.5 top-0 size-3 bg-primary rounded-full border-2 border-white dark:border-slate-custom-900 shadow-sm"></div>
+                  <p className="text-xs font-bold text-slate-custom-800 dark:text-slate-custom-200">
+                    Specialized Security
+                  </p>
+                  <p className="text-[10px] text-slate-custom-500">
+                    Current Phase: Preparing for CISSP
+                  </p>
+                  <button className="mt-2 text-[9px] font-bold text-primary uppercase hover:underline">
+                    View Gap Analysis
+                  </button>
+                </div>
+                <div className="relative pl-6">
+                  <div className="absolute -left-1.5 top-0 size-3 bg-slate-custom-200 dark:bg-slate-custom-700 rounded-full border-2 border-white dark:border-slate-custom-900"></div>
+                  <p className="text-xs font-bold text-slate-custom-400">
+                    Enterprise Architecture
+                  </p>
+                  <p className="text-[10px] text-slate-custom-500">
+                    Target Phase: TOGAF 9.2
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      {/* Footer Meta-Bar */}
+      <footer className="h-8 border-t border-slate-custom-200 dark:border-slate-custom-800 bg-white dark:bg-slate-custom-900 flex items-center justify-between px-6 shrink-0 z-10 w-full">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-green-500"></span>
+            <span className="text-[9px] font-bold text-slate-custom-500 font-mono">
+              API CONNECTED: SSG-GATEWAY-L4
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-primary animate-pulse"></span>
+            <span className="text-[9px] font-bold text-slate-custom-500 font-mono">
+              AI MODEL: CERTPREDICT-v2.1
+            </span>
+          </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

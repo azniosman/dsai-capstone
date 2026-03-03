@@ -9,10 +9,9 @@ import {
   XCircle,
   ArrowRight,
   Zap,
-  BarChart3,
   Target,
+  BarChart3,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -64,9 +63,12 @@ function CareerTrajectory({ score }: { score: number }) {
   // SVG coords (0,0 = top-left, y increases downward)
   const toSvgY = (v: number) => 100 - v; // flip: higher = higher on screen
 
-  const x0 = 20, y0 = toSvgY(base);
-  const x1 = 100, y1s = toSvgY(y1);
-  const x2 = 180, y2 = toSvgY(y3);
+  const x0 = 20,
+    y0 = toSvgY(base);
+  const x1 = 100,
+    y1s = toSvgY(y1);
+  const x2 = 180,
+    y2 = toSvgY(y3);
 
   const pathD = `M ${x0} ${y0} C ${x0 + 40} ${y0}, ${x1 - 30} ${y1s}, ${x1} ${y1s} C ${x1 + 30} ${y1s}, ${x2 - 40} ${y2}, ${x2} ${y2}`;
 
@@ -199,7 +201,9 @@ export default function MatchIntelligenceModal() {
       icon: TrendingUp,
       title: "Market Relevance",
       body: `Overall match quality: ${rec.skill_match_quality}. ${rec.salary_range ? `Salary band: ${rec.salary_range}.` : ""}`,
-      positive: rec.skill_match_quality === "strong" || rec.skill_match_quality === "moderate",
+      positive:
+        rec.skill_match_quality === "strong" ||
+        rec.skill_match_quality === "moderate",
     },
   ];
 
@@ -215,20 +219,26 @@ export default function MatchIntelligenceModal() {
         {/* Col 1: Skill Overlap */}
         <div className="space-y-4">
           <div>
-            <p className="micro-type mb-3">Skill Overlap Analysis</p>
-            <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-primary/5 border border-primary/15">
+            <p className="font-mono text-[9px] font-bold text-primary/60 uppercase tracking-widest mb-3 border-b border-primary/20 pb-2">
+              Skill Overlap Analysis
+            </p>
+            <div className="flex items-center justify-between mb-4 p-4 bg-background-dark/50 border border-primary/30 relative">
+              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50"></div>
+              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50"></div>
               <div>
-                <div className="text-3xl font-black tabular-nums text-primary">
+                <div className="text-4xl font-mono font-bold tabular-nums text-primary drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]">
                   {score}%
                 </div>
-                <p className="micro-type text-[9px] opacity-60">Overall Match</p>
+                <p className="font-mono text-[9px] text-primary/40 uppercase tracking-widest mt-1">
+                  Overall Match
+                </p>
               </div>
-              <div className="text-right space-y-1">
-                <div className="flex items-center gap-1 justify-end text-green-600">
+              <div className="text-right space-y-1.5 font-mono">
+                <div className="flex items-center gap-1.5 justify-end text-primary">
                   <CheckCircle2 className="h-3 w-3" />
                   <span className="text-xs font-bold">{matchedCount}</span>
                 </div>
-                <div className="flex items-center gap-1 justify-end text-red-500">
+                <div className="flex items-center gap-1.5 justify-end text-accent-coral">
                   <XCircle className="h-3 w-3" />
                   <span className="text-xs font-bold">{missingCount}</span>
                 </div>
@@ -236,7 +246,7 @@ export default function MatchIntelligenceModal() {
             </div>
 
             {overlapBars.length > 0 && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {overlapBars.map((bar, i) => (
                   <OverlapBar key={bar.category} {...bar} delay={i * 0.15} />
                 ))}
@@ -245,17 +255,22 @@ export default function MatchIntelligenceModal() {
           </div>
 
           {/* Cultural alignment */}
-          <div>
-            <p className="micro-type mb-2 opacity-60">Cultural Alignment</p>
-            <div className="space-y-1.5">
+          <div className="pt-4 border-t border-primary/10">
+            <p className="font-mono text-[9px] font-bold text-primary/60 uppercase tracking-widest mb-3">
+              Cultural Alignment
+            </p>
+            <div className="space-y-2 font-mono">
               {[
                 { label: "Remote-Ready", val: 82 },
                 { label: "Agile Fit", val: 75 },
                 { label: "SG Market", val: 91 },
               ].map(({ label, val }) => (
-                <div key={label} className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">{label}</span>
-                  <span className="text-xs font-bold text-primary tabular-nums">
+                <div
+                  key={label}
+                  className="flex justify-between items-center text-[10px] uppercase tracking-wider"
+                >
+                  <span className="text-slate-400">{label}</span>
+                  <span className="font-bold text-primary tabular-nums">
                     {val}%
                   </span>
                 </div>
@@ -266,7 +281,9 @@ export default function MatchIntelligenceModal() {
 
         {/* Col 2: AI Reasoning */}
         <div className="space-y-4">
-          <p className="micro-type">AI Reasoning Paths</p>
+          <p className="font-mono text-[9px] font-bold text-primary/60 uppercase tracking-widest mb-3 border-b border-primary/20 pb-2">
+            AI Reasoning Paths
+          </p>
 
           <div className="space-y-3">
             {reasoningPaths.map((path, i) => (
@@ -275,23 +292,47 @@ export default function MatchIntelligenceModal() {
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.1 }}
-                className="p-3 rounded-lg border border-border/50 bg-background/60 space-y-1.5"
+                className={cn(
+                  "p-3 border space-y-2 relative overflow-hidden",
+                  path.positive
+                    ? "bg-primary/5 border-primary/30"
+                    : "bg-accent-coral/5 border-accent-coral/30",
+                )}
               >
+                <div className="absolute top-0 right-0 p-1 opacity-50">
+                  <div
+                    className={cn(
+                      "size-2",
+                      path.positive
+                        ? "bg-primary"
+                        : "bg-accent-coral animate-pulse",
+                    )}
+                  ></div>
+                </div>
                 <div className="flex items-center gap-2">
                   <div
                     className={cn(
-                      "h-6 w-6 rounded-md flex items-center justify-center shrink-0",
+                      "h-6 w-6 flex items-center justify-center shrink-0 border",
                       path.positive
-                        ? "bg-green-50 text-green-600"
-                        : "bg-amber-50 text-amber-600",
+                        ? "bg-primary/10 text-primary border-primary/40"
+                        : "bg-accent-coral/10 text-accent-coral border-accent-coral/40",
                     )}
                   >
                     <path.icon className="h-3.5 w-3.5" />
                   </div>
-                  <p className="text-xs font-bold">{path.title}</p>
+                  <p
+                    className={cn(
+                      "text-[10px] font-mono font-bold uppercase tracking-wider",
+                      path.positive
+                        ? "text-primary/90"
+                        : "text-accent-coral/90",
+                    )}
+                  >
+                    {path.title}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {path.body}
+                <p className="text-xs font-mono text-slate-400 leading-relaxed uppercase tracking-wider pl-8 border-l border-slate-700/50">
+                  &gt; {path.body}
                 </p>
               </motion.div>
             ))}
@@ -299,14 +340,15 @@ export default function MatchIntelligenceModal() {
 
           {/* Recommendation box */}
           {rec.rationale && (
-            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-              <div className="flex items-center gap-1.5 mb-2">
-                <Brain className="h-3.5 w-3.5 text-primary" />
-                <p className="micro-type text-primary text-[9px]">
+            <div className="p-4 bg-background-dark/50 border border-primary/20 relative mt-6">
+              <div className="absolute -left-2 top-4 w-1 h-8 bg-primary shadow-[0_0_8px_rgba(37,157,244,0.8)]"></div>
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="h-4 w-4 text-primary" />
+                <p className="font-mono font-bold text-primary text-[10px] uppercase tracking-widest">
                   AI Recommendation
                 </p>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <p className="text-xs font-mono text-slate-300 leading-relaxed uppercase tracking-wider">
                 {rec.rationale}
               </p>
             </div>
@@ -315,43 +357,51 @@ export default function MatchIntelligenceModal() {
 
         {/* Col 3: Career Trajectory + Actions */}
         <div className="space-y-4">
-          <div className="glass-card p-4">
+          <div className="p-4 bg-background-dark/50 border border-primary/10">
             <CareerTrajectory score={score} />
           </div>
 
           {/* Top missing skills */}
           {(rec.missing_skills?.length || 0) > 0 && (
-            <div>
-              <p className="micro-type mb-2 opacity-60">Priority Gaps</p>
-              <div className="flex flex-wrap gap-1.5">
-                {(rec.missing_skills || []).slice(0, 5).map((s) => (
-                  <span
-                    key={s}
-                    className="text-[10px] px-2 py-0.5 rounded-md bg-red-50 text-red-600 border border-red-200 font-medium"
-                  >
-                    {s}
-                  </span>
+            <div className="pt-2">
+              <p className="font-mono text-[9px] font-bold text-accent-coral/60 uppercase tracking-widest mb-3 border-b border-accent-coral/20 pb-2">
+                Priority Gaps
+              </p>
+              <div className="flex flex-col gap-2 font-mono">
+                {(rec.missing_skills || []).slice(0, 5).map((s, idx) => (
+                  <div key={s} className="flex gap-2 items-center text-xs">
+                    <span className="text-accent-coral/70 shrink-0">
+                      0{idx + 1}.
+                    </span>
+                    <span className="text-slate-300 uppercase truncate">
+                      {s}
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
           )}
 
           {/* Action buttons */}
-          <div className="space-y-2 pt-2">
-            <Button className="clay-btn w-full gap-2">
-              <Zap className="h-4 w-4" /> Execute Application Sequence
+          <div className="space-y-3 pt-6 border-t border-primary/10">
+            <Button className="w-full bg-primary text-background-dark hover:bg-white hover:text-background-dark rounded-none font-mono font-bold uppercase tracking-widest text-[10px] py-6 shadow-[0_0_15px_rgba(37,157,244,0.4)] transition-all">
+              <Zap className="h-4 w-4 mr-2" /> Execute Application Sequence
             </Button>
-            <Button variant="outline" className="w-full gap-2 text-sm" asChild>
-              <a href="/courses">
-                <ArrowRight className="h-4 w-4" /> Bridge Skill Gaps
+            <Button
+              variant="outline"
+              className="w-full border-primary/30 text-primary hover:bg-primary/10 hover:border-primary rounded-none font-mono font-bold uppercase tracking-widest text-[10px] py-6 transition-all"
+              asChild
+            >
+              <a href="/recommendations">
+                <ArrowRight className="h-4 w-4 mr-2" /> Bridge Skill Gaps
               </a>
             </Button>
             <Button
               variant="ghost"
-              className="w-full text-xs text-muted-foreground"
+              className="w-full text-[10px] font-mono uppercase tracking-widest text-slate-500 hover:text-primary hover:bg-transparent rounded-none"
               onClick={closeModal}
             >
-              Close
+              [ Abort ]
             </Button>
           </div>
         </div>

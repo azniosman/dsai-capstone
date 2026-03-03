@@ -8,7 +8,6 @@ export interface PersonalInfo {
 }
 
 export interface ProfileBuilderState {
-  isOpen: boolean;
   step: number;
 
   resumeFile?: File;
@@ -18,8 +17,6 @@ export interface ProfileBuilderState {
   skills: string[];
 
   // Actions
-  open: () => void;
-  close: () => void;
   nextStep: () => void;
   prevStep: () => void;
   setStep: (step: number) => void;
@@ -28,7 +25,7 @@ export interface ProfileBuilderState {
   setParsedResume: (data: Record<string, unknown>) => void;
   setPersonalInfo: (data: Partial<PersonalInfo>) => void;
   setSkills: (skills: string[]) => void;
-  
+
   reset: () => void;
 }
 
@@ -40,7 +37,6 @@ const defaultPersonalInfo: PersonalInfo = {
 };
 
 export const useProfileBuilderStore = create<ProfileBuilderState>((set) => ({
-  isOpen: false,
   step: 1,
 
   resumeFile: undefined,
@@ -49,30 +45,20 @@ export const useProfileBuilderStore = create<ProfileBuilderState>((set) => ({
   personalInfo: { ...defaultPersonalInfo },
   skills: [],
 
-  open: () => set({ isOpen: true, step: 1 }),
-  close: () => set({ 
-    isOpen: false,
-    step: 1,
-    resumeFile: undefined,
-    parsedResume: undefined,
-    personalInfo: { ...defaultPersonalInfo },
-    skills: [],
-  }),
-  
   nextStep: () => set((state) => ({ step: Math.min(state.step + 1, 4) })),
   prevStep: () => set((state) => ({ step: Math.max(state.step - 1, 1) })),
   setStep: (step: number) => set({ step: Math.max(1, Math.min(step, 4)) }),
 
   setResume: (file) => set({ resumeFile: file }),
   setParsedResume: (data) => set({ parsedResume: data }),
-  
+
   setPersonalInfo: (data) =>
     set((state) => ({
       personalInfo: { ...state.personalInfo, ...data },
     })),
-    
+
   setSkills: (skills) => set({ skills }),
-  
+
   reset: () => set({
     step: 1,
     resumeFile: undefined,

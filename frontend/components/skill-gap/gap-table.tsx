@@ -12,10 +12,10 @@ import {
 import { cn } from "@/lib/utils";
 
 const SEVERITY_CLASSES: Record<string, string> = {
-  none: "bg-green-100 text-green-800 hover:bg-green-100",
-  low: "bg-blue-100 text-blue-800 hover:bg-blue-100",
-  medium: "bg-orange-100 text-orange-800 hover:bg-orange-100",
-  high: "bg-red-100 text-red-800 hover:bg-red-100",
+  none: "bg-muted-cyan/10 border-muted-cyan/30 text-muted-cyan",
+  low: "bg-amber-500/10 border-amber-500/30 text-amber-500",
+  medium: "bg-orange-500/10 border-orange-500/30 text-orange-500",
+  high: "bg-soft-coral/10 border-soft-coral/30 text-soft-coral",
 };
 
 interface Gap {
@@ -36,15 +36,25 @@ import { motion } from "framer-motion";
 
 export default function GapTable({ gaps, hoveredSkill, onHoverSkill }: Props) {
   return (
-    <div className="border rounded-lg overflow-x-auto">
+    <div className="border border-muted-cyan/30 bg-[#18181b] overflow-x-auto shadow-[0_0_15px_rgba(37,157,244,0.05)]">
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Skill</TableHead>
-            <TableHead>Required</TableHead>
-            <TableHead>Your Level</TableHead>
-            <TableHead>Gap</TableHead>
-            <TableHead>Priority</TableHead>
+        <TableHeader className="bg-muted-cyan/5">
+          <TableRow className="border-b border-muted-cyan/20 hover:bg-transparent">
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+              Node ID
+            </TableHead>
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+              Target Spec
+            </TableHead>
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+              Current Vol
+            </TableHead>
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+              Delta
+            </TableHead>
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+              Criticality
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -57,27 +67,47 @@ export default function GapTable({ gaps, hoveredSkill, onHoverSkill }: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
                 className={cn(
-                  "border-b transition-colors data-[state=selected]:bg-muted cursor-default",
-                  isActive
-                    ? "bg-primary/10"
-                    : "hover:bg-muted/50",
+                  "border-b border-muted-cyan/10 transition-colors data-[state=selected]:bg-muted-cyan/5 cursor-default group",
+                  isActive ? "bg-muted-cyan/10" : "hover:bg-muted-cyan/5",
                 )}
                 onMouseEnter={() => onHoverSkill?.(gap.skill)}
                 onMouseLeave={() => onHoverSkill?.(null)}
               >
-                <TableCell className={cn("font-medium transition-colors", isActive && "text-primary font-bold")}>
+                <TableCell
+                  className={cn(
+                    "font-mono text-xs text-white/80 transition-colors",
+                    isActive && "text-muted-cyan font-bold",
+                  )}
+                >
+                  <span className="opacity-0 group-hover:opacity-100 text-muted-cyan mr-2 transition-opacity">
+                    &gt;
+                  </span>
                   {gap.skill}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline">{gap.required_level}</Badge>
+                  <Badge
+                    variant="outline"
+                    className="border-white/20 text-white/60 bg-transparent rounded-none font-mono text-[10px] tracking-wider px-2 py-0"
+                  >
+                    {gap.required_level}
+                  </Badge>
                 </TableCell>
-                <TableCell>{gap.user_level_label}</TableCell>
+                <TableCell className="font-mono text-[11px] text-white/70">
+                  {gap.user_level_label}
+                </TableCell>
                 <TableCell>
-                  <Badge className={SEVERITY_CLASSES[gap.gap_severity] || ""}>
+                  <Badge
+                    className={cn(
+                      "rounded-none font-mono text-[9px] uppercase tracking-widest px-2 py-0 border",
+                      SEVERITY_CLASSES[gap.gap_severity] || "",
+                    )}
+                  >
                     {gap.gap_severity}
                   </Badge>
                 </TableCell>
-                <TableCell>{gap.priority}</TableCell>
+                <TableCell className="font-mono text-[11px] text-white/70">
+                  {gap.priority}
+                </TableCell>
               </motion.tr>
             );
           })}

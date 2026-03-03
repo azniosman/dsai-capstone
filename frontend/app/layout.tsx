@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { TenantProvider } from "@/contexts/tenant-context";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -9,7 +9,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ModalProvider } from "@/providers/ModalProvider";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
@@ -22,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SkillBridge",
+  title: "SkillBridge Analytical",
   description: "AI-Powered Career Intelligence Platform",
 };
 
@@ -33,13 +33,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head></head>
       <body
-        className={`${plusJakartaSans.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background text-foreground`}
+        className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background-dark text-slate-100 selection:bg-primary/30 min-h-dvh`}
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
-          enableSystem
+          defaultTheme="dark"
+          forcedTheme="dark"
           disableTransitionOnChange
         >
           <QueryProvider>

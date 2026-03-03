@@ -4,13 +4,16 @@ import { useProfileBuilderStore } from "@/store/profileBuilderStore";
 import { Button } from "@/components/ui/button";
 import {
   UploadCloud,
+  Upload,
   FileText,
+  CheckCircle2,
+  AlertCircle,
+  FileUp,
+  Loader2,
+  Terminal,
+  Brain,
   X,
   ArrowRight,
-  Loader2,
-  Brain,
-  CheckCircle2,
-  Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useCallback, useState } from "react";
@@ -34,64 +37,69 @@ function BlueprintDropzone({
     <div
       onClick={onClick}
       className={cn(
-        "relative h-full min-h-[200px] cursor-pointer overflow-hidden rounded-xl transition-all duration-200",
-        "border-2 border-dashed",
+        "relative h-full min-h-[220px] cursor-pointer overflow-hidden rounded-none transition-all duration-300",
+        "border border-dashed",
         isDragActive
-          ? "border-primary bg-primary/5"
-          : "border-primary/30 hover:border-primary/60 hover:bg-primary/3",
+          ? "border-muted-cyan bg-muted-cyan/10 shadow-[0_0_20px_rgba(37,157,244,0.2)]"
+          : "border-muted-cyan/30 hover:border-muted-cyan hover:bg-muted-cyan/5",
       )}
     >
       <input {...getInputProps()} />
 
       {/* Blueprint corner markers */}
       {[
-        "top-2 left-2",
-        "top-2 right-2 rotate-90",
-        "bottom-2 left-2 -rotate-90",
-        "bottom-2 right-2 rotate-180",
+        "top-0 left-0",
+        "top-0 right-0 rotate-90",
+        "bottom-0 left-0 -rotate-90",
+        "bottom-0 right-0 rotate-180",
       ].map((pos, i) => (
         <div key={i} className={cn("absolute h-4 w-4", pos)}>
-          <div className="absolute top-0 left-0 h-full w-[2px] bg-primary/40" />
-          <div className="absolute top-0 left-0 h-[2px] w-full bg-primary/40" />
+          <div className="absolute top-0 left-0 h-full w-[2px] bg-muted-cyan" />
+          <div className="absolute top-0 left-0 h-[2px] w-full bg-muted-cyan" />
         </div>
       ))}
 
       {/* Scanning line animation */}
       {isDragActive && (
         <div
-          className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent animate-scan pointer-events-none"
+          className="absolute left-0 right-0 h-px bg-linear-to-r from-transparent via-muted-cyan to-transparent animate-scan pointer-events-none shadow-[0_0_10px_rgba(37,157,244,0.8)]"
           style={{ top: "50%" }}
         />
       )}
 
       {/* Content */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
         <div
           className={cn(
-            "h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200",
+            "h-12 w-12 flex items-center justify-center transition-all duration-300 rounded-none border",
             isDragActive
-              ? "bg-primary/20 ring-2 ring-primary/40"
-              : "bg-primary/10 ring-1 ring-primary/20",
+              ? "bg-muted-cyan/20 border-muted-cyan shadow-[0_0_15px_rgba(37,157,244,0.3)]"
+              : "bg-muted-cyan/5 border-muted-cyan/30",
           )}
         >
           <UploadCloud
             className={cn(
-              "h-7 w-7 transition-colors",
-              isDragActive ? "text-primary" : "text-primary/60",
+              "h-5 w-5 transition-colors",
+              isDragActive ? "text-muted-cyan" : "text-muted-cyan/60",
             )}
           />
         </div>
-        <div className="text-center">
-          <p className="text-sm font-semibold">
-            {isDragActive ? "Drop to scan…" : "Drop resume or click to upload"}
+        <div className="text-center space-y-2">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] font-bold text-editorial-black">
+            {isDragActive ? "TARGET LOCKED" : "INITIALIZE SCAN_SEQUENCE"}
           </p>
-          <p className="micro-type mt-1 opacity-50">PDF or DOCX · max 5MB</p>
+          <p className="font-mono text-[9px] text-editorial-black/50 tracking-widest uppercase">
+            Drop data file or click to transmit
+          </p>
+          <p className="font-mono text-[8px] text-editorial-black/30 tracking-widest uppercase mt-1">
+            .PDF | .DOCX [MAX 5MB]
+          </p>
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="micro-type text-[9px] opacity-40">
-            AI PARSING ENABLED
+        <div className="flex items-center gap-2 mt-2 px-2 py-0.5 border border-muted-cyan/20 bg-muted-cyan/5">
+          <span className="font-mono text-[7px] text-muted-cyan tracking-widest uppercase">
+            NEURAL PARSER: ONLINE
           </span>
-          <span className="live-dot scale-75" />
+          <span className="live-dot scale-75 bg-muted-cyan shadow-[0_0_4px_rgba(37,157,244,0.8)]" />
         </div>
       </div>
     </div>
@@ -99,18 +107,27 @@ function BlueprintDropzone({
 }
 
 /* ─── Skill confidence card ─── */
-function SkillTag({ skill, confidence }: { skill: string; confidence: number }) {
+function SkillTag({
+  skill,
+  confidence,
+}: {
+  skill: string;
+  confidence: number;
+}) {
   const pct = Math.round(confidence * 100);
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-primary/5 border border-primary/15"
+      className="flex items-center gap-2 px-2 py-1 bg-muted-cyan/10 border border-muted-cyan/30"
     >
-      <span className="text-xs font-semibold text-foreground truncate">
+      {" "}
+      <span className="font-mono text-[10px] font-bold text-editorial-black uppercase tracking-wider truncate">
         {skill}
       </span>
-      <span className="micro-type text-[9px] text-primary shrink-0">{pct}%</span>
+      <span className="font-mono text-[9px] text-muted-cyan shrink-0">
+        {pct}%
+      </span>
     </motion.div>
   );
 }
@@ -173,14 +190,11 @@ export default function StepUploadResume() {
         setSkills(parsed.skills as string[]);
       }
 
-      toast.success("Resume scanned successfully!");
+      toast.success("Vector extraction complete!");
       nextStep();
     } catch (err) {
       toast.error(
-        extractApiError(
-          err,
-          "Failed to parse resume. You can fill out the form manually.",
-        ),
+        extractApiError(err, "Extraction failure. Reverting to manual input."),
       );
       nextStep();
     } finally {
@@ -188,7 +202,6 @@ export default function StepUploadResume() {
     }
   };
 
-  // Skills with synthetic confidence scores for display
   const parsedSkills = parsedResume?.skills as string[] | undefined;
   const skillsWithConf = (parsedSkills || []).slice(0, 10).map((s, i) => ({
     skill: s,
@@ -197,66 +210,78 @@ export default function StepUploadResume() {
 
   const expYears = parsedResume?.experience_years as number | undefined;
   const healthScore = parsedResume
-    ? Math.min(
-        95,
-        40 +
-          (skillsWithConf.length * 3) +
-          ((expYears ?? 0) * 4),
-      )
+    ? Math.min(95, 40 + skillsWithConf.length * 3 + (expYears ?? 0) * 4)
     : 0;
 
   return (
-    <div className="flex flex-col h-full gap-4">
-      <div>
-        <h3 className="text-lg font-bold">Upload Resume</h3>
-        <p className="text-sm text-muted-foreground">
-          AI scans your resume to extract skills and experience automatically.
+    <div className="flex flex-col h-full gap-6 relative">
+      <div className="absolute top-0 right-0 p-1 border border-muted-cyan/20 bg-muted-cyan/5">
+        <span className="text-[8px] font-mono text-muted-cyan uppercase tracking-widest">
+          AWAITING_DATA
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Terminal className="h-4 w-4 text-muted-cyan" />
+          <h3 className="text-xl font-sans font-black uppercase tracking-tighter text-editorial-black">
+            Data Ingestion
+          </h3>
+        </div>
+        <p className="font-mono text-[10px] text-editorial-black/50 border-l border-muted-cyan/30 pl-3 leading-relaxed">
+          &gt; Supply unstructured career archive for ML processing.
+          <br />
+          &gt; Extraction pipeline will normalize parameters automatically.
         </p>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
         {/* Left: Dropzone */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {resumeFile ? (
-            <div className="flex items-center justify-between p-4 rounded-xl border border-primary/30 bg-primary/5">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
-                  <FileText className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between p-4 border border-muted-cyan/30 bg-muted-cyan/5 rounded-none shadow-[0_0_10px_rgba(37,157,244,0.1)] relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-muted-cyan text-[#09090b] text-[7px] font-mono font-bold px-1 uppercase tracking-widest">
+                LOCKED
+              </div>
+              <div className="flex items-center gap-4 min-w-0 flex-1">
+                <div className="h-10 w-10 border border-muted-cyan/50 bg-muted-cyan/10 flex items-center justify-center shrink-0">
+                  <FileText className="h-4 w-4 text-muted-cyan" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold truncate">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-widest truncate text-editorial-black">
                     {resumeFile.name}
                   </p>
-                  <p className="micro-type text-[9px] opacity-50">
-                    {(resumeFile.size / 1024 / 1024).toFixed(2)} MB
+                  <p className="font-mono text-[8px] text-editorial-black/50">
+                    {(resumeFile.size / 1024 / 1024).toFixed(2)} MB ARCHIVE
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-3 shrink-0">
                 {isUploading ? (
-                  <div className="flex items-center gap-1.5 text-primary">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="micro-type text-[9px]">Scanning…</span>
+                  <div className="flex items-center gap-2 text-muted-cyan">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span className="font-mono text-[9px] uppercase tracking-widest">
+                      Processing
+                    </span>
                   </div>
                 ) : (
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <CheckCircle2 className="h-4 w-4 text-soft-coral shadow-[0_0_8px_rgba(147,51,234,0.5)]" />
                 )}
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-8 w-8 rounded-none hover:bg-soft-coral/10 hover:text-soft-coral"
                   onClick={() => setResume(null as unknown as File)}
                   disabled={isUploading}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  {" "}
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           ) : (
-            <div
-              {...getRootProps()}
-              className="flex-1 min-h-[200px]"
-            >
+            <div {...getRootProps()} className="flex-1 min-h-[220px]">
+              {" "}
               <BlueprintDropzone
                 isDragActive={isDragActive}
                 onClick={open}
@@ -266,63 +291,74 @@ export default function StepUploadResume() {
           )}
 
           {/* Status info */}
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 border border-border/50">
-            <Brain className="h-4 w-4 text-primary shrink-0" />
+          <div className="flex items-center gap-4 p-4 border border-editorial-black/20 bg-editorial-black/5 rounded-none">
+            <Brain className="h-5 w-5 text-editorial-black/50 shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold">AI Parsing System</p>
-              <p className="micro-type text-[9px] opacity-50">
-                Extracts: skills, experience, education, contact info
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-editorial-black">
+                Neural Extraction Engine
+              </p>
+              <p className="font-mono text-[8px] text-editorial-black/40 uppercase tracking-widest mt-1">
+                Isolating: Nodes, Tensors, Contact Vectors
               </p>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <span className="live-dot" />
-              <span className="micro-type text-[9px] text-green-600">
-                Active
+            <div className="flex items-center gap-2 shrink-0 border border-muted-cyan/30 bg-muted-cyan/10 px-2 py-0.5">
+              <span className="live-dot scale-75 bg-muted-cyan shadow-[0_0_5px_rgba(37,157,244,0.8)]" />
+              <span className="font-mono text-[8px] text-muted-cyan uppercase font-bold tracking-widest">
+                IDLE
               </span>
             </div>
           </div>
         </div>
 
         {/* Right: Live parsing panel */}
-        <div className="glass-card p-4 flex flex-col gap-3 overflow-y-auto">
-          <div className="flex items-center justify-between">
-            <p className="micro-type">Live AI Parsing</p>
+        <div className="border border-editorial-black/20 bg-editorial-black/5 p-6 flex flex-col gap-4 overflow-y-auto relative">
+          <div className="absolute top-0 right-0 p-2 border-b border-l border-editorial-black/20 bg-editorial-black/10">
+            <span className="text-[8px] font-mono text-editorial-black/50 uppercase tracking-widest">
+              TELEMETRY
+            </span>
+          </div>
+          <div className="flex items-center justify-between mt-2">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-editorial-black">
+              Live Data Stream
+            </p>
             {parsedResume && (
               <Badge
                 variant="default"
-                className="micro-type text-[9px] bg-green-600"
+                className="rounded-none bg-muted-cyan text-[#09090b] font-mono text-[9px] uppercase font-bold tracking-widest hover:bg-muted-cyan"
               >
-                Scanned
+                {" "}
+                EXTRACTED
               </Badge>
             )}
           </div>
 
           {!parsedResume && !isUploading && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-8 text-muted-foreground/50">
-              <UploadCloud className="h-8 w-8 mb-2" />
-              <p className="text-xs">Upload your resume to begin AI parsing</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-8 text-editorial-black/30 border border-dashed border-editorial-black/20 m-2">
+              <UploadCloud className="h-6 w-6 mb-3" />
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em]">
+                Awaiting Data Feed
+              </p>
             </div>
           )}
 
           {isUploading && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-xs text-muted-foreground">
-                Scanning document…
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 py-8 border border-muted-cyan/50 bg-muted-cyan/10 m-2 relative overflow-hidden shadow-[0_0_20px_rgba(37,157,244,0.1)]">
+              <div className="absolute left-0 top-1/2 w-full h-px bg-muted-cyan/80 animate-scan shadow-[0_0_12px_rgba(37,157,244,1)]" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-cyan font-bold" />
+              <p className="font-mono text-[10px] font-bold text-muted-cyan uppercase tracking-widest drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]">
+                Executing Extraction...
               </p>
-              <div className="flex gap-1.5">
-                {["Extracting skills", "Parsing experience", "Mapping profile"].map(
-                  (step, i) => (
-                    <span
-                      key={step}
-                      className="micro-type text-[9px] text-primary/60"
-                      style={{ animationDelay: `${i * 0.3}s` }}
-                    >
-                      {step}
-                      {i < 2 ? " →" : ""}
-                    </span>
-                  ),
-                )}
+              <div className="flex gap-2">
+                {["Indexing", "Vectorizing", "Mapping"].map((step, i) => (
+                  <span
+                    key={step}
+                    className="font-mono text-[8px] text-muted-cyan/70 uppercase tracking-widest"
+                    style={{ animationDelay: `${i * 0.3}s` }}
+                  >
+                    &gt; {step}
+                    {i < 2 ? " >" : ""}
+                  </span>
+                ))}
               </div>
             </div>
           )}
@@ -332,40 +368,37 @@ export default function StepUploadResume() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="space-y-4"
+                className="space-y-6"
               >
+                {" "}
                 {/* AI Career Health */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/15">
+                <div className="flex items-center justify-between p-4 bg-muted-cyan/10 border border-muted-cyan/30 shadow-[0_0_15px_rgba(37,157,244,0.1)]">
                   <div>
-                    <p className="micro-type text-[9px] opacity-60 mb-0.5">
-                      AI Career Health
+                    <p className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan mb-1">
+                      Signal Strength
                     </p>
-                    <p
-                      className="text-2xl font-black tabular-nums text-primary"
-                    >
+                    <p className="text-3xl font-sans font-black tracking-tighter text-muted-cyan drop-shadow-[0_0_8px_rgba(37,157,244,0.5)]">
                       {healthScore}
                     </p>
-                    <p className="micro-type text-[9px] opacity-50">/ 100</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs font-semibold">
-                      {skillsWithConf.length} skills found
+                  <div className="text-right space-y-1">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-editorial-black">
+                      {skillsWithConf.length} Vectors
                     </p>
                     {expYears !== undefined && (
-                      <p className="micro-type text-[9px] opacity-60">
-                        {expYears}yr experience
+                      <p className="font-mono text-[9px] text-editorial-black/50 uppercase tracking-widest">
+                        T={expYears}Y Duration
                       </p>
                     )}
                   </div>
                 </div>
-
                 {/* Extracted skills */}
                 {skillsWithConf.length > 0 && (
                   <div>
-                    <p className="micro-type mb-2 opacity-60">
-                      Extracted Skills
+                    <p className="font-mono text-[9px] text-editorial-black/50 uppercase tracking-widest mb-3 border-b border-editorial-black/10 pb-1">
+                      Extracted Nodes
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {skillsWithConf.map(({ skill, confidence }) => (
                         <SkillTag
                           key={skill}
@@ -376,33 +409,37 @@ export default function StepUploadResume() {
                     </div>
                   </div>
                 )}
-
                 {/* Quick info */}
                 {!!(parsedResume as Record<string, unknown>).name && (
-                  <div className="space-y-1.5 pt-2 border-t border-border/50">
+                  <div className="space-y-3 pt-4 border-t border-editorial-black/10">
                     {[
                       {
-                        label: "Name",
-                        val: String((parsedResume as Record<string, unknown>).name ?? ""),
+                        label: "Designation",
+                        val: String(
+                          (parsedResume as Record<string, unknown>).name ?? "",
+                        ),
                       },
                       {
-                        label: "Email",
-                        val: String((parsedResume as Record<string, unknown>).email ?? ""),
+                        label: "Vector ID",
+                        val: String(
+                          (parsedResume as Record<string, unknown>).email ?? "",
+                        ),
                       },
                     ].map(
                       (row) =>
                         !!row.val && (
                           <div
                             key={row.label}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-3"
                           >
-                            <span className="micro-type text-[9px] opacity-40 w-10 shrink-0">
+                            {" "}
+                            <span className="font-mono text-[9px] uppercase tracking-widest text-editorial-black/40 w-20 shrink-0">
                               {row.label}
                             </span>
-                            <span className="text-xs font-medium truncate">
+                            <span className="font-mono text-[10px] font-bold truncate text-editorial-black">
                               {String(row.val)}
                             </span>
-                            <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
+                            <CheckCircle2 className="h-3 w-3 text-muted-cyan shrink-0 drop-shadow-[0_0_4px_rgba(37,157,244,0.5)]" />
                           </div>
                         ),
                     )}
@@ -415,28 +452,30 @@ export default function StepUploadResume() {
       </div>
 
       {/* Footer */}
-      <div className="pt-4 border-t border-border/50 flex justify-between items-center shrink-0">
+      <div className="pt-6 border-t border-editorial-black/10 flex justify-between items-center shrink-0">
         <Button
           variant="ghost"
-          className="text-muted-foreground text-sm"
+          className="font-mono text-[10px] uppercase tracking-[0.2em] text-editorial-black/50 hover:text-editorial-black rounded-none"
           onClick={nextStep}
           disabled={isUploading}
         >
-          Skip to Manual Entry
+          {" "}
+          Override (Manual Entry)
         </Button>
         <Button
           onClick={handleNext}
           disabled={!resumeFile || isUploading}
-          className="clay-btn min-w-[130px]"
+          className="bg-muted-cyan/10 border border-muted-cyan text-muted-cyan hover:bg-muted-cyan hover:text-[#09090b] shadow-[0_0_10px_rgba(37,157,244,0.2)] rounded-none font-mono text-[10px] uppercase tracking-[0.2em] font-bold min-w-[200px] transition-all group"
         >
+          {" "}
           {isUploading ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" /> Scanning…
+            <span className="flex items-center justify-center gap-3">
+              <Loader2 className="h-4 w-4 animate-spin" /> Processing...
             </span>
           ) : (
-            <span className="flex items-center gap-2">
-              <Zap className="h-4 w-4" /> Next Step{" "}
-              <ArrowRight className="h-4 w-4" />
+            <span className="flex items-center justify-center gap-3">
+              Proceed to Verification{" "}
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </span>
           )}
         </Button>

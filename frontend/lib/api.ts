@@ -140,33 +140,6 @@ export interface JDMatchResult {
   gaps: GapItem[];
 }
 
-export interface MarketInsight {
-  // Backend field names (NestJS mocked response)
-  role_category?: string;
-  demand_level: string;
-  avg_salary_sgd?: number;
-  avg_salary_monthly?: number; // alias
-  yoy_growth_pct: number;
-  hiring_volume?: number;
-  job_openings?: number; // alias
-  trending_skills?: string[];
-  top_skills?: string[]; // alias
-  forecast_2026?: string;
-  outlook?: string;
-}
-
-export interface MarketInsightsResponse {
-  // Backend field names
-  top_skills_overall?: string[];
-  highest_demand_sectors?: string[];
-  insights?: MarketInsight[];
-  last_updated?: string;
-  // Frontend alias fields (from full implementation)
-  top_skills?: string[];
-  fastest_growing_sectors?: string[];
-  categories?: MarketInsight[];
-  generated_at?: string;
-}
 
 export interface DashboardSummary {
   profile_id: number;
@@ -420,15 +393,6 @@ export const jdMatchApi = {
   }) => api.post<JDMatchResult>("/api/jd-match", payload).then((r) => r.data),
 };
 
-// ─────────────────────────────────────────────
-// Market Insights
-// ─────────────────────────────────────────────
-
-export const marketApi = {
-  /** Get Singapore tech market insights */
-  get: () =>
-    api.get<MarketInsightsResponse>("/api/market-insights").then((r) => r.data),
-};
 
 // ─────────────────────────────────────────────
 // Dashboard
@@ -468,72 +432,6 @@ export const rolesApi = {
   list: () => api.get<Role[]>("/api/roles").then((r) => r.data),
 };
 
-// ─────────────────────────────────────────────
-// Interview
-// ─────────────────────────────────────────────
-
-export const interviewApi = {
-  /** Start or continue a mock interview session */
-  session: (payload: {
-    profile_id?: number | null;
-    role_title: string;
-    difficulty: "beginner" | "intermediate" | "advanced";
-    messages: ChatMessage[];
-  }) =>
-    api
-      .post<{
-        reply: string;
-        is_complete: boolean;
-        is_final?: boolean;
-        feedback?: string;
-        question_number?: number;
-      }>("/api/interview", payload)
-      .then((r) => r.data),
-};
-
-// ─────────────────────────────────────────────
-// Resume Rewriter
-// ─────────────────────────────────────────────
-
-export const resumeRewriterApi = {
-  /** Rewrite a resume bullet point for a target role */
-  rewrite: (payload: {
-    bullet: string;
-    target_role?: string;
-    profile_id?: number | null;
-  }) =>
-    api
-      .post<{
-        original: string;
-        optimised: string;
-        explanation: string;
-      }>("/api/resume-rewriter", payload)
-      .then((r) => r.data),
-};
-
-// ─────────────────────────────────────────────
-// Compare Roles
-// ─────────────────────────────────────────────
-
-export const compareApi = {
-  /** Compare multiple roles for a profile */
-  compare: (payload: { profile_id: number; role_ids: number[] }) =>
-    api
-      .post<{
-        common_skills: string[];
-        roles: Array<{
-          role_id: number;
-          title: string;
-          match_score: number;
-          transition_difficulty: string;
-          avg_salary: number;
-          matched_skills: string[];
-          missing_skills: string[];
-          unique_skills: string[];
-        }>;
-      }>("/api/compare-roles", payload)
-      .then((r) => r.data),
-};
 
 // ─────────────────────────────────────────────
 // SSG / SkillsFuture API

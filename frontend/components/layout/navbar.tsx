@@ -106,29 +106,45 @@ function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="ml-2 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-2 rounded-none border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary transition-colors h-8 w-8"
+        >
+          <Avatar className="h-full w-full rounded-none">
+            <AvatarFallback className="bg-transparent text-primary text-[10px] font-mono font-bold tracking-widest rounded-none">
               {initials}
             </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+      <DropdownMenuContent
+        align="end"
+        className="w-56 bg-background-dark/95 border border-primary/30 rounded-none backdrop-blur-md"
+      >
+        <DropdownMenuItem
+          disabled
+          className="text-[10px] font-mono text-primary/50 uppercase tracking-widest focus:bg-transparent"
+        >
           {userName}
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/dashboard")}>
+        <DropdownMenuSeparator className="bg-primary/20" />
+        <DropdownMenuItem
+          onClick={() => router.push("/dashboard")}
+          className="text-xs font-mono text-slate-300 hover:text-primary hover:bg-primary/10 focus:bg-primary/10 focus:text-primary cursor-pointer rounded-none transition-colors"
+        >
           Dashboard
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/account")}>
+        <DropdownMenuItem
+          onClick={() => router.push("/account")}
+          className="text-xs font-mono text-slate-300 hover:text-primary hover:bg-primary/10 focus:bg-primary/10 focus:text-primary cursor-pointer rounded-none transition-colors"
+        >
           Settings
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="bg-primary/20" />
         <DropdownMenuItem
           onClick={handleLogout}
-          className="text-destructive focus:text-destructive"
+          className="text-xs font-mono text-accent-coral hover:text-accent-coral hover:bg-accent-coral/10 focus:bg-accent-coral/10 focus:text-accent-coral cursor-pointer rounded-none transition-colors"
         >
           Logout
         </DropdownMenuItem>
@@ -151,8 +167,10 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center px-4">
+    <header className="sticky top-0 z-50 w-full border-b border-primary/20 bg-background-dark/95 backdrop-blur-sm -mb-2">
+      <div className="container mx-auto flex h-16 items-center px-4 relative">
+        <div className="absolute top-0 bottom-0 left-4 w-px bg-primary/20 hidden md:block"></div>
+        <div className="absolute top-0 bottom-0 right-4 w-px bg-primary/20 hidden md:block"></div>
         {/* Mobile Menu */}
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
@@ -160,16 +178,20 @@ export default function Navbar() {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[280px] sm:w-[300px]">
+          <SheetContent
+            side="left"
+            className="w-[280px] sm:w-[300px] bg-background-dark border-r border-primary/30 rounded-none"
+          >
             <SheetHeader>
-              <SheetTitle className="text-left text-lg font-bold">
-                Menu
+              <SheetTitle className="text-left text-sm font-mono font-bold text-primary uppercase tracking-widest border-b border-primary/20 pb-4">
+                System Menu
               </SheetTitle>
             </SheetHeader>
             <div className="flex flex-col gap-4 py-4">
               {NAV_SECTIONS.map((section) => (
-                <div key={section.header} className="space-y-1">
-                  <h4 className="px-2 text-xs font-semibold text-muted-foreground mb-2">
+                <div key={section.header} className="space-y-2">
+                  <h4 className="px-2 text-[10px] font-mono font-bold text-primary/60 uppercase tracking-widest flex items-center gap-2 mb-3">
+                    <span className="w-1.5 h-1.5 bg-primary/40 block"></span>{" "}
                     {section.header}
                   </h4>
                   {section.items.map((item) => (
@@ -177,13 +199,13 @@ export default function Navbar() {
                       key={item.path}
                       href={item.path}
                       onClick={() => setSheetOpen(false)}
-                      className={`flex items-center gap-3 px-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                      className={`flex items-center gap-3 px-3 py-2 text-xs font-mono uppercase tracking-wider transition-colors border-l-[3px] ${
                         pathname === item.path
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                          ? "bg-primary/10 text-primary border-primary"
+                          : "text-slate-400 border-transparent hover:bg-primary/5 hover:text-slate-200 hover:border-primary/50"
                       }`}
                     >
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className="h-4 w-4 shrink-0" />
                       {item.label}
                     </Link>
                   ))}
@@ -194,20 +216,23 @@ export default function Navbar() {
         </Sheet>
 
         {/* Logo */}
-        <Link href="/" className="mr-8 flex items-center gap-2">
+        <Link
+          href="/"
+          className="mr-8 flex items-center gap-2 relative z-10 md:ml-4"
+        >
           {tenantConfig.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={tenantConfig.logoUrl}
               alt={tenantConfig.name}
-              className="h-8 w-auto"
+              className="h-8 w-auto mix-blend-screen"
             />
           ) : (
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded bg-primary flex items-center justify-center text-primary-foreground">
-                <Command className="h-4 w-4" />
+              <div className="h-6 w-6 border border-primary bg-primary/10 flex items-center justify-center text-primary shadow-[0_0_8px_rgba(37,157,244,0.4)]">
+                <Command className="h-3 w-3" />
               </div>
-              <span className="font-semibold text-sm tracking-tight">
+              <span className="font-mono font-bold text-sm tracking-widest uppercase text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
                 {tenantConfig.name}
               </span>
             </div>
@@ -215,7 +240,7 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+        <nav className="hidden md:flex items-center gap-6 text-[11px] font-mono font-bold uppercase tracking-widest z-10">
           {NAV_LINKS.map((link) => {
             const isActive = pathname === link.path;
 
@@ -223,20 +248,23 @@ export default function Navbar() {
               <Link
                 key={link.path}
                 href={link.path}
-                className={`transition-colors hover:text-foreground/80 ${
+                className={`transition-all hover:text-primary relative group ${
                   isActive
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground"
+                    ? "text-primary drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]"
+                    : "text-slate-400"
                 }`}
               >
                 {link.label}
+                {isActive && (
+                  <span className="absolute -bottom-5 left-0 right-0 h-0.5 bg-primary shadow-[0_0_8px_rgba(37,157,244,0.8)]"></span>
+                )}
+                <span className="absolute -bottom-5 left-0 right-0 h-0.5 bg-primary/0 group-hover:bg-primary/50 transition-colors"></span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
-          <ThemeToggle />
+        <div className="ml-auto flex items-center gap-2 z-10 md:mr-4">
           <UserMenu />
         </div>
       </div>

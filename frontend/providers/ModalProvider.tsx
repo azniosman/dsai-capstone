@@ -1,7 +1,6 @@
 "use client";
 
 import { useModalStore } from "@/store/modalStore";
-import { useProfileBuilderStore } from "@/store/profileBuilderStore";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
@@ -27,10 +26,6 @@ const AIChatModal = dynamic(() => import("@/components/modals/AIChatModal"), {
 const ProfileModal = dynamic(() => import("@/components/modals/ProfileModal"), {
   ssr: false,
 });
-const BuildProfileModal = dynamic(
-  () => import("@/components/modals/BuildProfileModal"),
-  { ssr: false },
-);
 
 const JDMatchModal = dynamic(() => import("@/components/modals/JDMatchModal"), {
   ssr: false,
@@ -52,7 +47,6 @@ const MatchIntelligenceModal = dynamic(
 export function ModalProvider() {
   const [mounted, setMounted] = useState(false);
   const { type, isOpen } = useModalStore();
-  const isProfileBuilderOpen = useProfileBuilderStore((state) => state.isOpen);
 
   useEffect(() => {
     setTimeout(() => {
@@ -80,7 +74,6 @@ export function ModalProvider() {
         <SkillsFutureCoursesModalAdapter />
       )}
       {type === "matchIntelligence" && isOpen && <MatchIntelligenceModal />}
-      {isProfileBuilderOpen && <BuildProfileModal />}
     </>
   );
 }

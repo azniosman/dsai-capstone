@@ -51,9 +51,9 @@ export function AppModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className={cn(
-          "flex flex-col gap-0 overflow-hidden glass-panel transition-all",
+          "flex flex-col gap-0 overflow-hidden bg-[var(--background-dark)] border border-primary/30 transition-all rounded-none",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-          "duration-200 sm:rounded-[2rem]",
+          "duration-200 shadow-[0_0_30px_rgba(37,157,244,0.1)] relative",
           sizeClasses[size],
           size === "full" &&
             "rounded-none w-screen h-screen sm:h-[95vh] sm:w-[95vw] max-w-none m-0",
@@ -61,13 +61,50 @@ export function AppModal({
         )}
         showCloseButton={!hideCloseButton}
       >
+        <style>{`
+          .corner-bracket::before {
+              content: '';
+              position: absolute;
+              top: -1px;
+              left: -1px;
+              width: 10px;
+              height: 10px;
+              border-top: 2px solid #259df4;
+              border-left: 2px solid #259df4;
+          }
+          .corner-bracket::after {
+              content: '';
+              position: absolute;
+              bottom: -1px;
+              right: -1px;
+              width: 10px;
+              height: 10px;
+              border-bottom: 2px solid #259df4;
+              border-right: 2px solid #259df4;
+          }
+        `}</style>
+        <div className="absolute inset-0 corner-bracket pointer-events-none z-50"></div>
+        <div
+          className="absolute inset-0 pointer-events-none z-0 opacity-10"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(37, 157, 244, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(37, 157, 244, 0.2) 1px, transparent 1px)",
+            backgroundSize: "20px 20px",
+          }}
+        ></div>
+
         {(title || description) && (
-          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border/40 shrink-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-primary/20 shrink-0 relative z-10 bg-background-dark/95">
+            <div className="absolute top-0 right-0 p-2 opacity-50 font-mono text-[10px] text-primary hidden sm:block pointer-events-none">
+              MOD_ID: 49201A
+            </div>
             {title && (
-              <DialogTitle className="text-xl font-bold">{title}</DialogTitle>
+              <DialogTitle className="text-xl font-bold font-mono tracking-widest text-primary uppercase">
+                {title}
+              </DialogTitle>
             )}
             {description && (
-              <DialogDescription className="text-sm font-medium mt-1.5">
+              <DialogDescription className="text-xs font-mono text-primary/60 mt-2 uppercase tracking-wider">
                 {description}
               </DialogDescription>
             )}
@@ -77,15 +114,15 @@ export function AppModal({
         {/* Content area */}
         <div
           className={cn(
-            "flex-1 overflow-y-auto relative z-10 custom-scrollbar",
-            !noPadding && "p-6",
+            "flex-1 overflow-y-auto relative z-10 custom-scrollbar bg-background-dark/95",
+            !noPadding && "p-6 sm:p-8",
           )}
         >
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 min-h-[200px]">
               <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-              <p className="text-sm font-medium text-muted-foreground animate-pulse">
-                Loading...
+              <p className="text-[10px] font-mono tracking-widest text-primary uppercase animate-pulse">
+                Accessing Nodes...
               </p>
             </div>
           ) : (
@@ -94,7 +131,7 @@ export function AppModal({
         </div>
 
         {footer && (
-          <DialogFooter className="px-6 py-4 border-t border-border/40 bg-muted/20 shrink-0">
+          <DialogFooter className="px-6 py-4 border-t border-primary/20 bg-primary/5 shrink-0 relative z-10">
             {footer}
           </DialogFooter>
         )}

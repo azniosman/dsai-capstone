@@ -6,95 +6,39 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-  Command,
-  Sparkles,
-  TrendingUp,
-  GraduationCap,
+  Terminal,
+  Fingerprint,
+  Zap,
   Shield,
   ArrowRight,
-  BarChart3,
-  Activity,
+  TerminalSquare,
+  Settings,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import api from "@/lib/api-client";
 import { extractApiError } from "@/lib/utils";
-
-const FEATURES = [
-  {
-    icon: <Sparkles className="h-4 w-4" />,
-    label: "AI-Powered Matching",
-    desc: "Smart job recommendations based on your skills",
-  },
-  {
-    icon: <TrendingUp className="h-4 w-4" />,
-    label: "Skill Gap Analysis",
-    desc: "Identify exactly what you need to learn next",
-  },
-  {
-    icon: <GraduationCap className="h-4 w-4" />,
-    label: "SCTP Pathways",
-    desc: "Subsidised SkillsFuture courses tailored for you",
-  },
-  {
-    icon: <Shield className="h-4 w-4" />,
-    label: "Career Coaching",
-    desc: "AI coach to guide your career transition",
-  },
-];
-
-const MARKET_PULSE = [
-  { label: "SG Demand Index", bar: 78, delta: "+12.4%" },
-  { label: "Top Skill: Python", bar: 95, delta: "#1" },
-  { label: "Open Roles Today", bar: 54, delta: "542" },
-];
-
-const SKILLS = [
-  "Python",
-  "React",
-  "Cloud",
-  "AI/ML",
-  "TypeScript",
-  "SQL",
-  "Docker",
-];
-
-function MarketBar({ value, delta }: { value: number; delta: string }) {
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <div className="flex-1 h-[3px] rounded-full bg-sidebar-border overflow-hidden">
-        <div
-          className="h-full bg-primary rounded-full"
-          style={{ width: `${value}%` }}
-        />
-      </div>
-      <span className="text-primary font-bold data-num w-12 text-right">
-        {delta}
-      </span>
-    </div>
-  );
-}
+import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 
 const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
+  email: z.string().email("Invalid format"),
+  password: z.string().min(1, "Cipher required"),
 });
 
 const registerSchema = z
   .object({
-    name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().email("Please enter a valid email address"),
-    password: z.string().min(8, "Password must be at least 8 characters long"),
+    name: z.string().min(2, "Invalid designation"),
+    email: z.string().email("Invalid format"),
+    password: z.string().min(8, "Cipher too weak (min 8)"),
     password_confirm: z.string(),
   })
   .refine((data) => data.password === data.password_confirm, {
-    message: "Passwords do not match",
+    message: "Cipher mismatch",
     path: ["password_confirm"],
   });
 
@@ -108,7 +52,6 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Read pending profile data (set by BuildProfileModal for unauthenticated users)
   const pendingProfile =
     typeof window !== "undefined"
       ? (() => {
@@ -121,13 +64,11 @@ function LoginForm() {
         })()
       : null;
 
-  // Login Form Hook
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
-  // Register Form Hook — prefill name/email from pending profile if present
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -169,11 +110,11 @@ function LoginForm() {
       } catch {
         /* No linked profile */
       }
-      toast.success(`Welcome back, ${me.data.name}!`);
+      toast.success(`Access Granted: ${me.data.name}`);
       const redirect = searchParams.get("redirect");
       router.push(redirect || "/dashboard");
     } catch (err: unknown) {
-      setError(extractApiError(err, "Login failed"));
+      setError(extractApiError(err, "Authentication Failed"));
     } finally {
       setLoading(false);
     }
@@ -182,7 +123,6 @@ function LoginForm() {
   const onRegisterSubmit = async (data: RegisterFormValues) => {
     setLoading(true);
     setError(null);
-
     try {
       await api.post("/api/auth/register", {
         email: data.email,
@@ -191,407 +131,462 @@ function LoginForm() {
         name: data.name,
         tenantName: "Global",
       });
-
-      // Auto-login immediately after registration
       const params = new URLSearchParams();
       params.append("username", data.email);
       params.append("password", data.password);
       const loginRes = await api.post("/api/auth/login", params, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
-
       localStorage.setItem("token", loginRes.data.access_token);
       if (loginRes.data.refresh_token)
         localStorage.setItem("refreshToken", loginRes.data.refresh_token);
-
       const me = await api.get("/api/auth/me", {
         headers: { Authorization: `Bearer ${loginRes.data.access_token}` },
       });
       localStorage.setItem("userName", me.data.name);
       localStorage.setItem("userEmail", me.data.email);
-
-      // If BuildProfileModal left pending profile data, create it now
       const pendingRaw = localStorage.getItem("pending_profile");
       if (pendingRaw) {
         try {
           const pending = JSON.parse(pendingRaw);
           const profileRes = await api.post("/api/profile", pending, {
-            headers: {
-              Authorization: `Bearer ${loginRes.data.access_token}`,
-            },
+            headers: { Authorization: `Bearer ${loginRes.data.access_token}` },
           });
           localStorage.setItem("profileId", String(profileRes.data.id));
           localStorage.removeItem("pending_profile");
-          toast.success("Welcome to SkillBridge! Your profile is ready.");
+          toast.success("Profile Node Initialized.");
         } catch {
           localStorage.removeItem("pending_profile");
-          toast.success(`Welcome, ${me.data.name}! Account created.`);
         }
       } else {
-        toast.success(`Welcome, ${me.data.name}! Account created.`);
+        toast.success(`Node Created: ${me.data.name}`);
       }
-
       router.push("/dashboard");
     } catch (err: unknown) {
-      setError(extractApiError(err, "Registration failed"));
+      setError(extractApiError(err, "Integration Failed"));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    const refreshToken = localStorage.getItem("refreshToken");
-    if (refreshToken) {
-      try {
-        await api.post("/api/auth/logout", { refresh_token: refreshToken });
-      } catch {
-        /* ignore */
-      }
-    }
+  const handleLogout = () => {
     localStorage.clear();
-    toast.success("Logged out.");
+    toast.success("Connection Severed.");
     router.push("/");
   };
 
-  /* Already-logged-in state */
   if (token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card variant="metric" className="max-w-sm w-full">
-          <CardContent className="p-8 text-center">
-            <div className="h-14 w-14 rounded bg-primary/15 border border-primary/30 flex items-center justify-center mx-auto mb-5 text-primary">
-              <Command className="h-7 w-7" />
+      <div className="min-h-screen flex items-center justify-center bg-background-dark font-display text-slate-100 selection:bg-primary/30 relative overflow-hidden">
+        <style>{`
+          .cyber-grid {
+            background-image: linear-gradient(to right, rgba(37, 157, 244, 0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(37, 157, 244, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+          }
+          .scanline {
+            background: linear-gradient(to bottom, transparent 50%, rgba(37, 157, 244, 0.02) 50%);
+            background-size: 100% 4px;
+          }
+          .frosted {
+            backdrop-filter: blur(12px);
+            background: rgba(11, 14, 20, 0.8);
+          }
+        `}</style>
+        <div className="absolute inset-0 cyber-grid scanline" />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 w-full max-w-sm"
+        >
+          <div className="w-full frosted border border-primary/30 relative flex flex-col overflow-hidden p-8">
+            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-primary"></div>
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary"></div>
+            <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary"></div>
+            <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-primary"></div>
+
+            <div className="h-16 w-16 border border-primary bg-primary/10 flex items-center justify-center mx-auto text-primary shadow-[0_0_15px_rgba(37,157,244,0.3)] mb-6">
+              <Terminal className="h-8 w-8" />
             </div>
-            <p className="section-label mb-2">Session Active</p>
-            <h1 className="text-xl font-extrabold mb-1">
-              Welcome back, {userName || "User"}
-            </h1>
-            <p className="text-sm text-muted-foreground mb-6">
-              You&apos;re already signed in.
-            </p>
-            <div className="flex flex-col gap-2">
+            <div className="space-y-2 text-center">
+              <p className="font-mono text-[10px] text-primary tracking-widest animate-pulse">
+                SESSION ACTIVE
+              </p>
+              <h1 className="text-2xl font-bold uppercase tracking-tighter">
+                Connection <br /> Established
+              </h1>
+              <p className="font-mono text-xs text-slate-500">
+                ID: {userName || "SYS.ADMIN"}
+              </p>
+            </div>
+            <div className="space-y-4 pt-8">
               <Button
                 onClick={() => router.push("/dashboard")}
-                className="gap-2 w-full"
+                className="w-full bg-primary/10 border border-primary text-primary rounded-none font-bold uppercase tracking-widest h-12 hover:bg-primary hover:text-background-dark hover:shadow-[0_0_15px_rgba(37,157,244,0.5)] transition-all"
               >
-                Go to Dashboard <ArrowRight className="h-4 w-4" />
+                Access Dashboard
               </Button>
-              <Button variant="ghost" onClick={handleLogout} className="w-full">
-                Sign Out
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="w-full text-accent-coral hover:text-white hover:bg-accent-coral/20 font-mono font-bold uppercase tracking-widest text-[9px] rounded-none transition-colors border-none"
+              >
+                Sever Connection
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex bg-background">
-      {/* ── Left: Brand Panel ── */}
-      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-sidebar border-r border-sidebar-border p-10">
-        <div>
-          {/* Logo */}
-          <div className="flex items-center gap-3 mb-12">
-            <div className="h-8 w-8 rounded bg-primary flex items-center justify-center text-primary-foreground shrink-0">
-              <Command className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="font-extrabold text-base tracking-tight text-sidebar-foreground">
-                SkillBridge
-              </span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="live-dot" />
-                <span
-                  className="section-label text-primary"
-                  style={{ fontSize: "0.55rem" }}
-                >
-                  Live Data
-                </span>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen flex bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 selection:bg-primary/30 relative overflow-hidden">
+      <style>{`
+        .cyber-grid {
+          background-image: linear-gradient(to right, rgba(37, 157, 244, 0.05) 1px, transparent 1px),
+                            linear-gradient(to bottom, rgba(37, 157, 244, 0.05) 1px, transparent 1px);
+          background-size: 40px 40px;
+        }
+        .scanline {
+          background: linear-gradient(to bottom, transparent 50%, rgba(37, 157, 244, 0.02) 50%);
+          background-size: 100% 4px;
+        }
+        .frosted {
+          backdrop-filter: blur(12px);
+          background: rgba(11, 14, 20, 0.8);
+        }
+      `}</style>
 
-          {/* Headline */}
-          <h2 className="text-2xl font-extrabold tracking-tight mb-3 text-sidebar-foreground leading-tight">
-            Accelerate your career
-            <br />
-            <span className="text-primary">with intelligence.</span>
-          </h2>
-          <p className="text-sidebar-foreground/50 text-sm leading-relaxed mb-10">
-            AI-powered job matching, skill gap analysis, and curated upskilling
-            roadmaps for Singapore&apos;s tech professionals.
-          </p>
+      <div className="absolute inset-0 cyber-grid scanline" />
 
-          {/* Features */}
-          <div className="space-y-4 mb-10">
-            {FEATURES.map((f) => (
-              <div key={f.label} className="flex items-start gap-3">
-                <div className="h-7 w-7 rounded bg-primary/15 border border-primary/25 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                  {f.icon}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-sidebar-foreground">
-                    {f.label}
-                  </p>
-                  <p className="text-xs text-sidebar-foreground/50 mt-0.5">
-                    {f.desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Market Pulse */}
-          <div className="border border-sidebar-border rounded p-4 bg-background/30">
-            <div className="flex items-center gap-2 mb-3">
-              <BarChart3 className="h-3.5 w-3.5 text-primary" />
-              <p
-                className="section-label text-primary"
-                style={{ fontSize: "0.55rem" }}
-              >
-                Market Pulse
-              </p>
-            </div>
-            <div className="space-y-3">
-              {MARKET_PULSE.map((m) => (
-                <div key={m.label}>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-xs text-sidebar-foreground/60">
-                      {m.label}
-                    </span>
-                  </div>
-                  <MarketBar value={m.bar} delta={m.delta} />
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* Header Status Bar Decor */}
+      <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-center border-b border-primary/10 z-20">
+        <div className="flex items-center gap-2">
+          <Shield className="text-primary w-4 h-4" />
+          <span className="font-mono text-[10px] tracking-widest text-primary/60 uppercase hidden sm:inline">
+            Node: SG-CENTRAL-01
+          </span>
         </div>
-
-        {/* Skill tags */}
-        <div className="flex flex-wrap gap-1.5 mt-6">
-          {SKILLS.map((s) => (
-            <Badge
-              key={s}
-              variant="accent"
-              className="text-[0.65rem] font-semibold"
-            >
-              {s}
-            </Badge>
-          ))}
+        <div className="flex items-center gap-4">
+          <span className="font-mono text-[10px] tracking-widest text-primary uppercase">
+            System_Status: Stable
+          </span>
+          <div className="w-2 h-2 bg-primary rounded-full shadow-[0_0_8px_#259df4] animate-pulse"></div>
         </div>
       </div>
 
-      {/* ── Right: Form Panel ── */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
-            <div className="h-7 w-7 rounded bg-primary flex items-center justify-center text-primary-foreground">
-              <Command className="h-4 w-4" />
+      <div className="flex-1 flex items-center justify-center p-6 relative z-10 w-full">
+        <div className="w-full max-w-sm frosted border border-primary/30 relative flex flex-col overflow-hidden">
+          {/* Decorative Corners */}
+          <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-primary"></div>
+          <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary"></div>
+          <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary"></div>
+          <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-primary"></div>
+
+          {/* Icon Section */}
+          <div className="pt-10 pb-6 flex flex-col items-center">
+            <div className="relative mb-6">
+              <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full"></div>
+              <Fingerprint
+                className="w-12 h-12 text-primary relative z-10 drop-shadow-[0_0_15px_rgba(37,157,244,0.8)]"
+                strokeWidth={1.5}
+              />
             </div>
-            <span className="font-extrabold text-base">SkillBridge</span>
+            <h1 className="text-2xl font-bold tracking-tighter text-center uppercase leading-none text-slate-100">
+              Secure Enclave
+              <br />
+              <span className="text-primary">Initiation</span>
+            </h1>
+            <p className="font-mono text-[10px] text-primary/40 mt-4 tracking-[0.2em]">
+              ENCRYPTION: AES-256-GCM
+            </p>
           </div>
 
-          <header className="mb-8">
-            <div className="flex items-center gap-2 mb-2">
-              <Activity className="h-3.5 w-3.5 text-primary" />
-              <p className="section-label">Intelligence Platform</p>
+          {/* Actions / Forms */}
+          <div className="px-6 pb-10 flex flex-col gap-4">
+            <Tabs
+              value={tab}
+              onValueChange={(v) => {
+                setTab(v);
+                setError(null);
+              }}
+              className="w-full"
+            >
+              <TabsList className="flex w-full bg-transparent border-b border-primary/10 rounded-none p-0 mb-6">
+                <TabsTrigger
+                  value="login"
+                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500 data-[state=active]:text-primary data-[state=active]:shadow-[0_2px_10px_rgba(37,157,244,0.1)] transition-all"
+                >
+                  AUTH_REQ
+                </TabsTrigger>
+                <TabsTrigger
+                  value="register"
+                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500 data-[state=active]:text-primary data-[state=active]:shadow-[0_2px_10px_rgba(37,157,244,0.1)] transition-all"
+                >
+                  INIT_NODE
+                </TabsTrigger>
+              </TabsList>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={tab}
+                  initial={{ opacity: 0, x: 5 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -5 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {error && (
+                    <Alert
+                      variant="destructive"
+                      className="mb-6 rounded-none border-accent-coral bg-accent-coral/10 text-accent-coral text-xs font-mono py-3"
+                    >
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <TabsContent value="login" className="mt-0 space-y-6">
+                    <form
+                      onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                      className="space-y-4"
+                    >
+                      <div className="space-y-2 relative group">
+                        <Label
+                          htmlFor="email"
+                          className="font-mono text-[10px] text-primary/60 uppercase tracking-widest"
+                        >
+                          Vector ID (Email)
+                        </Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="sys.admin@bridge.sg"
+                          {...loginForm.register("email")}
+                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary placeholder:text-primary/20 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all h-10 font-mono text-xs"
+                        />
+                        {loginForm.formState.errors.email && (
+                          <p className="text-[9px] font-mono text-accent-coral uppercase mt-1 absolute -bottom-4">
+                            {loginForm.formState.errors.email.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-2 relative group pt-2">
+                        <Label
+                          htmlFor="password"
+                          className="font-mono text-[10px] text-primary/60 uppercase tracking-widest"
+                        >
+                          Cipher (Password)
+                        </Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          {...loginForm.register("password")}
+                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all h-10 font-mono text-lg tracking-[0.2em]"
+                        />
+                        {loginForm.formState.errors.password && (
+                          <p className="text-[9px] font-mono text-accent-coral uppercase mt-1 absolute -bottom-4">
+                            {loginForm.formState.errors.password.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="pt-4">
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          className="w-full bg-primary/10 border border-primary text-primary rounded-none font-bold font-mono uppercase tracking-[0.2em] h-12 hover:bg-primary hover:text-background-dark hover:shadow-[0_0_20px_rgba(37,157,244,0.5)] transition-all duration-300 group"
+                        >
+                          {loading ? (
+                            <span className="animate-pulse">Processing...</span>
+                          ) : (
+                            <span className="flex items-center justify-center gap-3">
+                              Execute{" "}
+                              <Zap className="h-3 w-3 group-hover:scale-125 transition-transform" />
+                            </span>
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  </TabsContent>
+
+                  <TabsContent value="register" className="mt-0 space-y-4">
+                    <form
+                      onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
+                      className="space-y-3"
+                    >
+                      <div className="space-y-1.5 relative">
+                        <Label
+                          htmlFor="name"
+                          className="font-mono text-[10px] text-primary/60 uppercase tracking-widest"
+                        >
+                          Designation
+                        </Label>
+                        <Input
+                          id="name"
+                          placeholder="Agent 04"
+                          {...registerForm.register("name")}
+                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary placeholder:text-primary/20 focus:border-primary h-10 font-mono text-xs"
+                        />
+                        {registerForm.formState.errors.name && (
+                          <p className="text-[9px] font-mono text-accent-coral uppercase absolute right-0 top-0">
+                            {registerForm.formState.errors.name.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5 relative">
+                        <Label
+                          htmlFor="reg-email"
+                          className="font-mono text-[10px] text-primary/60 uppercase tracking-widest"
+                        >
+                          Vector ID
+                        </Label>
+                        <Input
+                          id="reg-email"
+                          type="email"
+                          placeholder="agent@bridge.sg"
+                          {...registerForm.register("email")}
+                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary placeholder:text-primary/20 focus:border-primary h-10 font-mono text-xs"
+                        />
+                        {registerForm.formState.errors.email && (
+                          <p className="text-[9px] font-mono text-accent-coral uppercase absolute right-0 top-0">
+                            {registerForm.formState.errors.email.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5 relative">
+                        <Label
+                          htmlFor="reg-password"
+                          className="font-mono text-[10px] text-primary/60 uppercase tracking-widest"
+                        >
+                          New Cipher
+                        </Label>
+                        <Input
+                          id="reg-password"
+                          type="password"
+                          {...registerForm.register("password")}
+                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary focus:border-primary h-10 font-mono tracking-[0.2em]"
+                        />
+                        {registerForm.formState.errors.password && (
+                          <p className="text-[8px] font-mono text-accent-coral uppercase absolute right-0 top-0">
+                            {registerForm.formState.errors.password.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5 relative">
+                        <Label
+                          htmlFor="reg-confirm"
+                          className="font-mono text-[10px] text-primary/60 uppercase tracking-widest"
+                        >
+                          Verify Cipher
+                        </Label>
+                        <Input
+                          id="reg-confirm"
+                          type="password"
+                          {...registerForm.register("password_confirm")}
+                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary focus:border-primary h-10 font-mono tracking-[0.2em]"
+                        />
+                        {registerForm.formState.errors.password_confirm && (
+                          <p className="text-[8px] font-mono text-accent-coral uppercase absolute right-0 top-0">
+                            {
+                              registerForm.formState.errors.password_confirm
+                                .message
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="pt-2">
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          className="w-full bg-primary/10 border border-primary text-primary rounded-none font-bold font-mono uppercase tracking-[0.2em] h-12 hover:bg-primary hover:text-background-dark hover:shadow-[0_0_20px_rgba(37,157,244,0.5)] transition-all duration-300 group"
+                        >
+                          {loading ? (
+                            <span className="animate-pulse">
+                              Initializing...
+                            </span>
+                          ) : (
+                            <span className="flex items-center justify-center gap-3">
+                              Create Node{" "}
+                              <Zap className="h-3 w-3 group-hover:scale-125 transition-transform" />
+                            </span>
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  </TabsContent>
+                </motion.div>
+              </AnimatePresence>
+            </Tabs>
+
+            {/* Visual Element underneath form matching login.html visual design loosely */}
+            <div className="mt-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-px flex-1 bg-primary/20"></div>
+                <span className="font-mono text-[9px] text-primary/40 tracking-widest uppercase">
+                  Developer_Node_Auth
+                </span>
+                <div className="h-px flex-1 bg-primary/20"></div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <a
+                  className="flex items-center justify-between group py-2 border-b border-primary/5"
+                  href="#"
+                >
+                  <span className="font-mono text-[11px] text-primary/70 group-hover:text-primary transition-colors">
+                    GITHUB_SYNC
+                  </span>
+                  <ArrowRight className="text-primary/30 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </a>
+              </div>
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight">
-              {tab === "login" ? "Sign in" : "Create account"}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {tab === "login"
-                ? "Welcome back. Enter your credentials to continue."
-                : pendingProfile
-                  ? "Your profile is ready. Create a free account to unlock your personalised recommendations."
-                  : "Start your career acceleration journey."}
-            </p>
-          </header>
+          </div>
+        </div>
+      </div>
 
-          <Tabs
-            value={tab}
-            onValueChange={(v) => {
-              setTab(v);
-              setError(null);
-            }}
+      {/* Footer Decor */}
+      <div className="absolute bottom-12 left-0 w-full flex flex-col items-center gap-2 z-10 pointer-events-none hidden sm:flex">
+        <p className="font-mono text-[9px] text-primary/20 uppercase tracking-[0.3em]">
+          Singapore Tech Talent Network | SEC-L3
+        </p>
+        <div className="flex gap-4">
+          <div className="w-8 h-px bg-primary/10"></div>
+          <div className="w-1 h-1 bg-primary/40 rounded-full"></div>
+          <div className="w-8 h-px bg-primary/10"></div>
+        </div>
+      </div>
+
+      {/* Bottom Nav Bar Integration (Mobile primarily) */}
+      <div className="fixed bottom-0 left-0 w-full z-50 md:hidden">
+        <div className="flex gap-2 border-t border-primary/20 bg-background-dark/90 backdrop-blur-md px-4 pb-6 pt-2">
+          <Link
+            className="flex flex-1 flex-col items-center justify-end gap-1 text-primary/40 hover:text-primary transition-colors"
+            href="/recommendations"
           >
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
-            </TabsList>
-
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <TabsContent value="login">
-              <form
-                onSubmit={loginForm.handleSubmit(onLoginSubmit)}
-                className="space-y-4"
-              >
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="email"
-                    className="text-xs font-semibold tracking-wide uppercase"
-                    style={{ letterSpacing: "0.06em" }}
-                  >
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="name@example.com"
-                    {...loginForm.register("email")}
-                  />
-                  {loginForm.formState.errors.email && (
-                    <p className="text-sm text-destructive">
-                      {loginForm.formState.errors.email.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="password"
-                    className="text-xs font-semibold tracking-wide uppercase"
-                    style={{ letterSpacing: "0.06em" }}
-                  >
-                    Password
-                  </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    {...loginForm.register("password")}
-                  />
-                  {loginForm.formState.errors.password && (
-                    <p className="text-sm text-destructive">
-                      {loginForm.formState.errors.password.message}
-                    </p>
-                  )}
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  size="lg"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    "Signing in..."
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      Sign In <ArrowRight className="h-4 w-4" />
-                    </span>
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="register">
-              <form
-                onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
-                className="space-y-4"
-              >
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="name"
-                    className="text-xs font-semibold uppercase"
-                    style={{ letterSpacing: "0.06em" }}
-                  >
-                    Full Name
-                  </Label>
-                  <Input
-                    id="name"
-                    placeholder="Jane Doe"
-                    {...registerForm.register("name")}
-                  />
-                  {registerForm.formState.errors.name && (
-                    <p className="text-sm text-destructive">
-                      {registerForm.formState.errors.name.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="reg-email"
-                    className="text-xs font-semibold uppercase"
-                    style={{ letterSpacing: "0.06em" }}
-                  >
-                    Email
-                  </Label>
-                  <Input
-                    id="reg-email"
-                    type="email"
-                    placeholder="name@example.com"
-                    {...registerForm.register("email")}
-                  />
-                  {registerForm.formState.errors.email && (
-                    <p className="text-sm text-destructive">
-                      {registerForm.formState.errors.email.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="reg-password"
-                    className="text-xs font-semibold uppercase"
-                    style={{ letterSpacing: "0.06em" }}
-                  >
-                    Password
-                  </Label>
-                  <Input
-                    id="reg-password"
-                    type="password"
-                    {...registerForm.register("password")}
-                  />
-                  {registerForm.formState.errors.password && (
-                    <p className="text-sm text-destructive">
-                      {registerForm.formState.errors.password.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="reg-confirm"
-                    className="text-xs font-semibold uppercase"
-                    style={{ letterSpacing: "0.06em" }}
-                  >
-                    Confirm Password
-                  </Label>
-                  <Input
-                    id="reg-confirm"
-                    type="password"
-                    {...registerForm.register("password_confirm")}
-                  />
-                  {registerForm.formState.errors.password_confirm && (
-                    <p className="text-sm text-destructive">
-                      {registerForm.formState.errors.password_confirm.message}
-                    </p>
-                  )}
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  size="lg"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    "Creating account..."
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      Create Account <ArrowRight className="h-4 w-4" />
-                    </span>
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-
-          <p className="mt-8 text-center text-xs text-muted-foreground">
-            By continuing, you agree to our Terms of Service and Privacy Policy.
-          </p>
+            <div className="flex h-8 items-center justify-center">
+              <TerminalSquare className="w-6 h-6" />
+            </div>
+          </Link>
+          <Link
+            className="flex flex-1 flex-col items-center justify-end gap-1 text-primary"
+            href="/login"
+          >
+            <div className="flex h-10 items-center justify-center">
+              <Fingerprint
+                className="w-8 h-8 drop-shadow-[0_0_10px_rgba(37,157,244,0.6)]"
+                strokeWidth={1}
+              />
+            </div>
+          </Link>
+          <Link
+            className="flex flex-1 flex-col items-center justify-end gap-1 text-primary/40 hover:text-primary transition-colors"
+            href="/profile-builder"
+          >
+            <div className="flex h-8 items-center justify-center">
+              <Settings className="w-6 h-6" />
+            </div>
+          </Link>
         </div>
       </div>
     </div>
@@ -602,8 +597,8 @@ export default function Login() {
   return (
     <Suspense
       fallback={
-        <div className="h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
-          Loading...
+        <div className="h-screen flex items-center justify-center bg-background-dark font-mono text-xs text-primary animate-pulse tracking-widest uppercase">
+          INITIALIZING TERMINAL...
         </div>
       }
     >

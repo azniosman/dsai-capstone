@@ -52,10 +52,3 @@ export class JdMatchDto {
   job_title?: string;
 }
 
-export class RewriteBulletDto {
-  @IsString()
-  target_role!: string;
-
-  @IsString()
-  bullet_point!: string;
-}

@@ -12,9 +12,7 @@ import {
   ChatRequestDto,
   RecommendRequestDto,
   JdMatchDto,
-  RewriteBulletDto,
 } from './dto/intelligence.dto';
-import { InterviewRequestDto } from './dto/interview.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
@@ -68,38 +66,6 @@ export class IntelligenceController {
     };
   }
 
-  @UseGuards(OptionalJwtAuthGuard)
-  @Post('interview')
-  async interview(@Request() req: any, @Body() payload: InterviewRequestDto) {
-    const tenantId = req.user ? req.user.tenant.id : 1;
-    return this.intelligenceService.mockInterview(payload, tenantId);
-  }
-
-  @Get('market-insights')
-  async getMarketInsights(@Request() req: any) {
-    const tenantId = req.user ? req.user.tenant.id : 1;
-    return this.intelligenceService.getMarketInsights(tenantId);
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Get('peer-comparison/:profileId')
-  async getPeerComparison(
-    @Request() req: any,
-    @Param('profileId') profileId: string,
-  ) {
-    const tenantId = req.user ? req.user.tenant.id : 1;
-    return this.intelligenceService.getPeerComparison(+profileId, tenantId);
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Get('project-suggestions/:profileId')
-  async getProjectSuggestions(
-    @Request() req: any,
-    @Param('profileId') profileId: string,
-  ) {
-    const tenantId = req.user ? req.user.tenant.id : 1;
-    return this.intelligenceService.getProjectSuggestions(+profileId, tenantId);
-  }
 
   @UseGuards(OptionalJwtAuthGuard)
   @Post('jd-match')
@@ -110,15 +76,6 @@ export class IntelligenceController {
       payload.job_description,
       payload.job_title,
       tenantId,
-    );
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Post('resume-rewriter')
-  async rewriteBullet(@Request() req: any, @Body() payload: RewriteBulletDto) {
-    return this.intelligenceService.rewriteBullet(
-      payload.target_role,
-      payload.bullet_point,
     );
   }
 }

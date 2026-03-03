@@ -16,25 +16,24 @@ import { cn } from "@/lib/utils";
  * - inset     : Slightly sunken — muted bg (secondary panels, activity sections)
  */
 const cardVariants = cva(
-  "flex flex-col rounded-2xl border text-card-foreground backdrop-blur-md transition-all duration-300",
+  "flex flex-col rounded-none border text-card-foreground backdrop-blur-md transition-all duration-300",
   {
     variants: {
       variant: {
         default:
-          "bg-card/70 border-border/50 shadow-sm gap-6 py-6 hover:shadow-md hover:border-primary/20",
+          "bg-card border-border/50 shadow-sm gap-6 py-6 hover:shadow-md hover:border-primary/50 relative overflow-hidden",
         metric:
-          "bg-card/70 border-border/50 shadow gap-0 py-0 hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30",
-        kpi: "bg-card/70 shadow-md gap-0 py-0 border-primary/25 hover:shadow-lg hover:-translate-y-1 hover:border-primary/50 relative overflow-hidden before:absolute before:inset-0 before:bg-linear-to-br before:from-primary/5 before:to-transparent before:pointer-events-none",
+          "bg-card border-border/50 shadow-none gap-0 py-0 hover:-translate-y-0.5 hover:border-primary/50",
+        kpi: "bg-card shadow-md gap-0 py-0 border-primary/25 hover:shadow-lg hover:-translate-y-1 hover:border-primary/80 relative overflow-hidden before:absolute before:inset-0 before:bg-linear-to-br before:from-primary/10 before:to-transparent before:pointer-events-none",
         elevated:
-          "bg-card/85 border-border/50 shadow-md gap-0 py-0 hover:shadow-lg hover:border-primary/20",
-        data: "bg-muted/30 shadow-xs gap-0 py-0 border-border/60 hover:bg-muted/40",
+          "bg-background border-border/50 shadow-md gap-0 py-0 hover:shadow-lg hover:border-primary/30",
+        data: "bg-muted/10 shadow-none gap-0 py-0 border-border/60 hover:bg-muted/20",
         highlight:
-          "bg-primary/5 shadow-sm gap-0 py-0 border-primary/30 hover:border-primary/50 hover:bg-primary/10 relative overflow-hidden before:absolute before:inset-0 before:bg-linear-to-tl before:from-transparent before:to-primary/10 before:pointer-events-none",
+          "bg-primary/5 shadow-sm gap-0 py-0 border-primary/40 hover:border-primary/70 hover:bg-primary/10 relative overflow-hidden before:absolute before:inset-0 before:bg-linear-to-tl before:from-transparent before:to-primary/20 before:pointer-events-none",
         inset:
-          "bg-muted/40 shadow-2xs gap-0 py-0 border-border/50 focus-within:bg-muted/60",
-        /** Transparent card — border only, no background fill (Danger Zone etc.) */
+          "bg-muted/20 shadow-none gap-0 py-0 border-border/50 focus-within:bg-muted/40",
         ghost:
-          "bg-transparent border-transparent shadow-none gap-0 py-0 hover:bg-muted/20 hover:border-border/50",
+          "bg-transparent border-transparent shadow-none gap-0 py-0 hover:bg-muted/10 hover:border-border/50",
       },
     },
     defaultVariants: {

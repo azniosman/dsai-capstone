@@ -236,66 +236,7 @@ describe('LlmService', () => {
     });
   });
 
-  // ── rewriteBullet() ────────────────────────────────────────────────────
 
-  describe('rewriteBullet()', () => {
-    const inputTargetRole = 'Data Engineer';
-    const inputBulletPoint = 'Managed databases';
-    const expectedRewritten = {
-      rewritten: 'Optimised 5 PostgreSQL databases',
-      improvement_notes: 'Added metrics',
-    };
-
-    it('returns parsed JSON from Bedrock', async () => {
-      bedrockSend.mockResolvedValue(
-        bedrockResponse(JSON.stringify(expectedRewritten)),
-      );
-
-      const actualResult = await service.rewriteBullet(
-        inputTargetRole,
-        inputBulletPoint,
-      );
-
-      expect(actualResult.rewritten).toBe('Optimised 5 PostgreSQL databases');
-    });
-
-    it('falls back to Claude when Bedrock fails', async () => {
-      const mockClaudeResponse = {
-        rewritten: 'Claude rewrite',
-        improvement_notes: 'Claude notes',
-      };
-      bedrockSend.mockRejectedValue(new Error('Bedrock error'));
-      claudeCreate.mockResolvedValue(
-        claudeResponse(JSON.stringify(mockClaudeResponse)),
-      );
-
-      const actualResult = await service.rewriteBullet(
-        inputTargetRole,
-        inputBulletPoint,
-      );
-
-      expect(actualResult.rewritten).toBe('Claude rewrite');
-    });
-
-    it('falls back to Gemini when Bedrock and Claude fail', async () => {
-      const mockGeminiResponse = {
-        rewritten: 'Gemini rewrite',
-        improvement_notes: 'Gemini notes',
-      };
-      bedrockSend.mockRejectedValue(new Error('Bedrock error'));
-      claudeCreate.mockRejectedValue(new Error('Claude error'));
-      gemini.generateContent.mockResolvedValue(
-        geminiContentResponse(JSON.stringify(mockGeminiResponse)),
-      );
-
-      const actualResult = await service.rewriteBullet(
-        inputTargetRole,
-        inputBulletPoint,
-      );
-
-      expect(actualResult.rewritten).toBe('Gemini rewrite');
-    });
-  });
 
   // ── parseResume() ──────────────────────────────────────────────────────
 
