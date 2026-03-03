@@ -260,6 +260,38 @@ resource "aws_route53_record" "cf_alias_www_aaaa" {
   }
 }
 
+# 10c. Route 53 → S3 website alias records (apex + www, A only)
+# Used when custom_domain is set but CloudFront is disabled.
+# S3 static website endpoints only support HTTP; HTTPS requires CloudFront.
+# Route 53 A alias records must point to the S3 website endpoint (not the regional bucket domain).
+resource "aws_route53_record" "s3_alias_root_a" {
+  count           = var.enable_custom_domain && var.custom_domain != "" && !var.enable_cloudfront ? 1 : 0
+  allow_overwrite = true
+  zone_id         = module.dns[0].zone_id
+  name            = var.custom_domain
+  type            = "A"
+
+  alias {
+    name                   = module.s3_frontend.website_endpoint
+    zone_id                = module.s3_frontend.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "s3_alias_www_a" {
+  count           = var.enable_custom_domain && var.custom_domain != "" && !var.enable_cloudfront ? 1 : 0
+  allow_overwrite = true
+  zone_id         = module.dns[0].zone_id
+  name            = "www.${var.custom_domain}"
+  type            = "A"
+
+  alias {
+    name                   = module.s3_frontend.website_endpoint
+    zone_id                = module.s3_frontend.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
 # 11. OpenSearch — optional, single-node t3.small.search for hybrid vector search
 module "opensearch" {
   count  = var.enable_opensearch ? 1 : 0
