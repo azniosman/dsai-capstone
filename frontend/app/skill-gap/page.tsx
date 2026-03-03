@@ -21,7 +21,9 @@ import {
   Lock,
   Archive,
   Lightbulb,
+  Terminal,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 function HexRadar({
   axes,
@@ -279,19 +281,33 @@ export default function SkillGapPage() {
 
   if (!profileId || gaps.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-        <h2 className="text-lg font-bold text-slate-custom-900">
-          No Skill Gap Data Available
-        </h2>
-        <p className="text-sm text-slate-custom-500">
-          Please complete your profile to generate analysis.
-        </p>
-        <button
-          onClick={() => router.push("/profile-builder")}
-          className="bg-primary text-white px-4 py-2 rounded text-sm font-bold"
-        >
-          Initialize Profile
-        </button>
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] space-y-8 bg-background-dark font-display text-slate-100 selection:bg-primary/30">
+        <div className="w-32 h-32 border border-primary/20 bg-primary/5 shadow-[0_0_30px_rgba(37,157,244,0.1)] flex items-center justify-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-1 border-b border-l border-primary/30 bg-primary/10">
+            <span className="text-[7px] font-mono text-primary tracking-widest uppercase">
+              SYS_ERR
+            </span>
+          </div>
+          <Radar className="w-12 h-12 text-primary drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]" />
+        </div>
+        <div className="text-center space-y-4 max-w-md">
+          <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-100 mt-4">
+            No Matrix Data Found
+          </h2>
+          <p className="font-mono text-[10px] text-slate-400 leading-relaxed uppercase tracking-widest border-l-2 border-accent-coral pl-4 text-left">
+            &gt; Skill vector profile must be configured.
+            <br />
+            &gt; Competency extraction required before gap analysis can be
+            calculated.
+          </p>
+          <Button
+            onClick={() => router.push("/profile-builder")}
+            className="mt-8 mx-auto max-w-[300px] bg-primary/10 border border-primary text-primary hover:bg-primary hover:text-background-dark shadow-[0_0_15px_rgba(37,157,244,0.2)] font-mono uppercase text-[10px] font-bold tracking-[0.2em] rounded-none h-14 px-10 transition-all w-full flex items-center justify-center gap-3 group"
+          >
+            <Terminal className="h-4 w-4" /> Initialize Dossier{" "}
+            <ChevronRight className="h-4 w-4 ml-auto group-hover:translate-x-1 transition-transform" />
+          </Button>
+        </div>
       </div>
     );
   }
