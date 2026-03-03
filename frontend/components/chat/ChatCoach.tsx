@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * ChatCoach — AI Career Coach chat interface powered by Amazon Bedrock.
+ * ChatCoach — AI Career Coach chat interface powered by Groq / Claude / Gemini.
  *
  * Standalone embeddable component; drop into any page.
  * State is local (no client-side persistence).
- * All API calls go through /api/chat (FastAPI → Bedrock/Gemini).
+ * All API calls go through /api/chat (NestJS → Groq → Claude → Gemini).
  *
  * @param profileId   - Optional profile context attached to every request
  * @param placeholder - Input field placeholder text
@@ -61,7 +61,7 @@ const DEFAULT_SUGGESTIONS = [
 /** UUID generation with fallback for non-secure contexts / older browsers */
 function genId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return genId();
+    return crypto.randomUUID();
   }
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
