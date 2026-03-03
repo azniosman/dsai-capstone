@@ -127,10 +127,10 @@ export class IntelligenceService {
     const providerUsed = this.llmService.getLastUsedProvider();
     const engineLabel =
       {
-        bedrock: 'AWS Bedrock (Claude)',
+        groq: 'Groq',
         claude: 'Anthropic Claude',
         gemini: 'Google Gemini',
-      }[providerUsed ?? 'bedrock'] ?? 'LLM Router';
+      }[providerUsed ?? 'groq'] ?? 'LLM Router';
 
     return {
       reply,

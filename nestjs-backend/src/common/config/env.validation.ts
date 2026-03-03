@@ -51,7 +51,7 @@ export class EnvironmentVariables {
   @IsOptional()
   readonly SSG_CACHE_TTL_SECONDS?: string;
 
-  // LLM Router — provider priority (bedrock | claude | gemini)
+  // LLM Router — provider priority (groq | claude | gemini)
   @IsString()
   @IsOptional()
   readonly PRIMARY_LLM?: string;
@@ -64,14 +64,22 @@ export class EnvironmentVariables {
   @IsOptional()
   readonly TERTIARY_LLM?: string;
 
-  // AWS Bedrock
+  // Groq (primary)
   @IsString()
   @IsOptional()
-  readonly AWS_REGION?: string;
+  readonly GROQ_API_KEY?: string;
 
   @IsString()
   @IsOptional()
-  readonly BEDROCK_MODEL_ID?: string;
+  readonly GROQ_MODEL?: string;
+
+  @IsString()
+  @IsOptional()
+  readonly AI_TEMPERATURE?: string;
+
+  @IsString()
+  @IsOptional()
+  readonly AI_MAX_TOKENS?: string;
 
   // Anthropic Claude direct API
   @IsString()

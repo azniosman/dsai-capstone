@@ -10,7 +10,7 @@ SkillBridge — Job Recommendation & Skill Gap Analysis System for SCTP learners
 
 - **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + Recharts + Framer Motion + Three.js
 - **Backend**: NestJS 10 + TypeScript + MikroORM + Passport.js
-- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, configurable LLM chain via `LlmService` (default: Bedrock → Claude API → Gemini → 503)
+- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, configurable LLM chain via `LlmService` (default: Groq → Claude API → Gemini → 503)
 - **Database**: PostgreSQL 16 + pgvector
 - **Automation**: n8n workflows
 - **Deployment (capstone)**: Docker Compose locally; AWS Lambda + Aurora Serverless v2 + S3/CloudFront via Terraform
@@ -60,10 +60,12 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME` — individual DB fields (defaults: `capstone`/`changeme`/`localhost`/`5432`/`capstone`)
 - `JWT_SECRET` — JWT signing key
 - `GEMINI_API_KEY`, `GEMINI_MODEL` — optional (default: `gemini-2.0-flash`)
-- `ANTHROPIC_API_KEY`, `CLAUDE_MODEL` — optional; direct Anthropic API (distinct from Bedrock)
-- `AWS_REGION` — AWS region (default `ap-southeast-1`)
-- `BEDROCK_MODEL_ID` — must be a **cross-region inference profile ID** (default: `us.anthropic.claude-3-5-sonnet-20241022-v2:0`; note the `us.` prefix — direct model IDs are rejected)
-- `PRIMARY_LLM`, `SECONDARY_LLM`, `TERTIARY_LLM` — LLM dispatch order; valid values: `bedrock | claude | gemini`; defaults: `bedrock`/`claude`/`gemini`
+- `GROQ_API_KEY` — Groq API key (primary LLM; get from console.groq.com)
+- `GROQ_MODEL` — Groq model (default: `llama-3.3-70b-versatile`)
+- `AI_TEMPERATURE` — sampling temperature (default: `0.3`)
+- `AI_MAX_TOKENS` — max output tokens (default: `2048`)
+- `ANTHROPIC_API_KEY`, `CLAUDE_MODEL` — optional; direct Anthropic API fallback
+- `PRIMARY_LLM`, `SECONDARY_LLM`, `TERTIARY_LLM` — LLM dispatch order; valid values: `groq | claude | gemini`; defaults: `groq`/`claude`/`gemini`
 - `NEXT_PUBLIC_API_URL` — frontend env var pointing to backend (default `http://localhost:8000`)
 - `CORS_ALLOWED_ORIGINS` — allowed origins; accepts a JSON array string or comma-separated string (default `["http://localhost:3000","http://localhost:5173"]`)
 - `SSG_CLIENT_ID`, `SSG_CLIENT_SECRET` — optional; SkillsFuture/WSG API credentials. If absent, SSG module falls back to seeded SCTP data
@@ -103,7 +105,7 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `JwtAuthGuard` — requires valid JWT; throws 401 on failure
 - `OptionalJwtAuthGuard` — silently returns `null` user if JWT is absent/invalid; used on public endpoints (`/recommend`, `/skill-gap`, `/chat`, `/jd-match`). These endpoints default unauthenticated callers to tenant ID `1` (Global tenant).
 
-**LLM wiring**: `LlmService` (`intelligence/llm.service.ts`) dispatches to providers in the order defined by `PRIMARY_LLM` → `SECONDARY_LLM` → `TERTIARY_LLM` env vars (defaults: `bedrock`/`claude`/`gemini`). Each provider is tried in sequence; the chain terminates with HTTP 503 if all fail. The `resume-rewriter` endpoint (`POST /api/resume-rewriter`) also lives in `IntelligenceController`.
+**LLM wiring**: `LlmService` (`intelligence/llm.service.ts`) dispatches to providers in the order defined by `PRIMARY_LLM` → `SECONDARY_LLM` → `TERTIARY_LLM` env vars (defaults: `groq`/`claude`/`gemini`). Supported values: `groq | claude | gemini`. Each provider is tried in sequence; the chain terminates with HTTP 503 if all fail. The `resume-rewriter` endpoint (`POST /api/resume-rewriter`) also lives in `IntelligenceController`.
 
 ### Frontend (`frontend/`)
 

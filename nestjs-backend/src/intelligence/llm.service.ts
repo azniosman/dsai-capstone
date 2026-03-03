@@ -4,11 +4,11 @@
  * routing layer.
  *
  * Provider priority is configured via environment variables:
- * - `PRIMARY_LLM`   — first provider to try  (default: `bedrock`)
+ * - `PRIMARY_LLM`   — first provider to try  (default: `groq`)
  * - `SECONDARY_LLM` — second provider to try (default: `claude`)
  * - `TERTIARY_LLM`  — third provider to try  (default: `gemini`)
  *
- * Supported provider values: `bedrock` | `claude` | `gemini`
+ * Supported provider values: `groq` | `claude` | `gemini`
  *
  * The router attempts providers in priority order, logging each attempt and
  * any fallbacks. If every configured provider fails, a
@@ -27,7 +27,7 @@ import type {
   LlmProviderName,
   ChatMessage,
 } from './providers/llm-provider.interface';
-import { BedrockProvider } from './providers/bedrock.provider';
+import { GroqProvider } from './providers/groq.provider';
 import { ClaudeProvider } from './providers/claude.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 
@@ -49,11 +49,16 @@ export class LlmService {
 
   constructor(private readonly configService: ConfigService) {
     // ── Build individual providers ─────────────────────────────────────────
-    const region =
-      this.configService.get<string>('AWS_REGION') ?? 'ap-southeast-1';
-    const bedrockModelId =
-      this.configService.get<string>('BEDROCK_MODEL_ID') ??
-      'anthropic.claude-3-haiku-20240307-v1:0';
+    const groqApiKey = this.configService.get<string>('GROQ_API_KEY');
+    const groqModel =
+      this.configService.get<string>('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
+    const groqTemperature = parseFloat(
+      this.configService.get<string>('AI_TEMPERATURE') ?? '0.3',
+    );
+    const groqMaxTokens = parseInt(
+      this.configService.get<string>('AI_MAX_TOKENS') ?? '2048',
+      10,
+    );
 
     const claudeApiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
     const claudeModel =
@@ -65,7 +70,7 @@ export class LlmService {
       this.configService.get<string>('GEMINI_MODEL') ?? 'gemini-2.0-flash';
 
     const allProviders: Record<LlmProviderName, LlmProvider> = {
-      bedrock: new BedrockProvider(region, bedrockModelId),
+      groq: new GroqProvider(groqApiKey, groqModel, groqTemperature, groqMaxTokens),
       claude: new ClaudeProvider(claudeApiKey, claudeModel),
       gemini: new GeminiProvider(geminiApiKey, geminiModel),
     };
@@ -73,7 +78,7 @@ export class LlmService {
     // ── Build ordered chain from env ───────────────────────────────────────
     const primaryName =
       (this.configService.get<string>('PRIMARY_LLM') as LlmProviderName) ??
-      'bedrock';
+      'groq';
     const secondaryName =
       (this.configService.get<string>('SECONDARY_LLM') as LlmProviderName) ??
       'claude';
@@ -89,7 +94,7 @@ export class LlmService {
     if (this.providerChain.length === 0) {
       this.logger.warn(
         'LLM router: no providers are available. Configure at least one of: ' +
-          'AWS credentials (bedrock), ANTHROPIC_API_KEY (claude), GEMINI_API_KEY (gemini).',
+          'GROQ_API_KEY (groq), ANTHROPIC_API_KEY (claude), GEMINI_API_KEY (gemini).',
       );
     } else {
       this.logger.log(`Provider chain: ${chainNames}`);
@@ -157,7 +162,7 @@ export class LlmService {
     }
 
     throw new ServiceUnavailableException(
-      `LLM unavailable for "${label}". All configured providers failed.`,
+      `LLM unavailable for "${label}". All configured providers (groq, claude, gemini) failed.`,
     );
   }
 

@@ -11,14 +11,14 @@ export type ChatMessage = { role: string; content: string };
  * These correspond to the values used in `PRIMARY_LLM`, `SECONDARY_LLM`,
  * and `TERTIARY_LLM` environment variables.
  */
-export type LlmProviderName = 'bedrock' | 'claude' | 'gemini';
+export type LlmProviderName = 'groq' | 'claude' | 'gemini';
 
 /**
  * Contract that every LLM provider must implement.
  * Providers are stateless wrappers around a single vendor SDK.
  */
 export interface LlmProvider {
-  /** Human-readable name used in logs (e.g., `"bedrock"`). */
+  /** Human-readable name used in logs (e.g., `"groq"`). */
   readonly name: LlmProviderName;
 
   /**

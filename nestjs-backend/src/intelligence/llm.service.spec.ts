@@ -1,7 +1,7 @@
 /**
  * @file llm.service.spec.ts
  * @description Unit tests for {@link LlmService} — covers the 3-provider routing
- * chain (Bedrock → Claude → Gemini) and all fallback combinations.
+ * chain (Groq → Claude → Gemini) and all fallback combinations.
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
@@ -11,15 +11,16 @@ import { LlmService } from './llm.service';
 
 // ── Provider mocks ────────────────────────────────────────────────────────────
 
-/** Mock for AWS Bedrock SDK */
-jest.mock('@aws-sdk/client-bedrock-runtime', () => {
-  const mockSend = jest.fn();
+/** Mock for Groq SDK */
+jest.mock('groq-sdk', () => {
+  const mockCreate = jest.fn();
+  const MockGroq = jest.fn().mockImplementation(() => ({
+    chat: { completions: { create: mockCreate } },
+  }));
   return {
-    BedrockRuntimeClient: jest
-      .fn()
-      .mockImplementation(() => ({ send: mockSend })),
-    InvokeModelCommand: jest.fn().mockImplementation((input) => input),
-    __mockSend: mockSend,
+    default: MockGroq,
+    __mockCreate: mockCreate,
+    __MockGroq: MockGroq,
   };
 });
 
@@ -30,9 +31,7 @@ jest.mock('@anthropic-ai/sdk', () => {
     .fn()
     .mockImplementation(() => ({ messages: { create: mockCreate } }));
   return {
-    // Named export (used by ClaudeProvider via require('@anthropic-ai/sdk').Anthropic)
     Anthropic: MockAnthropic,
-    // Default export (used when import Anthropic from '@anthropic-ai/sdk')
     default: MockAnthropic,
     __mockCreate: mockCreate,
     __MockAnthropic: MockAnthropic,
@@ -62,9 +61,9 @@ jest.mock('@google/generative-ai', () => {
 
 // ── Mock accessors ─────────────────────────────────────────────────────────
 
-const getBedrockSend = (): jest.Mock =>
+const getGroqCreate = (): jest.Mock =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('@aws-sdk/client-bedrock-runtime').__mockSend;
+  require('groq-sdk').__mockCreate;
 
 const getClaudeCreate = (): jest.Mock =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -82,11 +81,9 @@ const getGeminiMocks = () => {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Builds a Bedrock-style response body (Anthropic Messages format). */
-const bedrockResponse = (text: string): { body: Uint8Array } => ({
-  body: new TextEncoder().encode(
-    JSON.stringify({ content: [{ type: 'text', text }] }),
-  ),
+/** Builds a Groq-style Chat Completions response. */
+const groqResponse = (text: string) => ({
+  choices: [{ message: { content: text } }],
 });
 
 /** Builds an Anthropic SDK-style response. */
@@ -106,7 +103,7 @@ const geminiContentResponse = (text: string) => ({
  * All three providers' credentials are always set so they all initialise.
  */
 const buildConfig = (
-  primary = 'bedrock',
+  primary = 'groq',
   secondary = 'claude',
   tertiary = 'gemini',
 ) =>
@@ -116,8 +113,10 @@ const buildConfig = (
         PRIMARY_LLM: primary,
         SECONDARY_LLM: secondary,
         TERTIARY_LLM: tertiary,
-        AWS_REGION: 'ap-southeast-1',
-        BEDROCK_MODEL_ID: 'anthropic.claude-3-haiku-20240307-v1:0',
+        GROQ_API_KEY: 'test-groq-key',
+        GROQ_MODEL: 'llama-3.3-70b-versatile',
+        AI_TEMPERATURE: '0.3',
+        AI_MAX_TOKENS: '2048',
         ANTHROPIC_API_KEY: 'test-claude-key',
         CLAUDE_MODEL: 'claude-3-5-sonnet-20241022',
         GEMINI_API_KEY: 'test-gemini-key',
@@ -131,17 +130,16 @@ const buildConfig = (
 
 describe('LlmService', () => {
   let service: LlmService;
-  let bedrockSend: jest.Mock;
+  let groqCreate: jest.Mock;
   let claudeCreate: jest.Mock;
   let gemini: ReturnType<typeof getGeminiMocks>;
 
   beforeEach(async () => {
-    bedrockSend = getBedrockSend();
+    groqCreate = getGroqCreate();
     claudeCreate = getClaudeCreate();
     gemini = getGeminiMocks();
 
-    // Reset all mocks before each test.
-    bedrockSend.mockReset();
+    groqCreate.mockReset();
     claudeCreate.mockReset();
     gemini.sendMessage.mockReset();
     gemini.generateContent.mockReset();
@@ -165,19 +163,19 @@ describe('LlmService', () => {
     const inputMessages = [{ role: 'user', content: 'Hello' }];
     const inputSystemPrompt = 'You are a helpful assistant.';
 
-    it('serves from Bedrock when Bedrock succeeds (primary)', async () => {
-      bedrockSend.mockResolvedValue(bedrockResponse('Bedrock reply'));
+    it('serves from Groq when Groq succeeds (primary)', async () => {
+      groqCreate.mockResolvedValue(groqResponse('Groq reply'));
 
       const actualResult = await service.chat(inputMessages, inputSystemPrompt);
 
-      expect(actualResult).toBe('Bedrock reply');
+      expect(actualResult).toBe('Groq reply');
       expect(claudeCreate).not.toHaveBeenCalled();
       expect(gemini.sendMessage).not.toHaveBeenCalled();
-      expect(service.getLastUsedProvider()).toBe('bedrock');
+      expect(service.getLastUsedProvider()).toBe('groq');
     });
 
-    it('falls back to Claude when Bedrock fails', async () => {
-      bedrockSend.mockRejectedValue(new Error('Bedrock timeout'));
+    it('falls back to Claude when Groq fails', async () => {
+      groqCreate.mockRejectedValue(new Error('Groq timeout'));
       claudeCreate.mockResolvedValue(claudeResponse('Claude reply'));
 
       const actualResult = await service.chat(inputMessages, inputSystemPrompt);
@@ -187,8 +185,8 @@ describe('LlmService', () => {
       expect(service.getLastUsedProvider()).toBe('claude');
     });
 
-    it('falls back to Gemini when Bedrock and Claude both fail', async () => {
-      bedrockSend.mockRejectedValue(new Error('Bedrock unavailable'));
+    it('falls back to Gemini when Groq and Claude both fail', async () => {
+      groqCreate.mockRejectedValue(new Error('Groq unavailable'));
       claudeCreate.mockRejectedValue(new Error('Claude rate limit'));
       gemini.generateContent.mockResolvedValue(
         geminiContentResponse('Gemini reply'),
@@ -201,7 +199,7 @@ describe('LlmService', () => {
     });
 
     it('throws ServiceUnavailableException when all providers fail', async () => {
-      bedrockSend.mockRejectedValue(new Error('Bedrock error'));
+      groqCreate.mockRejectedValue(new Error('Groq error'));
       claudeCreate.mockRejectedValue(new Error('Claude error'));
       gemini.sendMessage.mockRejectedValue(new Error('Gemini error'));
       gemini.generateContent.mockRejectedValue(new Error('Gemini error'));
@@ -218,16 +216,16 @@ describe('LlmService', () => {
     const inputMessages = [{ role: 'user', content: 'Hello' }];
     const inputSystemPrompt = 'You are a helpful assistant.';
 
-    it('returns Bedrock response via chat', async () => {
-      bedrockSend.mockResolvedValue(bedrockResponse('Bedrock chat reply'));
+    it('returns Groq response via chat', async () => {
+      groqCreate.mockResolvedValue(groqResponse('Groq chat reply'));
 
       const actualResult = await service.chat(inputMessages, inputSystemPrompt);
 
-      expect(actualResult).toBe('Bedrock chat reply');
+      expect(actualResult).toBe('Groq chat reply');
     });
 
     it('uses Claude as fallback for chat', async () => {
-      bedrockSend.mockRejectedValue(new Error('Bedrock error'));
+      groqCreate.mockRejectedValue(new Error('Groq error'));
       claudeCreate.mockResolvedValue(claudeResponse('Claude chat reply'));
 
       const actualResult = await service.chat(inputMessages, inputSystemPrompt);
@@ -249,10 +247,8 @@ describe('LlmService', () => {
       experience_years: 5,
     };
 
-    it('parses resume via Bedrock (primary)', async () => {
-      bedrockSend.mockResolvedValue(
-        bedrockResponse(JSON.stringify(expectedParsed)),
-      );
+    it('parses resume via Groq (primary)', async () => {
+      groqCreate.mockResolvedValue(groqResponse(JSON.stringify(expectedParsed)));
 
       const actualResult = await service.parseResume(inputResumeText);
 
@@ -260,8 +256,8 @@ describe('LlmService', () => {
       expect(actualResult.skills).toContain('Python');
     });
 
-    it('parses resume via Claude when Bedrock fails', async () => {
-      bedrockSend.mockRejectedValue(new Error('Bedrock error'));
+    it('parses resume via Claude when Groq fails', async () => {
+      groqCreate.mockRejectedValue(new Error('Groq error'));
       claudeCreate.mockResolvedValue(
         claudeResponse(JSON.stringify(expectedParsed)),
       );
@@ -271,8 +267,8 @@ describe('LlmService', () => {
       expect(actualResult.name).toBe('John Doe');
     });
 
-    it('parses resume via Gemini when Bedrock and Claude fail', async () => {
-      bedrockSend.mockRejectedValue(new Error('Bedrock error'));
+    it('parses resume via Gemini when Groq and Claude fail', async () => {
+      groqCreate.mockRejectedValue(new Error('Groq error'));
       claudeCreate.mockRejectedValue(new Error('Claude error'));
       gemini.generateContent.mockResolvedValue(
         geminiContentResponse(JSON.stringify(expectedParsed)),
@@ -297,10 +293,8 @@ describe('LlmService', () => {
       'Practice SQL on HackerRank',
     ];
 
-    it('returns advice array from Bedrock', async () => {
-      bedrockSend.mockResolvedValue(
-        bedrockResponse(JSON.stringify(expectedAdvice)),
-      );
+    it('returns advice array from Groq', async () => {
+      groqCreate.mockResolvedValue(groqResponse(JSON.stringify(expectedAdvice)));
 
       const actualResult = await service.generateSkillGapAdvice(
         inputRole,
@@ -311,8 +305,8 @@ describe('LlmService', () => {
       expect(actualResult[0]).toContain('Python');
     });
 
-    it('returns advice from Claude when Bedrock fails', async () => {
-      bedrockSend.mockRejectedValue(new Error('Bedrock error'));
+    it('returns advice from Claude when Groq fails', async () => {
+      groqCreate.mockRejectedValue(new Error('Groq error'));
       claudeCreate.mockResolvedValue(
         claudeResponse(JSON.stringify(expectedAdvice)),
       );
@@ -333,16 +327,16 @@ describe('LlmService', () => {
       expect(service.getLastUsedProvider()).toBeNull();
     });
 
-    it('returns "bedrock" after a successful Bedrock request', async () => {
-      bedrockSend.mockResolvedValue(bedrockResponse('Reply'));
+    it('returns "groq" after a successful Groq request', async () => {
+      groqCreate.mockResolvedValue(groqResponse('Reply'));
 
       await service.chat([{ role: 'user', content: 'Hi' }], 'System');
 
-      expect(service.getLastUsedProvider()).toBe('bedrock');
+      expect(service.getLastUsedProvider()).toBe('groq');
     });
 
-    it('returns "claude" after Bedrock fails and Claude succeeds', async () => {
-      bedrockSend.mockRejectedValue(new Error('Bedrock error'));
+    it('returns "claude" after Groq fails and Claude succeeds', async () => {
+      groqCreate.mockRejectedValue(new Error('Groq error'));
       claudeCreate.mockResolvedValue(claudeResponse('Claude reply'));
 
       await service.chat([{ role: 'user', content: 'Hi' }], 'System');
