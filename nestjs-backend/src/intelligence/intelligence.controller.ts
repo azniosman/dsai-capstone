@@ -66,7 +66,6 @@ export class IntelligenceController {
     };
   }
 
-
   @UseGuards(OptionalJwtAuthGuard)
   @Post('jd-match')
   async analyzeJdMatch(@Request() req: any, @Body() payload: JdMatchDto) {

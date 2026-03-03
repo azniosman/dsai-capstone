@@ -27,9 +27,7 @@ export class GeminiProvider implements LlmProvider {
 
   constructor(apiKey: string | undefined, modelId: string) {
     if (!apiKey) {
-      this.logger.warn(
-        'GEMINI_API_KEY is not set — Gemini provider disabled',
-      );
+      this.logger.warn('GEMINI_API_KEY is not set — Gemini provider disabled');
       this.geminiClient = null;
       this.isReady = false;
       return;
@@ -68,7 +66,10 @@ export class GeminiProvider implements LlmProvider {
    * @param systemPrompt - System-level instruction.
    * @returns The model's text response.
    */
-  async generate(messages: ChatMessage[], systemPrompt: string): Promise<string> {
+  async generate(
+    messages: ChatMessage[],
+    systemPrompt: string,
+  ): Promise<string> {
     if (!this.geminiClient) {
       throw new Error('Gemini client not available');
     }

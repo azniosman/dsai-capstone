@@ -95,8 +95,23 @@ resource "aws_cloudfront_distribution" "web" {
     }
   }
 
-  viewer_certificate {
-    cloudfront_default_certificate = true # Free *.cloudfront.net cert
+  aliases = var.custom_domain_aliases
+
+  dynamic "viewer_certificate" {
+    for_each = var.acm_certificate_arn != "" ? [1] : []
+    content {
+      acm_certificate_arn            = var.acm_certificate_arn
+      ssl_support_method             = "sni-only"
+      minimum_protocol_version       = "TLSv1.2_2021"
+      cloudfront_default_certificate = false
+    }
+  }
+
+  dynamic "viewer_certificate" {
+    for_each = var.acm_certificate_arn == "" ? [1] : []
+    content {
+      cloudfront_default_certificate = true
+    }
   }
 
   tags = { Name = "${var.project_name}-${var.environment}-cf" }

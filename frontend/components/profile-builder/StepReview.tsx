@@ -127,7 +127,7 @@ export default function StepReview() {
           <div className="grid grid-cols-2 gap-y-6 gap-x-4">
             <div>
               <p className="font-mono text-[8px] uppercase tracking-widest text-editorial-black/40 mb-1">
-                Designation
+                Name
               </p>
               <p className="font-mono text-[11px] font-bold text-editorial-black uppercase tracking-wider">
                 {store.personalInfo.name}

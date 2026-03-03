@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Terminal, Search } from "lucide-react";
+import { Terminal } from "lucide-react";
 import { HeroSection } from "@/components/sections/landing/hero-section";
 import { FeaturesSection } from "@/components/sections/landing/features-section";
 import { MarqueeSection } from "@/components/sections/landing/marquee-section";
@@ -39,7 +39,13 @@ export default function LandingPage() {
             </div>
 
             <nav className="hidden lg:flex items-center gap-8">
-              {["OPERATIONS", "NODES", "DOSSIER", "LOGS"].map((item) => (
+              <Link
+                href="/operations"
+                className="tactical-label text-neutral-400 hover:text-[#00f2f2] transition-colors tracking-[0.2em] font-black underline decoration-[#00f2f2]/20 underline-offset-4"
+              >
+                OPERATIONS
+              </Link>
+              {["NODES", "DOSSIER", "LOGS"].map((item) => (
                 <Link
                   key={item}
                   href="#"
@@ -52,15 +58,6 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="hidden md:flex items-center bg-white/5 border border-white/10 px-4 h-12 w-80 group focus-within:border-[#00f2f2]/50 transition-all">
-              <Search className="w-4 h-4 text-neutral-500" />
-              <input
-                type="text"
-                placeholder="SEARCH_NODE_ID"
-                className="bg-transparent border-none outline-none text-xs font-mono ml-3 w-full text-white placeholder:text-neutral-600 uppercase tracking-widest"
-              />
-            </div>
-
             <Link
               href="/login"
               className="bg-[#00f2f2] text-black px-6 h-12 flex items-center font-black uppercase text-xs tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(0,242,242,0.2)]"

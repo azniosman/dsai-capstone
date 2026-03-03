@@ -69,6 +69,18 @@ variable "enable_cloudfront" {
   default     = false
 }
 
+variable "enable_custom_domain" {
+  description = "Provision Route 53 DNS zone and ACM certificates for custom domain mapping (requires CloudFront)."
+  type        = bool
+  default     = false
+}
+
+variable "custom_domain" {
+  description = "The apex domain to attach (e.g., 'sklbr.co')"
+  type        = string
+  default     = ""
+}
+
 variable "lambda_memory_mb" {
   description = "Lambda memory in MB (higher = faster cold start for ML models)"
   type        = number

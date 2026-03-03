@@ -66,15 +66,16 @@ export class ClaudeProvider implements LlmProvider {
    * @param systemPrompt - System-level instruction.
    * @returns The assistant's text response.
    */
-  async generate(messages: ChatMessage[], systemPrompt: string): Promise<string> {
+  async generate(
+    messages: ChatMessage[],
+    systemPrompt: string,
+  ): Promise<string> {
     if (!this.client) {
       throw new Error('Claude API client not available');
     }
 
     const anthropicMessages = messages.map((m) => ({
-      role: (m.role === 'assistant' ? 'assistant' : 'user') as
-        | 'user'
-        | 'assistant',
+      role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
     }));
 

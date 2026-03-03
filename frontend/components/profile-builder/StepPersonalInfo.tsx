@@ -35,8 +35,7 @@ export default function StepPersonalInfo() {
             htmlFor="name"
             className="font-mono text-[9px] font-bold uppercase tracking-widest text-editorial-black/70"
           >
-            Designation (Full Name){" "}
-            <span className="text-soft-coral ml-1">*</span>
+            Name (Full Name) <span className="text-soft-coral ml-1">*</span>
           </Label>
           <Input
             id="name"

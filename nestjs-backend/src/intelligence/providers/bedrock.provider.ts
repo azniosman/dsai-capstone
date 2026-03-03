@@ -29,9 +29,14 @@ export class BedrockProvider implements LlmProvider {
     this.modelId = modelId;
     try {
       this.client = new BedrockRuntimeClient({ region });
-      this.logger.log(`Bedrock client ready (region=${region}, model=${modelId})`);
+      this.logger.log(
+        `Bedrock client ready (region=${region}, model=${modelId})`,
+      );
     } catch (err) {
-      this.logger.warn('Failed to initialise Bedrock client', (err as Error).message);
+      this.logger.warn(
+        'Failed to initialise Bedrock client',
+        (err as Error).message,
+      );
       this.client = null;
     }
   }
@@ -49,7 +54,10 @@ export class BedrockProvider implements LlmProvider {
    * @param systemPrompt - System-level instruction.
    * @returns The assistant's text response.
    */
-  async generate(messages: ChatMessage[], systemPrompt: string): Promise<string> {
+  async generate(
+    messages: ChatMessage[],
+    systemPrompt: string,
+  ): Promise<string> {
     if (!this.client) {
       throw new Error('Bedrock client not available');
     }

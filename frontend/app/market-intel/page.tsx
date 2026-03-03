@@ -22,6 +22,7 @@ import {
   ChevronRight,
   RefreshCw,
   Mic,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -242,7 +243,7 @@ export default function MarketIntelPage() {
   const tabs: {
     key: typeof activeTab;
     label: string;
-    icon: React.ElementType;
+    icon: LucideIcon;
   }[] = [
     { key: "sync", label: "Live Sync Log", icon: Radio },
     { key: "screening", label: "AI Screening", icon: Brain },
@@ -292,23 +293,26 @@ export default function MarketIntelPage() {
             role="tablist"
             aria-label="Intelligence sections"
           >
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                role="tab"
-                aria-selected={activeTab === tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all border-b-2",
-                  activeTab === tab.key
-                    ? "border-primary text-primary bg-primary/5"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-card",
-                )}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.key}
+                  role="tab"
+                  aria-selected={activeTab === tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all border-b-2",
+                    activeTab === tab.key
+                      ? "border-primary text-primary bg-primary/5"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-card",
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </header>

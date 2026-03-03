@@ -55,9 +55,13 @@ api.interceptors.response.use(
 
     if (typeof window === "undefined") return Promise.reject(error);
 
+    // Ignore 401s on auth endpoints to prevent infinite redirect loops
+    const isAuthEndpoint = originalRequest.url?.includes("/api/auth/login") || originalRequest.url?.includes("/api/auth/register");
+
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
+      !isAuthEndpoint &&
       localStorage.getItem("refreshToken")
     ) {
       originalRequest._retry = true;
@@ -76,7 +80,7 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       console.warn("Unauthorized request detected, clearing auth and redirecting to /login", {
         url: originalRequest.url,
         pathname: window.location.pathname

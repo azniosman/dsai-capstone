@@ -51,4 +51,3 @@ export class JdMatchDto {
   @IsString()
   job_title?: string;
 }
-

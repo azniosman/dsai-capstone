@@ -33,7 +33,7 @@ const loginSchema = z.object({
 
 const registerSchema = z
   .object({
-    name: z.string().min(2, "Invalid designation"),
+    name: z.string().min(2, "Invalid name"),
     email: z.string().email("Invalid format"),
     password: z.string().min(8, "Cipher too weak (min 8)"),
     password_confirm: z.string(),
@@ -315,9 +315,9 @@ function LoginForm() {
               />
             </div>
             <h1 className="text-2xl font-bold tracking-tighter text-center uppercase leading-none text-slate-100">
-              Secure Enclave
+              Secure Connection
               <br />
-              <span className="text-primary">Initiation</span>
+              <span className="text-primary">_SKLBR</span>
             </h1>
             <p className="font-mono text-[10px] text-primary/40 mt-4 tracking-[0.2em]">
               ENCRYPTION: AES-256-GCM
@@ -345,7 +345,7 @@ function LoginForm() {
                   value="register"
                   className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500 data-[state=active]:text-primary data-[state=active]:shadow-[0_2px_10px_rgba(37,157,244,0.1)] transition-all"
                 >
-                  INIT_NODE
+                  INIT_AUTH
                 </TabsTrigger>
               </TabsList>
 
@@ -381,7 +381,7 @@ function LoginForm() {
                         <Input
                           id="email"
                           type="email"
-                          placeholder="sys.admin@bridge.sg"
+                          placeholder="sys.admin@sklbr.co"
                           {...loginForm.register("email")}
                           className="rounded-none border-primary/20 bg-slate-950/50 text-primary placeholder:text-primary/20 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all h-10 font-mono text-xs"
                         />
@@ -440,11 +440,11 @@ function LoginForm() {
                           htmlFor="name"
                           className="font-mono text-[10px] text-primary/60 uppercase tracking-widest"
                         >
-                          Designation
+                          Name
                         </Label>
                         <Input
                           id="name"
-                          placeholder="Agent 04"
+                          placeholder="Your Name"
                           {...registerForm.register("name")}
                           className="rounded-none border-primary/20 bg-slate-950/50 text-primary placeholder:text-primary/20 focus:border-primary h-10 font-mono text-xs"
                         />
@@ -464,7 +464,7 @@ function LoginForm() {
                         <Input
                           id="reg-email"
                           type="email"
-                          placeholder="agent@bridge.sg"
+                          placeholder="agent@sklbr.co"
                           {...registerForm.register("email")}
                           className="rounded-none border-primary/20 bg-slate-950/50 text-primary placeholder:text-primary/20 focus:border-primary h-10 font-mono text-xs"
                         />
@@ -528,7 +528,7 @@ function LoginForm() {
                             </span>
                           ) : (
                             <span className="flex items-center justify-center gap-3">
-                              Create Node{" "}
+                              Create SKLBR ID{" "}
                               <Zap className="h-3 w-3 group-hover:scale-125 transition-transform" />
                             </span>
                           )}

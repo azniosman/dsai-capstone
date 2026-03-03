@@ -172,7 +172,18 @@ module "s3_frontend" {
   enable_public_access = !var.enable_cloudfront
 }
 
-# 9. CloudFront — optional (requires AWS account verification for new accounts)
+# 9. Optional Custom DNS — Route 53 + ACM (us-east-1 strictly required)
+module "dns" {
+  count  = var.enable_custom_domain && var.custom_domain != "" ? 1 : 0
+  source = "./modules/dns"
+
+  project_name           = var.project_name
+  environment            = var.environment
+  domain_name            = var.custom_domain
+  cloudfront_domain_name = var.enable_cloudfront ? module.cloudfront[0].cloudfront_domain_name : ""
+}
+
+# 10. CloudFront — optional CDN distribution (wires DNS SSL if activated)
 module "cloudfront" {
   count  = var.enable_cloudfront ? 1 : 0
   source = "./modules/cloudfront"
@@ -183,6 +194,9 @@ module "cloudfront" {
   s3_bucket_arn         = module.s3_frontend.bucket_arn
   s3_bucket_domain_name = module.s3_frontend.bucket_regional_domain_name
   api_gateway_url       = module.api_gateway.api_endpoint
+
+  acm_certificate_arn   = var.enable_custom_domain && var.custom_domain != "" ? module.dns[0].acm_certificate_arn : ""
+  custom_domain_aliases = var.enable_custom_domain && var.custom_domain != "" ? [var.custom_domain, "www.${var.custom_domain}"] : []
 }
 
 # 10. OpenSearch — optional, single-node t3.small.search for hybrid vector search

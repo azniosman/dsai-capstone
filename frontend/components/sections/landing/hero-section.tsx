@@ -14,14 +14,14 @@ import {
 export function HeroSection() {
   return (
     <section className="relative w-full min-h-screen flex flex-col items-center justify-center overflow-hidden bg-background">
-      {/* Background Map Placeholder */}
+      {/* Background Pre-rendered Map */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 opacity-40 mix-blend-overlay pointer-events-none">
-          {/* Theoretical high-contrast map background */}
-          <div className="w-full h-full bg-[url('https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/103.8198,1.3521,11,0/1200x800?access_token=pk.eyJ1IjoiZGV2LW1hcGJveCIsImEiOiJjbGl2Z2Z2Z2wwMDB3M2NvNHp2Nnh2Nnh2In0')] bg-cover bg-center grayscale contrast-125" />
+        <div className="absolute inset-0 opacity-60 pointer-events-none">
+          {/* Tactical pre-rendered background */}
+          <div className="w-full h-full bg-[url('/tactical-map-sg.png')] bg-cover bg-center" />
         </div>
         <div className="absolute inset-0 map-vignette z-1" />
-        <div className="absolute inset-0 grid-pattern opacity-10 z-1" />
+        <div className="absolute inset-0 grid-pattern opacity-20 z-1" />
       </div>
 
       <div className="relative z-10 w-full max-w-[1400px] px-8 h-full flex flex-col justify-center pt-20">
@@ -50,7 +50,7 @@ export function HeroSection() {
           <span className="text-[#00f2f2] drop-shadow-[0_0_15px_rgba(0,242,242,0.3)]">
             SINGAPORE
           </span>
-          _NODE
+          _SKLBR
         </motion.h1>
 
         <motion.p
@@ -59,8 +59,9 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
         >
-          Discover skill demand across Singapore with AI-powered insights, and
-          receive tailored upskilling roadmaps to advance your career.
+          Empowering your career with seamless SkillsFuture integration and
+          real-time market insights. Bridging the gap between individual talent
+          and national digital demand.
         </motion.p>
 
         <motion.div
@@ -121,7 +122,7 @@ export function HeroSection() {
       </div>
 
       {/* Map Tooltip Mockup */}
-      <div className="absolute bottom-[30%] right-[30%] z-10 pointer-events-none">
+      <div className="absolute bottom-[50%] right-[25%] z-10 pointer-events-none">
         <div className="relative">
           <div className="absolute top-0 left-0 w-4 h-4 rounded-full bg-[#ff3b3b] shadow-[0_0_12px_#ff3b3b] animate-ping" />
           <div className="absolute top-0 left-0 w-2.5 h-2.5 rounded-full bg-[#ff3b3b] m-0.75" />

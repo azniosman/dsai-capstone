@@ -177,7 +177,6 @@ export class InternalController {
     return { deleted, duration_ms: Date.now() - start };
   }
 
-
   // ─── Analytics ─────────────────────────────────────────────────────────────
 
   /**

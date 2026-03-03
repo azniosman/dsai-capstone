@@ -125,11 +125,12 @@ export class IntelligenceService {
 
     const reply = await this.llmService.chat(payload.messages, systemPrompt);
     const providerUsed = this.llmService.getLastUsedProvider();
-    const engineLabel = {
-      bedrock: 'AWS Bedrock (Claude)',
-      claude: 'Anthropic Claude',
-      gemini: 'Google Gemini',
-    }[providerUsed ?? 'bedrock'] ?? 'LLM Router';
+    const engineLabel =
+      {
+        bedrock: 'AWS Bedrock (Claude)',
+        claude: 'Anthropic Claude',
+        gemini: 'Google Gemini',
+      }[providerUsed ?? 'bedrock'] ?? 'LLM Router';
 
     return {
       reply,
@@ -332,7 +333,6 @@ export class IntelligenceService {
     }
   }
 
-
   async analyzeJdMatch(
     profileId: number,
     jobDescription: string,
@@ -391,6 +391,4 @@ export class IntelligenceService {
       gaps,
     };
   }
-
-
 }

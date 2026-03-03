@@ -25,3 +25,15 @@ variable "api_gateway_url" {
   type        = string
   description = "API Gateway invoke URL (https://id.execute-api.region.amazonaws.com)"
 }
+
+variable "acm_certificate_arn" {
+  type        = string
+  description = "ARN of the ACM certificate to attach to CloudFront (us-east-1)"
+  default     = ""
+}
+
+variable "custom_domain_aliases" {
+  type        = list(string)
+  description = "List of domains to alias on this CloudFront distribution"
+  default     = []
+}

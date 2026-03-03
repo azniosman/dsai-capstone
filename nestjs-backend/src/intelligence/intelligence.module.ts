@@ -20,4 +20,3 @@ import { DomainModule } from '../domain/domain.module';
   exports: [IntelligenceService, LlmService],
 })
 export class IntelligenceModule {}
-

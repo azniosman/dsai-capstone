@@ -36,7 +36,9 @@ export class InternalTokenGuard implements CanActivate {
     const expected = this.config.get<string>('INTERNAL_AUTOMATION_TOKEN');
 
     if (!expected || !token || token !== expected) {
-      throw new ForbiddenException('Invalid or missing internal automation token');
+      throw new ForbiddenException(
+        'Invalid or missing internal automation token',
+      );
     }
 
     return true;

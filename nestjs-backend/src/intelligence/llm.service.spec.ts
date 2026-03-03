@@ -192,7 +192,9 @@ describe('LlmService', () => {
     it('falls back to Gemini when Bedrock and Claude both fail', async () => {
       bedrockSend.mockRejectedValue(new Error('Bedrock unavailable'));
       claudeCreate.mockRejectedValue(new Error('Claude rate limit'));
-      gemini.generateContent.mockResolvedValue(geminiContentResponse('Gemini reply'));
+      gemini.generateContent.mockResolvedValue(
+        geminiContentResponse('Gemini reply'),
+      );
 
       const actualResult = await service.chat(inputMessages, inputSystemPrompt);
 
@@ -235,8 +237,6 @@ describe('LlmService', () => {
       expect(actualResult).toBe('Claude chat reply');
     });
   });
-
-
 
   // ── parseResume() ──────────────────────────────────────────────────────
 

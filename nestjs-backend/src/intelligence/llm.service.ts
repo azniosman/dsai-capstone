@@ -22,7 +22,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import type { LlmProvider, LlmProviderName, ChatMessage } from './providers/llm-provider.interface';
+import type {
+  LlmProvider,
+  LlmProviderName,
+  ChatMessage,
+} from './providers/llm-provider.interface';
 import { BedrockProvider } from './providers/bedrock.provider';
 import { ClaudeProvider } from './providers/claude.provider';
 import { GeminiProvider } from './providers/gemini.provider';
@@ -137,9 +141,8 @@ export class LlmService {
         return result;
       } catch (err) {
         const latencyMs = Date.now() - start;
-        const nextProvider = this.providerChain[
-          this.providerChain.indexOf(provider) + 1
-        ];
+        const nextProvider =
+          this.providerChain[this.providerChain.indexOf(provider) + 1];
         if (nextProvider) {
           this.logger.warn(
             `[${label}] ${provider.name} failed after ${latencyMs}ms (${(err as Error).message}), ` +
@@ -170,7 +173,6 @@ export class LlmService {
   async chat(messages: ChatMessage[], systemPrompt: string): Promise<string> {
     return this.withFallback('chat', messages, systemPrompt);
   }
-
 
   /**
    * Analyses a job description and computes a skill match score against the

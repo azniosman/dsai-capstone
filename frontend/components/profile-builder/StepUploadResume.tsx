@@ -414,7 +414,7 @@ export default function StepUploadResume() {
                   <div className="space-y-3 pt-4 border-t border-editorial-black/10">
                     {[
                       {
-                        label: "Designation",
+                        label: "Name",
                         val: String(
                           (parsedResume as Record<string, unknown>).name ?? "",
                         ),
