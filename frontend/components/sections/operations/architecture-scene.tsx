@@ -1,12 +1,11 @@
 "use client";
 
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useState, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import {
   OrbitControls,
   PerspectiveCamera,
-  Environment,
   ContactShadows,
   Stars,
 } from "@react-three/drei";
@@ -30,6 +29,13 @@ export function ArchitectureScene({ onNodeSelect }: ArchitectureSceneProps) {
   );
   const [hoveredNode, setHoveredNode] = useState<ArchitectureNode | null>(null);
 
+  // Memoize so the GridHelper object is not recreated on every render.
+  // Recreating THREE objects every frame causes a memory leak and WebGL context loss.
+  const gridHelper = useMemo(
+    () => new THREE.GridHelper(20, 20, 0x00f2f2, 0x111111),
+    [],
+  );
+
   const handleSelect = (node: ArchitectureNode | null) => {
     setSelectedNode(node);
     onNodeSelect(node);
@@ -37,7 +43,8 @@ export function ArchitectureScene({ onNodeSelect }: ArchitectureSceneProps) {
 
   return (
     <div className="w-full h-full min-h-[600px] bg-black cursor-grab active:cursor-grabbing rounded-lg overflow-hidden border border-white/5 shadow-2xl">
-      <Canvas shadows dpr={[1, 2]}>
+      {/* PCFShadowMap replaces deprecated PCFSoftShadowMap */}
+      <Canvas shadows={{ type: THREE.PCFShadowMap }} dpr={[1, 2]}>
         <PerspectiveCamera makeDefault position={[0, 5, 12]} fov={50} />
         <OrbitControls
           enableDamping
@@ -71,12 +78,7 @@ export function ArchitectureScene({ onNodeSelect }: ArchitectureSceneProps) {
 
           <group position={[0, 0, 0]}>
             {/* Grid Helper (Tactical look) */}
-            <primitive
-              object={new THREE.GridHelper(20, 20, 0x00f2f2, 0x111111)}
-              position={[0, -3, 0]}
-            >
-              <meshBasicMaterial attach="material" transparent opacity={0.1} />
-            </primitive>
+            <primitive object={gridHelper} position={[0, -3, 0]} />
 
             {/* 3D Flow Lines */}
             {ARCHITECTURE_DATA.edges.map((edge) => {
@@ -126,8 +128,9 @@ export function ArchitectureScene({ onNodeSelect }: ArchitectureSceneProps) {
             blur={2.4}
             far={4.5}
           />
-
-          <Environment preset="night" />
+          {/* Environment preset removed: fetched dikhololo_night_1k.hdr from an
+              external CDN which fails in deployment. Explicit lights already
+              provide sufficient illumination. */}
         </Suspense>
 
         {/* Post-Processing Effects */}

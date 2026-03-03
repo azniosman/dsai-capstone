@@ -4,6 +4,7 @@ import React, { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
+
 interface FlowLine3DProps {
   start: [number, number, number];
   end: [number, number, number];
@@ -11,7 +12,6 @@ interface FlowLine3DProps {
 }
 
 export function FlowLine3D({ start, end, animated = false }: FlowLine3DProps) {
-  const lineRef = useRef<THREE.Line>(null);
   const particleRef = useRef<THREE.Mesh>(null);
 
   const points = useMemo(() => {
@@ -21,6 +21,35 @@ export function FlowLine3D({ start, end, animated = false }: FlowLine3DProps) {
   const geometry = useMemo(() => {
     return new THREE.BufferGeometry().setFromPoints(points);
   }, [points]);
+
+  // Memoize Line objects — creating them inline (new THREE.Line(...) in JSX)
+  // allocates a new GPU object every render, quickly exhausting WebGL resources
+  // and causing context loss.
+  const bgLine = useMemo(
+    () =>
+      new THREE.Line(
+        geometry,
+        new THREE.LineBasicMaterial({
+          color: "#ffffff",
+          opacity: 0.05,
+          transparent: true,
+        }),
+      ),
+    [geometry],
+  );
+
+  const glowLine = useMemo(
+    () =>
+      new THREE.Line(
+        geometry,
+        new THREE.LineBasicMaterial({
+          color: "#00f2f2",
+          opacity: 0.2,
+          transparent: true,
+        }),
+      ),
+    [geometry],
+  );
 
   useFrame((state) => {
     if (animated && particleRef.current) {
@@ -45,32 +74,10 @@ export function FlowLine3D({ start, end, animated = false }: FlowLine3DProps) {
   return (
     <group>
       {/* Background dashed-style line */}
-      <primitive
-        object={
-          new THREE.Line(
-            geometry,
-            new THREE.LineBasicMaterial({
-              color: "#ffffff",
-              opacity: 0.05,
-              transparent: true,
-            }),
-          )
-        }
-      />
+      <primitive object={bgLine} />
 
       {/* Main glowing connection */}
-      <primitive
-        object={
-          new THREE.Line(
-            geometry,
-            new THREE.LineBasicMaterial({
-              color: "#00f2f2",
-              opacity: 0.2,
-              transparent: true,
-            }),
-          )
-        }
-      />
+      <primitive object={glowLine} />
 
       {animated && (
         <mesh ref={particleRef}>
