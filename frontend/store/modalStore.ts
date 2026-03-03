@@ -7,6 +7,7 @@ export type ModalType =
   | "skillGap"
   | "aiChat"
   | "profile"
+  | "profileSetup"
   | "jdMatch"
   | "roleMatch"
   | "skillsFutureCourses"

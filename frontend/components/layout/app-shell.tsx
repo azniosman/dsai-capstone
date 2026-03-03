@@ -13,15 +13,9 @@ const SIDEBAR_ROUTES = [
   "/roadmap",
   "/jd-match",
   "/chat",
-  "/interview",
   "/courses",
-  "/market",
-  "/compare",
-  "/peers",
-  "/progress",
+  "/market-intel",
   "/account",
-  "/resume-rewriter",
-  "/projects",
 ];
 
 function useIsSidebarRoute() {

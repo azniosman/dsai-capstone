@@ -715,7 +715,7 @@ export default function Recommendations() {
             </span>
           </Link>
           <Link
-            href="/matching"
+            href="/jd-match"
             className="flex flex-col items-center gap-1 text-primary group"
           >
             <Network className="w-6 h-6" />
