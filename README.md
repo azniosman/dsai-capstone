@@ -34,7 +34,7 @@ SkillBridge is deployed entirely on AWS serverless infrastructure. The backend i
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                           FRONTEND                               │
-│           Next.js 15 (Static Export) — S3 + CloudFront           │
+│           Next.js 16 (Static Export) — S3 + CloudFront           │
 └───────────────────────────┬──────────────────────────────────────┘
                             │ HTTPS
            ┌────────────────┴────────────────┐
@@ -102,7 +102,7 @@ SkillBridge is deployed entirely on AWS serverless infrastructure. The backend i
 
 | Tool                  | Version         | Role                                              |
 | --------------------- | --------------- | ------------------------------------------------- |
-| Next.js               | 15 (App Router) | React framework, static export (`output: export`) |
+| Next.js               | 16 (App Router) | React framework, static export (`output: export`) |
 | React                 | 19              | UI runtime                                        |
 | TypeScript            | 5               | Type safety                                       |
 | Tailwind CSS          | 4               | Utility-first styling (OKLCH color space)         |
@@ -353,7 +353,7 @@ All automation targets are protected by `InternalTokenGuard` (shared secret: `X-
 ### AI Career Coach
 
 - **Context-Aware Chat** — The LLM knows your full profile, skill gaps, SCTP courses, and live Singapore market data
-- **Engine priority:** Google Gemini (primary) → AWS Bedrock Claude 3.5 Sonnet (fallback) → HTTP 503
+- **LLM dispatch:** Gemini API (primary) → AWS Bedrock Claude 3.5 Sonnet (fallback) → HTTP 503. `POST /api/chat` returns `text/event-stream` SSE; parse lines filtering `[ENGINE:*]` prefixes
 - **Multi-turn conversation** — Full message history sent on every request; persistent across page navigation
 - **RAG-Augmented Responses** — Career coach draws from stored resume embeddings via the RAG pipeline
 
@@ -440,6 +440,41 @@ terraform apply \
   -var="lambda_image_uri=<ecr_url>:latest" \
   -var="internal_automation_token=${TF_VAR_internal_automation_token}"
 ```
+
+### GitHub Actions (CI/CD)
+
+The workflow supports these `workflow_dispatch` inputs:
+
+| Input                  | Default | Description                                                   |
+| ---------------------- | ------- | ------------------------------------------------------------- |
+| `environment`          | `dev`   | Target environment (`dev` / `prod`)                           |
+| `skip_terraform`       | `false` | `true` = push image + update Lambda only (~5 min, URLs preserved) |
+| `enable_cloudfront`    | `true`  | CloudFront CDN + HTTPS (set `false` for S3-only HTTP)         |
+| `enable_custom_domain` | `false` | Enable Route 53 + ACM certificate for `custom_domain`         |
+| `custom_domain`        | —       | Apex domain (e.g. `sklbr.co`)                                 |
+
+```bash
+# Quick redeploy — code only, Terraform skipped (~5 min, URLs preserved)
+gh workflow run deploy-serverless.yml -f environment=dev -f skip_terraform=true
+
+# Full deploy with custom domain + CloudFront + HTTPS
+gh workflow run deploy-serverless.yml \
+  -f environment=dev \
+  -f enable_cloudfront=true \
+  -f enable_custom_domain=true \
+  -f custom_domain=sklbr.co
+
+# Custom domain without CloudFront — HTTP only (S3 website endpoint)
+gh workflow run deploy-serverless.yml \
+  -f environment=dev \
+  -f enable_cloudfront=false \
+  -f enable_custom_domain=true \
+  -f custom_domain=sklbr.co
+```
+
+> **Custom domain DNS note:** After the first deploy, Route 53 creates a hosted zone. You must update your domain registrar's nameservers to match the 4 NS records in that hosted zone. Run `aws route53 list-hosted-zones` and look up the NS records for your domain. Without this step the domain will not resolve.
+
+> **HTTPS requires CloudFront.** S3 static website endpoints serve HTTP only. For production, set `enable_cloudfront=true`.
 
 ### Verify EventBridge Automation After Deploy
 
@@ -550,6 +585,10 @@ SSG_CACHE_TTL_SECONDS=86400
 # Generate: python3 -c "import secrets; print(secrets.token_hex(32))"
 INTERNAL_AUTOMATION_TOKEN=change-me-in-production
 
+# ── CORS ────────────────────────────────────────────────────────
+# JSON array of allowed origins; comma-separated also accepted
+CORS_ALLOWED_ORIGINS=["http://localhost:3000","http://localhost:5173"]
+
 # ── Frontend (build-time) ───────────────────────────────────────
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_OUTPUT=export                      # set for static S3 export
@@ -565,29 +604,32 @@ All public endpoints are prefixed `/api`. Internal automation endpoints (`/inter
 
 | Method | Path                 | Description                                                                |
 | ------ | -------------------- | -------------------------------------------------------------------------- |
-| `POST` | `/api/auth/register` | Register — body: `{email, password, name}`                                 |
-| `POST` | `/api/auth/login`    | Login — body: `{email, password}`, returns `{access_token, refresh_token}` |
+| `POST` | `/api/auth/register` | Register — JSON body: `{email, password, name}`                                                                                          |
+| `POST` | `/api/auth/login`    | Login — `application/x-www-form-urlencoded` body: `username=<email>&password=<password>`; returns `{access_token, refresh_token}` |
 | `GET`  | `/api/auth/me`       | Current user — requires Bearer token                                       |
 
 ### Profile & Resume
 
-| Method | Path                              | Description                                               |
-| ------ | --------------------------------- | --------------------------------------------------------- |
-| `POST` | `/api/profile`                    | Create/update profile                                     |
-| `GET`  | `/api/profile/me`                 | Fetch authenticated user's profile                        |
-| `POST` | `/api/intelligence/upload-resume` | Upload PDF/DOCX (multipart) — returns structured analysis |
-| `POST` | `/api/intelligence/jd-match`      | Match profile against a job description                   |
+| Method | Path                  | Description                                               |
+| ------ | --------------------- | --------------------------------------------------------- |
+| `POST` | `/api/profile`        | Create/update profile                                     |
+| `GET`  | `/api/profile/me`     | Fetch authenticated user's profile                        |
+| `POST` | `/api/upload-resume`  | Upload PDF/DOCX (multipart) — returns structured analysis |
+| `POST` | `/api/jd-match`       | Match profile against a job description                   |
 
 ### AI Features
 
-| Method | Path                                               | Description                                                             |
-| ------ | -------------------------------------------------- | ----------------------------------------------------------------------- |
-| `POST` | `/api/intelligence/chat`                           | Career coach — body: `{profile_id?, messages}`                          |
-| `POST` | `/api/intelligence/interview`                      | Mock interview — body: `{profile_id, role_title, messages, difficulty}` |
-| `POST` | `/api/intelligence/recommend`                      | Hybrid job recommendations                                              |
-| `GET`  | `/api/intelligence/skill-gap/:profileId`           | Per-role skill gap analysis                                             |
-| `POST` | `/api/intelligence/resume-rewrite`                 | Rewrite a resume bullet point                                           |
-| `GET`  | `/api/intelligence/project-suggestions/:profileId` | Portfolio project ideas                                                 |
+| Method | Path                               | Description                                                             |
+| ------ | ---------------------------------- | ----------------------------------------------------------------------- |
+| `POST` | `/api/chat`                        | Career coach — body: `{profile_id?, messages}`; response: SSE stream    |
+| `POST` | `/api/interview`                   | Mock interview — body: `{profile_id, role_title, messages, difficulty}` |
+| `POST` | `/api/recommend`                   | Hybrid job recommendations                                              |
+| `GET`  | `/api/skill-gap/:profileId`        | Per-role skill gap analysis                                             |
+| `POST` | `/api/resume-rewriter`             | Rewrite a resume bullet point                                           |
+| `GET`  | `/api/project-suggestions/:profileId` | Portfolio project ideas                                              |
+| `POST` | `/api/gap-analysis`                | Async skill gap analysis                                                |
+| `POST` | `/api/rag/query`                   | RAG-based document retrieval                                            |
+| `GET`  | `/api/dashboard/summary`           | Authenticated user's dashboard KPIs                                     |
 
 ### Upskilling & Courses
 
@@ -595,25 +637,26 @@ All public endpoints are prefixed `/api`. Internal automation endpoints (`/inter
 | ------ | ---------------------------------------- | ---------------------------------------------- |
 | `GET`  | `/api/upskilling/:profileId`             | Personalized upskilling roadmap                |
 | `GET`  | `/api/ssg/courses/search?keyword=python` | Search SSG courses (pre-warmed by EventBridge) |
+| `GET`  | `/api/ssg/courses/:ref`                  | Single SSG course by reference number          |
 | `GET`  | `/api/ssg/job-roles?sector=ICT`          | SSG Skills Framework job roles                 |
 | `POST` | `/api/ssg/recommendations`               | Personalised SSG course recommendations        |
 | `GET`  | `/api/courses`                           | SCTP courses with fee, subsidy, nett payable   |
-| `POST` | `/api/domain/calculate-subsidy`          | Calculate MCES/SFC subsidy for a course        |
+| `POST` | `/api/calculate-subsidy`                 | Calculate MCES/SFC subsidy for a course        |
 
 ### Market & Roles
 
 | Method | Path                          | Description                                          |
 | ------ | ----------------------------- | ---------------------------------------------------- |
-| `GET`  | `/api/domain/market-insights` | Singapore 2026 salary + demand data (pre-aggregated) |
+| `GET`  | `/api/market-insights` | Singapore 2026 salary + demand data (pre-aggregated) |
 | `GET`  | `/api/roles`                  | All job roles with SGD salary benchmarks             |
 
 ### Skills & Progress
 
 | Method | Path                                       | Description                      |
 | ------ | ------------------------------------------ | -------------------------------- |
-| `POST` | `/api/skills/progress`                     | Record skill progress checkpoint |
-| `GET`  | `/api/skills/progress/:profileId`          | Progress dashboard data          |
-| `GET`  | `/api/skills/progress/:profileId/timeline` | Progress timeline for charting   |
+| `POST` | `/api/progress`                     | Record skill progress checkpoint |
+| `GET`  | `/api/progress/:profileId`          | Progress dashboard data          |
+| `GET`  | `/api/progress/:profileId/timeline` | Progress timeline for charting   |
 
 ### Internal Automation (Lambda Invoke only — not via API Gateway)
 
@@ -747,7 +790,7 @@ dsai-capstone/
 │   └── voice_coaching_handler.py
 │
 ├── frontend/
-│   ├── app/                         # Next.js 15 App Router pages
+│   ├── app/                         # Next.js 16 App Router pages
 │   ├── components/
 │   │   ├── ui/                      # shadcn primitives
 │   │   └── layout/                  # AppShell, SidebarNav, PageHeader
