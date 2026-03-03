@@ -81,3 +81,9 @@ variable "voice_transcribe_bucket" {
   default     = ""
   description = "S3 bucket name for Transcribe staging (voice pipeline)"
 }
+
+variable "cors_allowed_origins" {
+  type        = string
+  default     = "[\"http://localhost:3000\",\"http://localhost:5173\"]"
+  description = "JSON array of CORS allowed origins"
+}

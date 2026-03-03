@@ -83,6 +83,20 @@ jobs:
         env:
           RAW: ${{ secrets.DB_PASSWORD }}
 
+      # ── Compute CORS allowed origins ──────────────────────────────────────────
+      # Allow localhost for dev + custom domain (if set). Written to $GITHUB_ENV
+      # as TF_VAR_cors_allowed_origins so all downstream Terraform steps pick it
+      # up automatically without needing to add it to every env: block.
+      - name: Compute CORS allowed origins
+        run: |
+          DOMAIN="${{ github.event.inputs.custom_domain }}"
+          if [ -n "$DOMAIN" ]; then
+            CORS="[\"https://${DOMAIN}\",\"http://localhost:3000\",\"http://localhost:5173\"]"
+          else
+            CORS='["http://localhost:3000","http://localhost:5173"]'
+          fi
+          echo "TF_VAR_cors_allowed_origins=${CORS}" >> $GITHUB_ENV
+
       # ── Setup Terraform (early — needed for fmt/validate before ECR step) ────
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -775,6 +789,24 @@ jobs:
           echo "cf_id=$(terraform output -raw cloudfront_id)"           >> $GITHUB_OUTPUT
           echo "frontend_url=$(terraform output -raw frontend_url)"     >> $GITHUB_OUTPUT
           echo "ws_url=$(terraform output -raw websocket_endpoint)"     >> $GITHUB_OUTPUT
+          echo "name_servers=$(terraform output -json name_servers 2>/dev/null || echo '[]')" >> $GITHUB_OUTPUT
+
+      # ── Compute effective API URL for frontend ────────────────────────────────
+      # When CloudFront is enabled, the frontend routes /api/* through CloudFront
+      # (same-origin) rather than directly hitting API Gateway. This avoids CORS
+      # entirely for same-origin requests and enables caching at the edge.
+      # Priority: custom domain > CloudFront domain > raw API Gateway URL.
+      - name: Compute effective API URL
+        run: |
+          DOMAIN="${{ github.event.inputs.custom_domain }}"
+          CF="${{ github.event.inputs.enable_cloudfront }}"
+          if [ -n "$DOMAIN" ] && [ "$CF" = "true" ]; then
+            echo "EFFECTIVE_API_URL=https://${DOMAIN}" >> $GITHUB_ENV
+          elif [ "$CF" = "true" ]; then
+            echo "EFFECTIVE_API_URL=https://${{ steps.tf.outputs.cf_domain }}" >> $GITHUB_ENV
+          else
+            echo "EFFECTIVE_API_URL=${{ steps.tf.outputs.api_url }}" >> $GITHUB_ENV
+          fi
 
       # ── Step 6: Build and deploy frontend ────────────────────────────────────
       - name: Setup Node.js
@@ -791,7 +823,7 @@ jobs:
       - name: Build frontend (Next.js static export)
         working-directory: ./frontend
         env:
-          NEXT_PUBLIC_API_URL:      ${{ steps.tf.outputs.api_url }}
+          NEXT_PUBLIC_API_URL:      ${{ env.EFFECTIVE_API_URL }}
           NEXT_PUBLIC_APP_URL:      ${{ steps.tf.outputs.frontend_url }}
           NEXT_PUBLIC_VOICE_WS_URL: ${{ steps.tf.outputs.ws_url }}
           NEXT_OUTPUT: export
@@ -882,6 +914,21 @@ jobs:
           echo "| WebSocket  | ${{ steps.tf.outputs.ws_url }} |" >> $GITHUB_STEP_SUMMARY
           echo "| S3 Bucket  | ${{ steps.tf.outputs.s3_bucket }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Image      | ${{ env.IMAGE_URI }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Custom domain + nameserver instructions
+          DOMAIN="${{ github.event.inputs.custom_domain }}"
+          NS='${{ steps.tf.outputs.name_servers }}'
+          if [ -n "$DOMAIN" ] && [ "$NS" != "[]" ] && [ -n "$NS" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Custom Domain: ${DOMAIN}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Update your registrar's nameservers to:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "${NS}" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "> DNS propagation takes 5–60 minutes after updating the registrar." >> $GITHUB_STEP_SUMMARY
+          fi
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Cost notes:**" >> $GITHUB_STEP_SUMMARY
           echo "- Aurora Serverless v2: ~\$43/mo (0.5 ACU min)" >> $GITHUB_STEP_SUMMARY

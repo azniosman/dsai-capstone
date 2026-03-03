@@ -49,8 +49,13 @@ output "cloudfront_id" {
 }
 
 output "frontend_url" {
-  description = "Frontend application URL"
-  value       = var.enable_cloudfront ? "https://${module.cloudfront[0].cloudfront_domain_name}" : "http://${module.s3_frontend.website_endpoint}"
+  description = "Frontend application URL (custom domain > CloudFront > S3)"
+  value       = (var.enable_custom_domain && var.custom_domain != "") ? "https://${var.custom_domain}" : var.enable_cloudfront ? "https://${module.cloudfront[0].cloudfront_domain_name}" : "http://${module.s3_frontend.website_endpoint}"
+}
+
+output "name_servers" {
+  description = "Route 53 name servers — update your domain registrar NS records to these values"
+  value       = (var.enable_custom_domain && var.custom_domain != "") ? module.dns[0].name_servers : []
 }
 
 output "opensearch_endpoint" {
@@ -71,9 +76,10 @@ output "sagemaker_endpoint_name" {
 output "deploy_summary" {
   description = "Quick deployment summary"
   value = {
-    frontend = var.enable_cloudfront ? "https://${module.cloudfront[0].cloudfront_domain_name}" : "http://${module.s3_frontend.website_endpoint}"
-    api      = module.api_gateway.api_endpoint
-    ecr      = module.ecr.backend_repo_url
-    s3       = module.s3_frontend.bucket_id
+    frontend      = (var.enable_custom_domain && var.custom_domain != "") ? "https://${var.custom_domain}" : var.enable_cloudfront ? "https://${module.cloudfront[0].cloudfront_domain_name}" : "http://${module.s3_frontend.website_endpoint}"
+    api           = module.api_gateway.api_endpoint
+    ecr           = module.ecr.backend_repo_url
+    s3            = module.s3_frontend.bucket_id
+    custom_domain = (var.enable_custom_domain && var.custom_domain != "") ? var.custom_domain : "disabled"
   }
 }

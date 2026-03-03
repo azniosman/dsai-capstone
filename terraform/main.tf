@@ -123,6 +123,7 @@ module "lambda_backend" {
   secret_key              = var.secret_key
   opensearch_url          = var.enable_opensearch ? "https://${module.opensearch[0].opensearch_endpoint}" : ""
   voice_transcribe_bucket = aws_s3_bucket.uploads.id
+  cors_allowed_origins    = var.cors_allowed_origins
 
   depends_on = [module.rds, module.iam, aws_s3_bucket.uploads]
 }

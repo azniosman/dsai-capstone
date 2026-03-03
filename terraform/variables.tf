@@ -124,3 +124,9 @@ variable "enable_warmup" {
   type        = bool
   default     = true
 }
+
+variable "cors_allowed_origins" {
+  description = "JSON array of CORS allowed origins for the API Lambda (e.g. '[\"https://sklbr.co\"]')"
+  type        = string
+  default     = "[\"http://localhost:3000\",\"http://localhost:5173\"]"
+}
