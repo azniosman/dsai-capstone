@@ -745,6 +745,56 @@ jobs:
 
           echo "DNS import complete"
 
+      # ── Step 4e: Import CloudFront into Terraform state ───────────────────────
+      # When enable_cloudfront=true, a previous partial apply may have created the
+      # OAC and/or distribution before failing. Import them so Terraform updates
+      # in place rather than failing with "resource already exists".
+      - name: Import CloudFront into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' && github.event.inputs.enable_cloudfront == 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region:                  ${{ env.AWS_REGION }}
+          TF_VAR_environment:                 ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:                 ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key:                  ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront:           ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain:        ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain:               ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token:   ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+
+          # Import OAC if it already exists
+          OAC_ID=$(aws cloudfront list-origin-access-controls \
+            --query "OriginAccessControlList.Items[?Name=='${P}-${E}-oac'].Id | [0]" \
+            --output text 2>/dev/null)
+          if [ -n "$OAC_ID" ] && [ "$OAC_ID" != "None" ] && [ "$OAC_ID" != "null" ]; then
+            echo "Importing CloudFront OAC: ${OAC_ID}"
+            terraform state rm 'module.cloudfront[0].aws_cloudfront_origin_access_control.web' 2>/dev/null || true
+            terraform import -input=false \
+              'module.cloudfront[0].aws_cloudfront_origin_access_control.web' "${OAC_ID}" \
+              2>&1 | grep -v "^$" || true
+          else
+            echo "No existing CloudFront OAC — Terraform will create it"
+          fi
+
+          # Import CloudFront distribution if it already exists
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Comment=='${P}-${E}'].Id | [0]" \
+            --output text 2>/dev/null)
+          if [ -n "$DIST_ID" ] && [ "$DIST_ID" != "None" ] && [ "$DIST_ID" != "null" ]; then
+            echo "Importing CloudFront distribution: ${DIST_ID}"
+            terraform state rm 'module.cloudfront[0].aws_cloudfront_distribution.web' 2>/dev/null || true
+            terraform import -input=false \
+              'module.cloudfront[0].aws_cloudfront_distribution.web' "${DIST_ID}" \
+              2>&1 | grep -v "^$" || true
+          else
+            echo "No existing CloudFront distribution — Terraform will create it"
+          fi
+
+          echo "CloudFront import complete"
+
       # ── Step 5: Terraform Plan + Apply ────────────────────────────────────────
       - name: Terraform Plan
         if: ${{ github.event.inputs.skip_terraform != 'true' }}
