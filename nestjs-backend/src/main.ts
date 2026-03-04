@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from '@app/common/filters/all-exceptions.filter';
 import { TransformInterceptor } from '@app/common/interceptors/transform.interceptor';
 import { MikroORM } from '@mikro-orm/core';
+import { EntityManager } from '@mikro-orm/postgresql';
 import { DatabaseSeeder } from './seeders/DatabaseSeeder';
 
 const logger = new Logger('Bootstrap');
@@ -16,10 +17,11 @@ async function bootstrap() {
   // safe to run on every cold start. The seeder guards every insert with
   // findOne(), making it idempotent as well.
   const orm = app.get(MikroORM);
+  const pgEm = orm.em as EntityManager;
   try {
     // Enable pgvector extension before updateSchema() attempts to create
     // any `vector(N)` columns.  The extension is a no-op if already present.
-    await orm.em.execute('CREATE EXTENSION IF NOT EXISTS vector');
+    await pgEm.getConnection().execute('CREATE EXTENSION IF NOT EXISTS vector');
     logger.log('pgvector extension ready');
 
     await orm.getSchemaGenerator().updateSchema();
@@ -27,7 +29,7 @@ async function bootstrap() {
 
     // Create HNSW index for cosine similarity search on document_chunk.
     // IF NOT EXISTS makes this idempotent across cold starts.
-    await orm.em.execute(`
+    await pgEm.getConnection().execute(`
       CREATE INDEX IF NOT EXISTS document_chunk_embedding_hnsw
       ON document_chunk USING hnsw (embedding vector_cosine_ops)
     `);
@@ -36,12 +38,12 @@ async function bootstrap() {
     // tsvector generated column + GIN index for hybrid keyword search (Phase 4).
     // The generated column is maintained automatically by PostgreSQL on every
     // INSERT/UPDATE — no application code needed to keep it up to date.
-    await orm.em.execute(`
+    await pgEm.getConnection().execute(`
       ALTER TABLE document_chunk
       ADD COLUMN IF NOT EXISTS search_vector tsvector
       GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
     `);
-    await orm.em.execute(`
+    await pgEm.getConnection().execute(`
       CREATE INDEX IF NOT EXISTS document_chunk_search_vector_gin
       ON document_chunk USING gin(search_vector)
     `);

@@ -19,7 +19,7 @@ import { RagService } from './rag.service';
 import { RagQueryDto } from './dto/rag-query.dto';
 import { RagFeedbackDto } from './dto/rag-feedback.dto';
 import { OptionalJwtAuthGuard } from '@app/auth/guards/optional-jwt-auth.guard';
-import type { OptionalAuthenticatedRequest } from '@app/intelligence/intelligence.controller';
+import type { OptionalAuthenticatedRequest } from '@app/types/auth-request.interface';
 
 @Controller('rag')
 export class RagController {
@@ -76,7 +76,7 @@ export class RagController {
     @Request() req: OptionalAuthenticatedRequest,
     @Body() dto: RagFeedbackDto,
   ): Promise<{ recorded: boolean }> {
-    const profileId = dto.profile_id ?? req.user?.profile?.id ?? null;
+    const profileId = dto.profile_id ?? null;
 
     await this.ragService.recordFeedback(
       dto.chunk_id,

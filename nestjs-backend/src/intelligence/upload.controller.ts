@@ -22,7 +22,7 @@ import { IntelligenceService } from './intelligence.service';
 import { ResumeParser } from '../common/utils/resume-parser.util';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RagService } from '../rag/rag.service';
-import type { OptionalAuthenticatedRequest } from './intelligence.controller';
+import type { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
 
 class UploadResumeDto {
   @IsOptional()
