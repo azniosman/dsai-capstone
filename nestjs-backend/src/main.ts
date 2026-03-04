@@ -17,8 +17,22 @@ async function bootstrap() {
   // findOne(), making it idempotent as well.
   const orm = app.get(MikroORM);
   try {
+    // Enable pgvector extension before updateSchema() attempts to create
+    // any `vector(N)` columns.  The extension is a no-op if already present.
+    await orm.em.execute('CREATE EXTENSION IF NOT EXISTS vector');
+    logger.log('pgvector extension ready');
+
     await orm.getSchemaGenerator().updateSchema();
     logger.log('Schema up to date');
+
+    // Create HNSW index for cosine similarity search on document_chunk.
+    // IF NOT EXISTS makes this idempotent across cold starts.
+    await orm.em.execute(`
+      CREATE INDEX IF NOT EXISTS document_chunk_embedding_hnsw
+      ON document_chunk USING hnsw (embedding vector_cosine_ops)
+    `);
+    logger.log('HNSW index ready');
+
     const seeder = orm.getSeeder();
     await seeder.seed(DatabaseSeeder);
     logger.log('Seed complete');

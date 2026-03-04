@@ -7,6 +7,7 @@ import { ChatRequestDto, RecommendRequestDto } from './dto/intelligence.dto';
 import { LlmService } from './llm.service';
 import { ResumeParser } from '../common/utils/resume-parser.util';
 import { DomainService } from '../domain/domain.service';
+import { RagService } from '../rag/rag.service';
 
 @Injectable()
 export class IntelligenceService {
@@ -17,6 +18,7 @@ export class IntelligenceService {
     private readonly roleRepository: EntityRepository<JobRole>,
     private readonly llmService: LlmService,
     private readonly domainService: DomainService,
+    private readonly ragService: RagService,
   ) {}
 
   // Shared hybrid scoring: 0.55 × content + 0.25 × rule + 0.20 × career bonus
@@ -117,11 +119,30 @@ export class IntelligenceService {
       }
     }
 
+    // Retrieve relevant document chunks for the last user message (RAG context)
+    let ragContext = '';
+    try {
+      const lastUserMsg = [...payload.messages]
+        .reverse()
+        .find((m) => m.role === 'user');
+      if (lastUserMsg) {
+        const chunks = await this.ragService.query(
+          lastUserMsg.content,
+          tenantId,
+          { topK: 3, threshold: 0.5, profileId },
+        );
+        ragContext = RagService.formatContext(chunks);
+      }
+    } catch {
+      // RAG enrichment is best-effort — never block the chat response
+    }
+
     const systemPrompt =
       `You are SkillBridge, a Singapore career coach for SCTP learners and career-switchers. ` +
       `You help users identify skill gaps, recommend courses, and plan career transitions in Singapore's tech sector. ` +
       `Be concise, encouraging, and practical. Singapore context: SkillsFuture Credit, MCES, WSG programmes.` +
-      (profileContext ? ` User profile context: ${profileContext}` : '');
+      (profileContext ? ` User profile context: ${profileContext}` : '') +
+      ragContext;
 
     const reply = await this.llmService.chat(payload.messages, systemPrompt);
     const providerUsed = this.llmService.getLastUsedProvider();

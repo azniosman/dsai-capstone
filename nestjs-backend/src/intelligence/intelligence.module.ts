@@ -8,12 +8,14 @@ import { LlmService } from './llm.service';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { JobRole } from '@app/entities/job-role.entity';
 import { DomainModule } from '../domain/domain.module';
+import { RagModule } from '../rag/rag.module';
 
 @Module({
   imports: [
     ConfigModule,
     MikroOrmModule.forFeature([UserProfile, JobRole]),
     DomainModule,
+    RagModule,
   ],
   controllers: [IntelligenceController, UploadController],
   providers: [IntelligenceService, LlmService],

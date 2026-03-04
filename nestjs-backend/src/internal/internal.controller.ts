@@ -7,10 +7,22 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { InternalTokenGuard } from '@app/common/guards/internal-token.guard';
 import { SsgService } from '../ssg/ssg.service';
 import { SsgCacheService } from '../ssg/ssg-cache.service';
 import { DomainService } from '../domain/domain.service';
+import { RagService } from '../rag/rag.service';
+
+class BackfillDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  @Type(() => Number)
+  limit?: number = 100;
+}
 
 /** Response shape for cache sync operations. */
 interface SyncResult {
@@ -44,6 +56,7 @@ export class InternalController {
     private readonly ssgService: SsgService,
     private readonly ssgCacheService: SsgCacheService,
     private readonly domainService: DomainService,
+    private readonly ragService: RagService,
   ) {}
 
   // ─── Health ────────────────────────────────────────────────────────────────
@@ -168,6 +181,25 @@ export class InternalController {
     const start = Date.now();
     const deleted = await this.ssgCacheService.purgeExpired();
     return { deleted, duration_ms: Date.now() - start };
+  }
+
+  // ─── Embedding Backfill ────────────────────────────────────────────────────
+
+  /**
+   * Re-embeds `document_chunk` rows that have a NULL embedding.
+   * Triggered every 6 hours by EventBridge (rate 6 hours).
+   *
+   * POST /internal/embeddings/backfill
+   */
+  @Post('embeddings/backfill')
+  @UseGuards(InternalTokenGuard)
+  @HttpCode(HttpStatus.OK)
+  async backfillEmbeddings(
+    @Body() dto: BackfillDto,
+  ): Promise<{ processed: number; errors: number; duration_ms: number }> {
+    const start = Date.now();
+    const result = await this.ragService.backfill(dto.limit ?? 100);
+    return { ...result, duration_ms: Date.now() - start };
   }
 
   // ─── Analytics ─────────────────────────────────────────────────────────────

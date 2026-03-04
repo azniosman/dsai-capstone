@@ -130,14 +130,18 @@ LLM provider chain (Groq → Claude → Gemini)
 
 ### Phase 2 Implementation Checklist
 
-- [ ] `EmbeddingService` — NestJS injectable wrapping `@xenova/transformers`
-- [ ] `ProfileEmbedding` entity with `vector(384)` pgvector column
-- [ ] `DocumentChunk` entity with `vector(384)` pgvector column + metadata fields
-- [ ] Migration: `CREATE INDEX ... USING hnsw (embedding vector_cosine_ops)`
-- [ ] `RagService.query(queryText, topK, tenantId)` — embed + similarity search
-- [ ] `POST /api/rag/query` NestJS controller
-- [ ] `POST /internal/embeddings/backfill` NestJS controller (then re-enable EventBridge schedule)
-- [ ] On resume upload: chunk + embed + store with idempotency
-- [ ] Inject retrieved chunks into `IntelligenceService.chat()` system prompt
-- [ ] Unit tests for `EmbeddingService` and `RagService`
-- [ ] Log similarity scores per query to CloudWatch
+- [x] `EmbeddingService` — NestJS injectable wrapping `@xenova/transformers` (`src/rag/embedding.service.ts`)
+- [x] `DocumentChunk` entity with `vector(384)` pgvector column + content_hash idempotency (`src/entities/document-chunk.entity.ts`)
+- [x] Custom `VectorType` for MikroORM → pgvector serialisation (`src/common/types/vector.type.ts`)
+- [x] pgvector extension enabled at bootstrap (`src/main.ts` — `CREATE EXTENSION IF NOT EXISTS vector`)
+- [x] HNSW index created at bootstrap (`CREATE INDEX IF NOT EXISTS ... USING hnsw (embedding vector_cosine_ops)`)
+- [x] `RagService.query()` — embed + pgvector cosine similarity search (`src/rag/rag.service.ts`)
+- [x] `RagService.storeChunks()` — chunking + embedding + hash-idempotent upsert
+- [x] `RagService.backfill()` — re-embed NULL-embedding chunks
+- [x] `POST /api/rag/query` NestJS controller (`src/rag/rag.controller.ts`)
+- [x] `POST /internal/embeddings/backfill` NestJS controller — EventBridge re-enabled (`src/internal/internal.controller.ts`)
+- [x] On resume upload: fire-and-forget `storeChunks()` call (`src/intelligence/upload.controller.ts`)
+- [x] RAG context injected into `IntelligenceService.chat()` system prompt (top-3 chunks, threshold 0.5)
+- [x] Unit tests for `EmbeddingService` (`src/rag/embedding.service.spec.ts` — 5 tests)
+- [x] Unit tests for `RagService` (`src/rag/rag.service.spec.ts` — 12 tests)
+- [ ] Log similarity scores per query to CloudWatch (Phase 3 observability)

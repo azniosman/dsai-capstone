@@ -14,6 +14,7 @@ import { CoursesModule } from './courses/courses.module';
 import { DomainModule } from './domain/domain.module';
 import { SsgModule } from './ssg/ssg.module';
 import { InternalModule } from './internal/internal.module';
+import { RagModule } from './rag/rag.module';
 import mikroOrmConfig from './mikro-orm.config';
 
 @Module({
@@ -31,6 +32,7 @@ import mikroOrmConfig from './mikro-orm.config';
     DomainModule,
     SsgModule,
     InternalModule,
+    RagModule,
   ],
   controllers: [AppController],
   providers: [AppService],
