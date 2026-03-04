@@ -33,6 +33,20 @@ async function bootstrap() {
     `);
     logger.log('HNSW index ready');
 
+    // tsvector generated column + GIN index for hybrid keyword search (Phase 4).
+    // The generated column is maintained automatically by PostgreSQL on every
+    // INSERT/UPDATE — no application code needed to keep it up to date.
+    await orm.em.execute(`
+      ALTER TABLE document_chunk
+      ADD COLUMN IF NOT EXISTS search_vector tsvector
+      GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
+    `);
+    await orm.em.execute(`
+      CREATE INDEX IF NOT EXISTS document_chunk_search_vector_gin
+      ON document_chunk USING gin(search_vector)
+    `);
+    logger.log('tsvector column + GIN index ready');
+
     const seeder = orm.getSeeder();
     await seeder.seed(DatabaseSeeder);
     logger.log('Seed complete');

@@ -3,13 +3,22 @@
  * @description Core RAG (Retrieval-Augmented Generation) service.
  *
  * Responsibilities:
- *   1. **Ingestion** — `storeChunks()`: split raw text into overlapping
- *      chunks, hash each chunk for idempotency, generate embeddings, and
- *      persist to `document_chunk` via pgvector.
- *   2. **Retrieval** — `query()`: embed a user query and run a pgvector
- *      cosine-similarity search to return the most relevant text chunks.
- *   3. **Backfill** — `backfill()`: re-embed any `document_chunk` rows
- *      that have a NULL embedding (e.g. from before the pipeline existed).
+ *   1. **Ingestion**  — `storeChunks()`: split raw text into overlapping
+ *      chunks, hash each for idempotency, embed, and persist via pgvector.
+ *   2. **Retrieval**  — `query()`: hybrid semantic + keyword search with
+ *      Reciprocal Rank Fusion (RRF) re-ranking.
+ *   3. **Backfill**   — `backfill()`: re-embed NULL-embedding rows.
+ *   4. **Feedback**   — `recordFeedback()`: persist thumbs-up/down signals.
+ *
+ * ### Hybrid Search (Phase 4)
+ * `query()` runs two parallel branches and merges with RRF (k = 60):
+ *
+ *   Semantic branch  — pgvector cosine similarity on `embedding` column
+ *   Keyword branch   — PostgreSQL full-text search on `search_vector`
+ *                      (tsvector generated column, GIN-indexed)
+ *
+ * If the keyword branch fails (e.g. `search_vector` column not yet created
+ * on a fresh DB), the service gracefully falls back to semantic-only.
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -19,6 +28,7 @@ import { createHash } from 'crypto';
 import { DocumentChunk, ChunkSourceType } from '@app/entities/document-chunk.entity';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { Tenant } from '@app/entities/tenant.entity';
+import { RagFeedback } from '@app/entities/rag-feedback.entity';
 import { emitEMF } from '@app/common/utils/metrics.util';
 import { EmbeddingService } from './embedding.service';
 
@@ -52,6 +62,9 @@ const CHUNK_SIZE = 1500;
 /** Overlap between consecutive chunks in characters (~50 tokens). */
 const CHUNK_OVERLAP = 200;
 
+/** Standard RRF constant — balances contribution of tail-ranked results. */
+const RRF_K = 60;
+
 @Injectable()
 export class RagService {
   private readonly logger = new Logger(RagService.name);
@@ -69,11 +82,6 @@ export class RagService {
    * Splits `text` into overlapping chunks, embeds each one, and persists to
    * `document_chunk`.  Chunks whose SHA-256 hash already exists for this
    * profile are skipped (idempotent).
-   *
-   * @param text       Raw source text (resume, JD, etc.)
-   * @param profileId  ID of the UserProfile this text belongs to (nullable).
-   * @param sourceType Where the text came from: 'resume' | 'jd' | 'note'.
-   * @param tenantId   Tenant for multi-tenancy isolation.
    */
   async storeChunks(
     text: string,
@@ -86,7 +94,6 @@ export class RagService {
 
     const hashes = chunks.map((c) => RagService.sha256(c));
 
-    // Find which hashes already exist for this profile to skip re-embedding
     const existing = await this.chunkRepository.find({
       contentHash: { $in: hashes },
       ...(profileId ? { profile: { id: profileId } } : { profile: null }),
@@ -134,8 +141,11 @@ export class RagService {
   // ─── Retrieval ─────────────────────────────────────────────────────────────
 
   /**
-   * Embeds `queryText` and returns the top-K most similar document chunks
-   * from pgvector using cosine similarity.
+   * Hybrid semantic + keyword search with Reciprocal Rank Fusion.
+   *
+   * Runs both branches, merges with RRF (k=60), and returns the top-K chunks
+   * ranked by combined RRF score.  The keyword branch fails gracefully —
+   * if `search_vector` does not exist the method returns semantic results only.
    *
    * @param queryText  The user's question or context string.
    * @param tenantId   Restricts search to this tenant's chunks.
@@ -156,12 +166,43 @@ export class RagService {
       return [];
     }
 
+    const results = await this.hybridQuery(queryText, queryEmbedding, tenantId, {
+      topK,
+      threshold,
+      profileId,
+    });
+
+    const latencyMs = Date.now() - t0;
+    this.emitQueryMetrics(latencyMs, results);
+
+    this.logger.log(
+      `RAG query returned ${results.length} chunks (tenant=${tenantId} topK=${topK} threshold=${threshold} latencyMs=${latencyMs})`,
+    );
+
+    return results;
+  }
+
+  /**
+   * Runs semantic (pgvector) and keyword (tsvector) branches in parallel,
+   * then merges results using Reciprocal Rank Fusion.
+   *
+   * The keyword branch is wrapped in try/catch — if `search_vector` does not
+   * yet exist (e.g. a fresh DB before bootstrap runs) it returns empty and the
+   * merge degrades gracefully to semantic-only ranking.
+   */
+  private async hybridQuery(
+    queryText: string,
+    queryEmbedding: number[],
+    tenantId: number,
+    opts: Required<Pick<QueryOptions, 'topK' | 'threshold'>> & { profileId?: number },
+  ): Promise<RetrievedChunk[]> {
+    const { topK, threshold, profileId } = opts;
+    const overFetch = topK * 3;
+    const profileFilter = profileId ? `AND dc.profile_id = ${profileId}` : '';
     const vectorLiteral = `[${queryEmbedding.join(',')}]`;
 
-    // pgvector <=> is cosine distance; similarity = 1 - distance
-    const profileFilter = profileId ? `AND dc.profile_id = ${profileId}` : '';
-
-    const rows: Array<{
+    // ── Semantic branch (pgvector cosine similarity) ─────────────────────────
+    const semRows: Array<{
       id: number;
       content: string;
       source_type: string;
@@ -183,56 +224,87 @@ export class RagService {
       ORDER BY dc.embedding <=> $1::vector
       LIMIT $4
       `,
-      [vectorLiteral, tenantId, threshold, topK],
+      [vectorLiteral, tenantId, threshold, overFetch],
     );
 
-    const results: RetrievedChunk[] = rows.map((r) => ({
+    // ── Keyword branch (PostgreSQL full-text search on tsvector) ─────────────
+    // Wrapped in try/catch: if search_vector column is absent (pre-bootstrap),
+    // the keyword branch silently returns empty and semantic-only results flow through.
+    let kwRows: Array<{
+      id: number;
+      content: string;
+      source_type: string;
+      chunk_index: number;
+    }> = [];
+
+    try {
+      kwRows = await this.em.getConnection().execute(
+        `
+        SELECT
+          dc.id,
+          dc.content,
+          dc.source_type,
+          dc.chunk_index
+        FROM document_chunk dc
+        WHERE dc.tenant_id = $1
+          AND dc.search_vector @@ plainto_tsquery('english', $2)
+          ${profileFilter}
+        ORDER BY ts_rank(dc.search_vector, plainto_tsquery('english', $2)) DESC
+        LIMIT $3
+        `,
+        [tenantId, queryText, overFetch],
+      );
+    } catch (err) {
+      this.logger.debug(
+        `Keyword branch unavailable — degrading to semantic-only: ${(err as Error).message}`,
+      );
+    }
+
+    // ── Reciprocal Rank Fusion ────────────────────────────────────────────────
+    // RRF score = Σ 1 / (k + rank_i) across branches.
+    // Chunks appearing in both branches receive a higher combined score.
+    const semMap = new Map(
+      semRows.map((r, i) => [r.id, { ...r, semRank: i + 1 }]),
+    );
+    const kwMap = new Map(
+      kwRows.map((r, i) => [r.id, { ...r, kwRank: i + 1 }]),
+    );
+
+    const allIds = new Set([...semMap.keys(), ...kwMap.keys()]);
+
+    const scored = [...allIds].map((id) => {
+      const s = semMap.get(id);
+      const k = kwMap.get(id);
+      const rrfScore =
+        (s ? 1 / (RRF_K + s.semRank) : 0) +
+        (k ? 1 / (RRF_K + k.kwRank) : 0);
+
+      return {
+        id,
+        content: s?.content ?? k?.content ?? '',
+        source_type: s?.source_type ?? k?.source_type ?? 'resume',
+        chunk_index: s?.chunk_index ?? k?.chunk_index ?? 0,
+        similarity: s?.similarity ?? 0,
+        rrfScore,
+      };
+    });
+
+    scored.sort((a, b) => b.rrfScore - a.rrfScore);
+
+    return scored.slice(0, topK).map((r) => ({
       id: r.id,
       content: r.content,
       sourceType: r.source_type,
-      chunkIndex: r.chunk_index ?? 0,
-      similarity: parseFloat(String(r.similarity)),
+      chunkIndex: r.chunk_index,
+      similarity: r.similarity,
     }));
-
-    const latencyMs = Date.now() - t0;
-    this.emitQueryMetrics(latencyMs, results);
-
-    this.logger.log(
-      `RAG query returned ${results.length} chunks (tenant=${tenantId} topK=${topK} threshold=${threshold} latencyMs=${latencyMs})`,
-    );
-
-    return results;
-  }
-
-  /**
-   * Emits CloudWatch EMF metrics for a completed `query()` call.
-   * Metrics namespace: `SkillBridge/RAG`.
-   */
-  private emitQueryMetrics(latencyMs: number, chunks: RetrievedChunk[]): void {
-    const similarities = chunks.map((c) => c.similarity);
-    const maxSim =
-      similarities.length > 0 ? Math.max(...similarities) : 0;
-    const meanSim =
-      similarities.length > 0
-        ? similarities.reduce((a, b) => a + b, 0) / similarities.length
-        : 0;
-
-    emitEMF('SkillBridge/RAG', { Service: 'RagService' }, [
-      { name: 'RagQueryLatencyMs', value: latencyMs, unit: 'Milliseconds' },
-      { name: 'RagChunksReturned', value: chunks.length, unit: 'Count' },
-      { name: 'RagSimilarityMax', value: maxSim, unit: 'None' },
-      { name: 'RagSimilarityMean', value: meanSim, unit: 'None' },
-    ]);
   }
 
   // ─── Backfill ──────────────────────────────────────────────────────────────
 
   /**
    * Re-embeds `document_chunk` rows that have a NULL embedding.
-   * Called by the EventBridge `embedding-backfill` automation Lambda
-   * via `POST /internal/embeddings/backfill`.
-   *
-   * @param limit  Maximum rows to process per invocation (default: 100).
+   * Called by the EventBridge `embedding-backfill` automation Lambda.
    */
   async backfill(limit = 100): Promise<{ processed: number; errors: number }> {
     const rows = await this.chunkRepository.find(
@@ -264,6 +336,59 @@ export class RagService {
     return { processed, errors };
   }
 
+  // ─── Feedback ──────────────────────────────────────────────────────────────
+
+  /**
+   * Persists a thumbs-up or thumbs-down signal for a retrieved chunk.
+   *
+   * Signals are stored in `rag_feedback` for future re-ranking (Phase 5).
+   * The call is lightweight — one INSERT — and should not throw in the
+   * controller's hot path; callers may fire-and-forget with `.catch()`.
+   *
+   * @param chunkId    ID of the DocumentChunk the user reacted to.
+   * @param queryText  The query that surfaced this chunk.
+   * @param isPositive `true` = thumbs-up, `false` = thumbs-down.
+   * @param profileId  Profile ID, or `null` for anonymous feedback.
+   */
+  async recordFeedback(
+    chunkId: number,
+    queryText: string,
+    isPositive: boolean,
+    profileId: number | null,
+  ): Promise<void> {
+    const feedback = this.em.create(RagFeedback, {
+      chunk: this.em.getReference(DocumentChunk, chunkId),
+      profile: profileId ? this.em.getReference(UserProfile, profileId) : undefined,
+      queryText,
+      isPositive,
+      createdAt: new Date(),
+    });
+    this.em.persist(feedback);
+    await this.em.flush();
+  }
+
+  // ─── Private helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Emits CloudWatch EMF metrics for a completed `query()` call.
+   * Namespace: `SkillBridge/RAG`.
+   */
+  private emitQueryMetrics(latencyMs: number, chunks: RetrievedChunk[]): void {
+    const similarities = chunks.map((c) => c.similarity);
+    const maxSim = similarities.length > 0 ? Math.max(...similarities) : 0;
+    const meanSim =
+      similarities.length > 0
+        ? similarities.reduce((a, b) => a + b, 0) / similarities.length
+        : 0;
+
+    emitEMF('SkillBridge/RAG', { Service: 'RagService' }, [
+      { name: 'RagQueryLatencyMs', value: latencyMs, unit: 'Milliseconds' },
+      { name: 'RagChunksReturned', value: chunks.length, unit: 'Count' },
+      { name: 'RagSimilarityMax', value: maxSim, unit: 'None' },
+      { name: 'RagSimilarityMean', value: meanSim, unit: 'None' },
+    ]);
+  }
+
   // ─── Static helpers ────────────────────────────────────────────────────────
 
   /**
@@ -286,7 +411,6 @@ export class RagService {
       const end = Math.min(start + chunkSize, normalized.length);
       let chunk = normalized.slice(start, end);
 
-      // Snap to nearest sentence boundary if not at end
       if (end < normalized.length) {
         const boundary = Math.max(
           chunk.lastIndexOf('. '),

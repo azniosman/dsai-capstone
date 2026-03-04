@@ -31,6 +31,7 @@ const buildMockEm = () => ({
   persist: jest.fn(),
   flush: jest.fn().mockResolvedValue(undefined),
   getReference: jest.fn().mockImplementation((_cls, id) => ({ id })),
+  create: jest.fn().mockImplementation((_cls, data) => ({ ...data })),
   getConnection: jest.fn().mockReturnValue({
     execute: jest.fn().mockResolvedValue([]),
   }),
@@ -215,6 +216,104 @@ describe('RagService', () => {
 
       const sqlCall = mockEm.getConnection().execute.mock.calls[0][0] as string;
       expect(sqlCall).toContain('profile_id = 42');
+    });
+  });
+
+  // ── Hybrid search (RRF) ────────────────────────────────────────────────────
+
+  describe('query() — hybrid RRF ranking', () => {
+    it('ranks chunks appearing in both branches above single-branch chunks', async () => {
+      // id=2 appears in both semantic (rank 2) and keyword (rank 1) → highest RRF
+      const semRows = [
+        { id: 1, content: 'sem-only', source_type: 'resume', chunk_index: 0, similarity: 0.9 },
+        { id: 2, content: 'both', source_type: 'resume', chunk_index: 1, similarity: 0.7 },
+      ];
+      const kwRows = [
+        { id: 2, content: 'both', source_type: 'resume', chunk_index: 1 },
+        { id: 3, content: 'kw-only', source_type: 'resume', chunk_index: 2 },
+      ];
+
+      mockEm.getConnection().execute
+        .mockResolvedValueOnce(semRows) // semantic branch
+        .mockResolvedValueOnce(kwRows); // keyword branch
+
+      const results = await service.query('test', 1, { topK: 3 });
+
+      // id=2 appears in both → should rank first despite lower semantic similarity
+      expect(results[0].id).toBe(2);
+      expect(results.map((r) => r.id)).toContain(3); // keyword-only chunk included
+    });
+
+    it('includes keyword-only chunks that did not appear in semantic results', async () => {
+      const semRows = [
+        { id: 1, content: 'sem-only', source_type: 'resume', chunk_index: 0, similarity: 0.8 },
+      ];
+      const kwRows = [
+        { id: 99, content: 'keyword-only chunk', source_type: 'jd', chunk_index: 0 },
+      ];
+
+      mockEm.getConnection().execute
+        .mockResolvedValueOnce(semRows)
+        .mockResolvedValueOnce(kwRows);
+
+      const results = await service.query('test', 1, { topK: 5 });
+
+      expect(results.some((r) => r.id === 99)).toBe(true);
+      expect(results.find((r) => r.id === 99)?.content).toBe('keyword-only chunk');
+    });
+
+    it('returns semantic-only results when keyword branch throws', async () => {
+      const semRows = [
+        { id: 1, content: 'fallback', source_type: 'resume', chunk_index: 0, similarity: 0.75 },
+      ];
+
+      mockEm.getConnection().execute
+        .mockResolvedValueOnce(semRows)                          // semantic OK
+        .mockRejectedValueOnce(new Error('column does not exist')); // keyword fails
+
+      const results = await service.query('test', 1, { topK: 3 });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe(1);
+      expect(results[0].content).toBe('fallback');
+    });
+
+    it('respects topK limit after RRF merge', async () => {
+      const semRows = Array.from({ length: 6 }, (_, i) => ({
+        id: i + 1,
+        content: `chunk ${i}`,
+        source_type: 'resume',
+        chunk_index: i,
+        similarity: 0.9 - i * 0.05,
+      }));
+
+      mockEm.getConnection().execute
+        .mockResolvedValueOnce(semRows)
+        .mockResolvedValueOnce([]); // no keyword results
+
+      const results = await service.query('test', 1, { topK: 3 });
+      expect(results).toHaveLength(3);
+    });
+  });
+
+  // ── recordFeedback() ───────────────────────────────────────────────────────
+
+  describe('recordFeedback()', () => {
+    it('persists a positive feedback entry and flushes', async () => {
+      await service.recordFeedback(1, 'Python skills', true, 42);
+
+      expect(mockEm.create).toHaveBeenCalled();
+      expect(mockEm.persist).toHaveBeenCalled();
+      expect(mockEm.flush).toHaveBeenCalled();
+    });
+
+    it('persists anonymous (null profile) feedback', async () => {
+      await service.recordFeedback(5, 'React hooks', false, null);
+
+      const createCall = mockEm.create.mock.calls[0][1] as Record<string, unknown>;
+      expect(createCall.profile).toBeUndefined();
+      expect(createCall.isPositive).toBe(false);
+      expect(mockEm.flush).toHaveBeenCalled();
     });
   });
 

@@ -1,9 +1,9 @@
 /**
  * @file rag.controller.ts
- * @description Public RAG query endpoint — embeds the query, searches
- * pgvector, and returns relevant document chunks with similarity scores.
+ * @description Public RAG endpoints.
  *
- * POST /api/rag/query
+ * POST /api/rag/query    — hybrid semantic + keyword search (Phase 4)
+ * POST /api/rag/feedback — thumbs-up / thumbs-down signal storage (Phase 4)
  */
 
 import {
@@ -17,6 +17,7 @@ import {
 } from '@nestjs/common';
 import { RagService } from './rag.service';
 import { RagQueryDto } from './dto/rag-query.dto';
+import { RagFeedbackDto } from './dto/rag-feedback.dto';
 import { OptionalJwtAuthGuard } from '@app/auth/guards/optional-jwt-auth.guard';
 import type { OptionalAuthenticatedRequest } from '@app/intelligence/intelligence.controller';
 
@@ -25,8 +26,8 @@ export class RagController {
   constructor(private readonly ragService: RagService) {}
 
   /**
-   * Performs a semantic similarity search against all document chunks for the
-   * current tenant and returns the top-K most relevant passages.
+   * Hybrid semantic + keyword search (Reciprocal Rank Fusion) against all
+   * document chunks for the current tenant.
    *
    * POST /api/rag/query
    */
@@ -60,5 +61,30 @@ export class RagController {
       chunks,
       total: chunks.length,
     };
+  }
+
+  /**
+   * Records a thumbs-up or thumbs-down signal for a retrieved chunk.
+   * Signals are stored for future re-ranking (Phase 5).
+   *
+   * POST /api/rag/feedback
+   */
+  @Post('feedback')
+  @UseGuards(OptionalJwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async ragFeedback(
+    @Request() req: OptionalAuthenticatedRequest,
+    @Body() dto: RagFeedbackDto,
+  ): Promise<{ recorded: boolean }> {
+    const profileId = dto.profile_id ?? req.user?.profile?.id ?? null;
+
+    await this.ragService.recordFeedback(
+      dto.chunk_id,
+      dto.query_text,
+      dto.is_positive,
+      profileId,
+    );
+
+    return { recorded: true };
   }
 }

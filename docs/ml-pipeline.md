@@ -171,9 +171,90 @@ One alarm added (`terraform/modules/eventbridge/main.tf`):
 
 ---
 
-## Phase 4 (Planned)
+## Phase 4 (Complete — Active in Production)
 
-- Hybrid search: keyword (tsvector) + semantic (pgvector) re-ranked with Reciprocal Rank Fusion
-- User feedback signal: thumbs-up/down on chat replies → reinforces chunk relevance
-- CloudWatch Logs Insights dashboard for RAG miss-rate trend
-- Similarity score dashboard in CloudWatch
+### Hybrid Search — Reciprocal Rank Fusion (RRF)
+
+`RagService.query()` now runs two retrieval branches in parallel and merges
+results with **Reciprocal Rank Fusion** (k = 60):
+
+```
+User query
+    │
+    ├─► Semantic branch  — pgvector cosine similarity (existing)
+    │       embedding <=> query_embedding, threshold ≥ 0.5
+    │
+    └─► Keyword branch   — PostgreSQL full-text search (new)
+            search_vector @@ plainto_tsquery('english', query)
+            ts_rank ordered, GIN index on tsvector generated column
+    │
+    ▼
+RRF merge: score_i = Σ 1 / (60 + rank_j)
+           chunks in both branches rank highest
+    │
+    ▼
+Top-K results by RRF score → LLM context injection
+```
+
+**Graceful degradation**: If the keyword branch fails (e.g. `search_vector`
+column not yet on a fresh DB), the service automatically falls back to
+semantic-only results — no error is returned to the caller.
+
+#### Bootstrap SQL (added to `src/main.ts`)
+
+```sql
+-- Generated column — maintained automatically by PostgreSQL on every write
+ALTER TABLE document_chunk
+  ADD COLUMN IF NOT EXISTS search_vector tsvector
+  GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
+
+-- GIN index for fast full-text lookups
+CREATE INDEX IF NOT EXISTS document_chunk_search_vector_gin
+  ON document_chunk USING gin(search_vector);
+```
+
+### User Feedback Signal
+
+`POST /api/rag/feedback` accepts thumbs-up/down reactions for retrieved chunks:
+
+```json
+{ "chunk_id": 42, "query_text": "Python skills", "is_positive": true, "profile_id": 7 }
+```
+
+Feedback is stored in the `rag_feedback` table (`src/entities/rag-feedback.entity.ts`).
+In **Phase 5**, signals will re-rank results: chunks with net-positive feedback
+for a given profile receive a small RRF score boost.
+
+### CloudWatch Observability Dashboard
+
+Terraform resource `aws_cloudwatch_dashboard.rag_observability` creates a
+4-widget dashboard in `${project}-${env}-rag-observability`:
+
+| Widget | Metrics | Period |
+|---|---|---|
+| RAG Query Latency | `RagQueryLatencyMs` avg + max | 5 min |
+| Chunks Returned | `RagChunksReturned` avg | 5 min |
+| Similarity Scores | `RagSimilarityMax` + `RagSimilarityMean` avg | 5 min |
+| Miss Count | `RagChunksReturned` sum (low = miss indicator) | 1 hour |
+
+### Phase 4 Implementation Checklist
+
+- [x] `search_vector` tsvector generated column + GIN index at bootstrap (`src/main.ts`)
+- [x] `RagService.hybridQuery()` — semantic + keyword branches with RRF merge (`src/rag/rag.service.ts`)
+- [x] Keyword branch try/catch — graceful degradation to semantic-only on column absence
+- [x] `RagFeedback` entity — chunk FK, profile FK, queryText, isPositive (`src/entities/rag-feedback.entity.ts`)
+- [x] `RagFeedbackDto` — validated DTO for `POST /api/rag/feedback` (`src/rag/dto/rag-feedback.dto.ts`)
+- [x] `RagService.recordFeedback()` — persists feedback row via EntityManager
+- [x] `POST /api/rag/feedback` controller endpoint (`src/rag/rag.controller.ts`)
+- [x] `aws_cloudwatch_dashboard.rag_observability` — 4-widget Terraform resource
+- [x] Unit tests: RRF ordering, keyword-only inclusion, keyword-fail fallback, topK cap, recordFeedback (6 new tests; 47 total)
+- [ ] Phase 5: apply feedback boost in RRF scoring (re-ranking pass after merge)
+
+---
+
+## Phase 5 (Planned)
+
+- Feedback-weighted re-ranking: `chunk_score += α × net_feedback` per profile
+- CloudWatch Logs Insights saved queries for miss-rate trending
+- ONNX model upgrade path (`all-MiniLM-L12-v2`, 384-dim → higher quality)
+- Hybrid index: combine HNSW + GIN in a single pgvector+tsvector query via SQL CTE
