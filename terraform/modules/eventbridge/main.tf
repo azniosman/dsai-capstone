@@ -485,3 +485,20 @@ resource "aws_cloudwatch_metric_alarm" "embedding_errors" {
   treat_missing_data  = "notBreaching"
   alarm_actions       = [aws_sns_topic.alerts.arn]
 }
+
+# Alarm 7: RAG query latency — indicates embedding model stall or cold-start blowout
+# Metric emitted via CloudWatch EMF from RagService.query() (namespace: SkillBridge/RAG)
+resource "aws_cloudwatch_metric_alarm" "rag_latency_high" {
+  alarm_name          = "${var.project_name}-${var.environment}-rag-latency-high"
+  alarm_description   = "RAG query latency > 8s — all-MiniLM-L6-v2 model may be stalling (namespace: SkillBridge/RAG)"
+  namespace           = "SkillBridge/RAG"
+  metric_name         = "RagQueryLatencyMs"
+  dimensions          = { Service = "RagService" }
+  statistic           = "Maximum"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 8000
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}

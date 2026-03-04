@@ -218,6 +218,66 @@ describe('RagService', () => {
     });
   });
 
+  // ── EMF metrics ────────────────────────────────────────────────────────────
+
+  describe('query() — EMF metric emission', () => {
+    let writeSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      writeSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    });
+
+    afterEach(() => {
+      writeSpy.mockRestore();
+    });
+
+    it('emits a valid EMF line with RagQueryLatencyMs and RagChunksReturned', async () => {
+      mockEm.getConnection().execute.mockResolvedValue([
+        {
+          id: 1,
+          content: 'Python developer',
+          source_type: 'resume',
+          chunk_index: 0,
+          similarity: 0.82,
+        },
+      ]);
+
+      await service.query('Python skills', 1, { topK: 3 });
+
+      const calls = writeSpy.mock.calls.map((c) => c[0] as string);
+      const emfLine = calls.find((l) => l.includes('RagQueryLatencyMs'));
+
+      expect(emfLine).toBeDefined();
+      const parsed = JSON.parse(emfLine!.trim()) as Record<string, unknown>;
+
+      // EMF envelope
+      const aws = parsed._aws as {
+        CloudWatchMetrics: Array<{ Namespace: string; Dimensions: string[][]; Metrics: Array<{ Name: string; Unit: string }> }>;
+      };
+      expect(aws.CloudWatchMetrics[0].Namespace).toBe('SkillBridge/RAG');
+
+      // Metric values
+      expect(parsed['RagChunksReturned']).toBe(1);
+      expect(typeof parsed['RagQueryLatencyMs']).toBe('number');
+      expect(typeof parsed['RagSimilarityMax']).toBe('number');
+      expect(typeof parsed['RagSimilarityMean']).toBe('number');
+    });
+
+    it('emits zero-chunk metrics on the embed-unavailable early-exit path', async () => {
+      embeddingService.embed.mockResolvedValue([]);
+
+      await service.query('anything', 1);
+
+      const calls = writeSpy.mock.calls.map((c) => c[0] as string);
+      const emfLine = calls.find((l) => l.includes('RagChunksReturned'));
+
+      expect(emfLine).toBeDefined();
+      const parsed = JSON.parse(emfLine!.trim()) as Record<string, unknown>;
+      expect(parsed['RagChunksReturned']).toBe(0);
+      expect(parsed['RagSimilarityMax']).toBe(0);
+    });
+  });
+
   // ── backfill() ─────────────────────────────────────────────────────────────
 
   describe('backfill()', () => {

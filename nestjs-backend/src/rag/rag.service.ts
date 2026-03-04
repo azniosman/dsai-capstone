@@ -19,6 +19,7 @@ import { createHash } from 'crypto';
 import { DocumentChunk, ChunkSourceType } from '@app/entities/document-chunk.entity';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { Tenant } from '@app/entities/tenant.entity';
+import { emitEMF } from '@app/common/utils/metrics.util';
 import { EmbeddingService } from './embedding.service';
 
 /** A retrieved chunk with its similarity score. */
@@ -146,10 +147,12 @@ export class RagService {
     opts: QueryOptions = {},
   ): Promise<RetrievedChunk[]> {
     const { topK = 3, threshold = 0.5, profileId } = opts;
+    const t0 = Date.now();
 
     const queryEmbedding = await this.embeddingService.embed(queryText);
     if (queryEmbedding.length === 0) {
       this.logger.warn('RAG query skipped — embedding service unavailable');
+      this.emitQueryMetrics(Date.now() - t0, []);
       return [];
     }
 
@@ -183,17 +186,43 @@ export class RagService {
       [vectorLiteral, tenantId, threshold, topK],
     );
 
-    this.logger.log(
-      `RAG query returned ${rows.length} chunks (tenant=${tenantId} topK=${topK} threshold=${threshold})`,
-    );
-
-    return rows.map((r) => ({
+    const results: RetrievedChunk[] = rows.map((r) => ({
       id: r.id,
       content: r.content,
       sourceType: r.source_type,
       chunkIndex: r.chunk_index ?? 0,
       similarity: parseFloat(String(r.similarity)),
     }));
+
+    const latencyMs = Date.now() - t0;
+    this.emitQueryMetrics(latencyMs, results);
+
+    this.logger.log(
+      `RAG query returned ${results.length} chunks (tenant=${tenantId} topK=${topK} threshold=${threshold} latencyMs=${latencyMs})`,
+    );
+
+    return results;
+  }
+
+  /**
+   * Emits CloudWatch EMF metrics for a completed `query()` call.
+   * Metrics namespace: `SkillBridge/RAG`.
+   */
+  private emitQueryMetrics(latencyMs: number, chunks: RetrievedChunk[]): void {
+    const similarities = chunks.map((c) => c.similarity);
+    const maxSim =
+      similarities.length > 0 ? Math.max(...similarities) : 0;
+    const meanSim =
+      similarities.length > 0
+        ? similarities.reduce((a, b) => a + b, 0) / similarities.length
+        : 0;
+
+    emitEMF('SkillBridge/RAG', { Service: 'RagService' }, [
+      { name: 'RagQueryLatencyMs', value: latencyMs, unit: 'Milliseconds' },
+      { name: 'RagChunksReturned', value: chunks.length, unit: 'Count' },
+      { name: 'RagSimilarityMax', value: maxSim, unit: 'None' },
+      { name: 'RagSimilarityMean', value: meanSim, unit: 'None' },
+    ]);
   }
 
   // ─── Backfill ──────────────────────────────────────────────────────────────

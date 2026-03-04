@@ -12,7 +12,7 @@
 | Job recommendation ranking | Hybrid scoring formula (see below) | `IntelligenceService.getRecommendations()` |
 | Skill gap advice | LLM — one call per role batch | `LlmService.generateSkillGapAdvice()` |
 | JD match analysis | LLM skill extraction + set intersection | `LlmService.analyzeJobDescription()` |
-| Career chat | LLM with profile context injection | `IntelligenceService.chat()` |
+| Career chat | LLM with profile context + RAG injection | `IntelligenceService.chat()` |
 | Upskilling narrative | LLM | `LlmService.generateRoadmapNarrative()` |
 
 ### LLM Provider Chain
@@ -61,20 +61,13 @@ generated for all 3 role entries concurrently via `Promise.allSettled`.
 
 ---
 
-## Phase 2 (Planned — Not Yet Implemented)
-
-> The components below are **stubs only**. The Lambda handlers exist in
-> `lambdas/` but return HTTP 501 and reference services that do not exist.
-> The EventBridge schedule for `embedding-backfill` is **DISABLED** until
-> the NestJS handler is implemented.
+## Phase 2 (Complete — Active in Production)
 
 ### Embedding Pipeline
 
-**Planned model**: `all-MiniLM-L6-v2` (384-dim, sentence-transformers)
-**Planned library**: `@xenova/transformers` (Node.js ONNX runtime — no Python needed)
-**Vector store**: pgvector (extension already installed on PostgreSQL 16)
-
-Planned flow:
+**Model**: `all-MiniLM-L6-v2` (384-dim, sentence-transformers)
+**Library**: `@xenova/transformers` (Node.js ONNX runtime — no Python needed)
+**Vector store**: pgvector (extension installed on PostgreSQL 16)
 
 ```
 Text (resume chunk / skill / query)
@@ -83,7 +76,7 @@ Text (resume chunk / skill / query)
 EmbeddingService.embed(text) → float32[384]  (all-MiniLM-L6-v2)
     │
     ▼
-ProfileEmbedding / DocumentChunk entity
+DocumentChunk entity
   .embedding  pgvector column  vector(384)
     │
     ▼
@@ -92,11 +85,10 @@ CREATE INDEX ... USING hnsw (embedding vector_cosine_ops)
 
 ### Document Chunking
 
-Planned strategy:
-- Chunk size: 512 tokens
-- Overlap: 64 tokens
-- Metadata per chunk: `profile_id`, `source`, `chunk_index`, `created_at`, `content_hash`
-- Idempotency: SHA-256 hash of content — skip re-embedding if hash matches
+- Chunk size: ~1500 chars (~375 tokens for English)
+- Overlap: 200 chars — snapped to nearest sentence boundary
+- Metadata per chunk: `profile_id`, `source_type`, `chunk_index`, `created_at`, `content_hash`
+- Idempotency: SHA-256 hash of content (64-char hex) — skip re-embedding if hash matches
 
 ### RAG Retrieval Flow
 
@@ -107,26 +99,17 @@ User query
 EmbeddingService.embed(query)
     │
     ▼
-pgvector cosine similarity search (top-K, threshold ≥ 0.65)
+pgvector cosine similarity search (top-3, threshold ≥ 0.5)
     │
     ▼
 Chunks injected into LLM system prompt:
   [SYSTEM INSTRUCTIONS]
-  [RETRIEVED CONTEXT — up to 3 chunks]
+  [RETRIEVED CONTEXT — up to 3 chunks with similarity scores]
   [USER QUESTION]
     │
     ▼
 LLM provider chain (Groq → Claude → Gemini)
 ```
-
-### Phase 2 Stub Files
-
-| File | Status | Reason |
-|---|---|---|
-| `lambdas/rag_query_handler.py` | STUB — returns 501 | `app.services.rag_service` does not exist |
-| `lambdas/embedding_generator.py` | STUB — returns 501 | `app.services.rag_service` does not exist |
-| `lambdas/resume_upload_handler.py` | STUB — returns 501 | `app.services.rag_service` does not exist |
-| EventBridge `embedding-backfill` schedule | DISABLED | `/internal/embeddings/backfill` NestJS handler not yet implemented |
 
 ### Phase 2 Implementation Checklist
 
@@ -144,4 +127,53 @@ LLM provider chain (Groq → Claude → Gemini)
 - [x] RAG context injected into `IntelligenceService.chat()` system prompt (top-3 chunks, threshold 0.5)
 - [x] Unit tests for `EmbeddingService` (`src/rag/embedding.service.spec.ts` — 5 tests)
 - [x] Unit tests for `RagService` (`src/rag/rag.service.spec.ts` — 12 tests)
-- [ ] Log similarity scores per query to CloudWatch (Phase 3 observability)
+
+---
+
+## Phase 3 (Complete — Active in Production)
+
+### Observability — CloudWatch EMF Metrics
+
+Every `RagService.query()` call emits a **CloudWatch Embedded Metric Format (EMF)** line
+to stdout. Lambda's CloudWatch Logs agent automatically extracts these into custom metrics
+without extra IAM permissions or SDK calls.
+
+**Namespace**: `SkillBridge/RAG`
+**Dimension**: `Service = RagService`
+
+| Metric | Unit | Description |
+|---|---|---|
+| `RagQueryLatencyMs` | Milliseconds | Wall-clock time from embed start to results returned |
+| `RagChunksReturned` | Count | Number of chunks above similarity threshold (0 = miss) |
+| `RagSimilarityMax` | None | Highest cosine similarity score in result set (0–1) |
+| `RagSimilarityMean` | None | Mean cosine similarity across returned chunks (0–1) |
+
+Zero-chunk (miss) queries also emit metrics with `RagChunksReturned = 0` and
+`RagSimilarityMax = RagSimilarityMean = 0` — including the early-exit path when
+the embedding model is unavailable.
+
+### CloudWatch Alarm
+
+One alarm added (`terraform/modules/eventbridge/main.tf`):
+
+| Alarm | Condition | Action |
+|---|---|---|
+| `rag-latency-high` | `RagQueryLatencyMs` max > 8000 ms for 2 × 5-min periods | SNS alert email |
+
+### Phase 3 Implementation Checklist
+
+- [x] `emitEMF()` utility (`src/common/utils/metrics.util.ts`) — EMF helper, no extra SDK
+- [x] `RagService.emitQueryMetrics()` private method — called on every `query()` exit path
+- [x] `RagQueryLatencyMs`, `RagChunksReturned`, `RagSimilarityMax`, `RagSimilarityMean` emitted
+- [x] CloudWatch alarm `rag-latency-high` in `terraform/modules/eventbridge/main.tf`
+- [x] Unit tests for EMF emission (`src/rag/rag.service.spec.ts` — 2 new tests, 41 total)
+- [ ] Log similarity scores dashboard in CloudWatch (Phase 4 observability)
+
+---
+
+## Phase 4 (Planned)
+
+- Hybrid search: keyword (tsvector) + semantic (pgvector) re-ranked with Reciprocal Rank Fusion
+- User feedback signal: thumbs-up/down on chat replies → reinforces chunk relevance
+- CloudWatch Logs Insights dashboard for RAG miss-rate trend
+- Similarity score dashboard in CloudWatch
