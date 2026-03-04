@@ -349,61 +349,61 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="flex-1 overflow-y-auto">
-                <table className="w-full text-xs text-left text-slate-custom-900 border-slate-custom-200">
-                  <thead className="bg-slate-custom-50 sticky top-0 border-b border-slate-custom-100 text-slate-custom-500">
+                <table className="w-full text-xs text-left text-slate-300 border-white/5">
+                  <thead className="bg-background-dark/80 backdrop-blur-md sticky top-0 border-b border-primary/20 text-slate-400">
                     <tr>
-                      <th className="px-3 py-2 font-bold uppercase text-[9px]">
+                      <th className="px-3 py-2 font-bold uppercase text-[9px] tracking-widest">
                         Skill
                       </th>
-                      <th className="px-3 py-2 font-bold uppercase text-[9px] text-right">
+                      <th className="px-3 py-2 font-bold uppercase text-[9px] text-right tracking-widest">
                         Trend
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-custom-100">
-                    <tr className="hover:bg-slate-custom-50 cursor-pointer">
+                  <tbody className="divide-y divide-white/5">
+                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
                       <td className="px-3 py-2 font-medium">Generative AI</td>
-                      <td className="px-3 py-2 text-right text-green-600 font-mono">
+                      <td className="px-3 py-2 text-right text-primary font-mono drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]">
                         +142%
                       </td>
                     </tr>
-                    <tr className="hover:bg-slate-custom-50 cursor-pointer">
+                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
                       <td className="px-3 py-2 font-medium">Cloud Security</td>
-                      <td className="px-3 py-2 text-right text-green-600 font-mono">
+                      <td className="px-3 py-2 text-right text-primary font-mono drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]">
                         +45%
                       </td>
                     </tr>
-                    <tr className="hover:bg-slate-custom-50 cursor-pointer">
+                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
                       <td className="px-3 py-2 font-medium">
                         Rust Engineering
                       </td>
-                      <td className="px-3 py-2 text-right text-green-600 font-mono">
+                      <td className="px-3 py-2 text-right text-primary font-mono drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]">
                         +28%
                       </td>
                     </tr>
-                    <tr className="hover:bg-slate-custom-50 cursor-pointer">
+                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
                       <td className="px-3 py-2 font-medium">
                         FinOps Analytics
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-custom-400 font-mono">
+                      <td className="px-3 py-2 text-right text-slate-400 font-mono">
                         +4%
                       </td>
                     </tr>
-                    <tr className="hover:bg-slate-custom-50 cursor-pointer">
+                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
                       <td className="px-3 py-2 font-medium">Blockchain Hubs</td>
-                      <td className="px-3 py-2 text-right text-red-600 font-mono">
+                      <td className="px-3 py-2 text-right text-accent-coral font-mono drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]">
                         -12%
                       </td>
                     </tr>
-                    <tr className="hover:bg-slate-custom-50 cursor-pointer">
+                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
                       <td className="px-3 py-2 font-medium">React Native</td>
-                      <td className="px-3 py-2 text-right text-slate-custom-400 font-mono">
+                      <td className="px-3 py-2 text-right text-slate-400 font-mono">
                         --
                       </td>
                     </tr>
-                    <tr className="hover:bg-slate-custom-50 cursor-pointer">
+                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
                       <td className="px-3 py-2 font-medium">MLOps Lifecycle</td>
-                      <td className="px-3 py-2 text-right text-green-600 font-mono">
+                      <td className="px-3 py-2 text-right text-primary font-mono drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]">
                         +62%
                       </td>
                     </tr>

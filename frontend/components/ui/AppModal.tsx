@@ -51,9 +51,9 @@ export function AppModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className={cn(
-          "flex flex-col gap-0 overflow-hidden bg-[var(--background-dark)] border border-primary/30 transition-all rounded-none",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-          "duration-200 shadow-[0_0_30px_rgba(37,157,244,0.1)] relative",
+          "flex flex-col gap-0 overflow-hidden bg-background-dark border border-primary/30 transition-all rounded-none",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[50%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[50%]",
+          "duration-200 shadow-[0_0_30px_rgba(37,157,244,0.1)] fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]",
           sizeClasses[size],
           size === "full" &&
             "rounded-none w-screen h-screen sm:h-[95vh] sm:w-[95vw] max-w-none m-0",

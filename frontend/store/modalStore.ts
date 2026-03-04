@@ -13,6 +13,7 @@ export type ModalType =
   | "skillsFutureCourses"
   | "matchIntelligence"
   | "aiExecutiveBrief"
+  | "courseIntel"
   | null;
 
 interface ModalStore {

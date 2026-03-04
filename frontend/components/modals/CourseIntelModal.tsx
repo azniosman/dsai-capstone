@@ -7,18 +7,27 @@ import { Sparkles, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "@/lib/api-client";
-import type { Recommendation } from "@/lib/api";
 
-export default function AiExecutiveBriefModal() {
+// Re-defining the subset of the Course interface used here
+interface Course {
+  id: number;
+  title: string;
+  provider: string;
+  skills_taught: string[];
+}
+
+export default function CourseIntelModal() {
   const { isOpen, closeModal, data, type } = useModalStore();
   const [generating, setGenerating] = useState(false);
   const [aiText, setAiText] = useState<string | null>(null);
 
-  const isModalOpen = isOpen && type === "aiExecutiveBrief";
-  const rec = (data as Recommendation | null) || {
-    title: "Unknown Role",
-    match_score: 0,
-    missing_skills: [],
+  const isModalOpen = isOpen && type === "courseIntel";
+  // Provide a safe fallback so the modal can always render the shell
+  const course = (data as Course | null) || {
+    id: 0,
+    title: "Unknown Course",
+    provider: "Unknown Provider",
+    skills_taught: [],
   };
 
   const handleGenerateInsight = async (force: boolean = false) => {
@@ -28,7 +37,7 @@ export default function AiExecutiveBriefModal() {
     setAiText(null);
     try {
       const pid = localStorage.getItem("profileId");
-      const prompt = `Give a 3-sentence career insight for the role "${rec.title}" with match score ${Math.round(rec?.match_score * 100)}%. Key skills I'm missing: ${(rec?.missing_skills || []).slice(0, 3).join(", ") || "none"}. Keep it concise and actionable.`;
+      const prompt = `Give a 3-sentence career insight on the ROI and skill gaps this course fills for the user. Course: "${course.title}" by ${course.provider}. Skills taught: ${(course.skills_taught || []).slice(0, 3).join(", ") || "none"}. Keep it concise and actionable.`;
 
       const res = await api.post("/api/chat", {
         profile_id: pid ? parseInt(pid) : null,
@@ -67,8 +76,8 @@ export default function AiExecutiveBriefModal() {
     <AppModal
       isOpen={isModalOpen}
       onClose={closeModal}
-      title="AI Executive Brief"
-      description={`Synthesizing intel for ${rec.title}`}
+      title="CERTIFICATION INTELLIGENCE"
+      description={`Analyzing ROI for ${course.title}`}
       size="md"
     >
       <div className="p-6 bg-background-dark border border-primary/30 rounded-xl relative overflow-hidden shadow-[0_0_15px_rgba(37,157,244,0.1)] mt-4">
@@ -77,7 +86,7 @@ export default function AiExecutiveBriefModal() {
           <div className="flex items-center gap-2">
             <Sparkles className="text-primary w-4 h-4 shadow-[0_0_8px_rgba(37,157,244,0.8)]" />
             <h3 className="font-mono font-bold uppercase tracking-widest text-[10px] text-primary">
-              Executive Summary
+              AI Course Evaluation
             </h3>
           </div>
           {aiText && !generating && (
@@ -85,7 +94,7 @@ export default function AiExecutiveBriefModal() {
               onClick={() => handleGenerateInsight(true)}
               className="flex items-center gap-1 font-mono text-[8px] uppercase font-bold text-primary hover:text-white transition-colors tracking-widest border border-primary/20 bg-primary/5 px-2 py-1 rounded"
             >
-              <RefreshCw className="w-3 h-3" /> Re-calculate
+              <RefreshCw className="w-3 h-3" /> Re-evaluate
             </button>
           )}
         </div>

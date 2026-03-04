@@ -48,6 +48,11 @@ const AiExecutiveBriefModal = dynamic(
   { ssr: false },
 );
 
+const CourseIntelModal = dynamic(
+  () => import("@/components/modals/CourseIntelModal"),
+  { ssr: false },
+);
+
 export function ModalProvider() {
   const [mounted, setMounted] = useState(false);
   const { type, isOpen } = useModalStore();
@@ -79,6 +84,7 @@ export function ModalProvider() {
       )}
       {type === "matchIntelligence" && isOpen && <MatchIntelligenceModal />}
       {type === "aiExecutiveBrief" && isOpen && <AiExecutiveBriefModal />}
+      {type === "courseIntel" && isOpen && <CourseIntelModal />}
     </>
   );
 }

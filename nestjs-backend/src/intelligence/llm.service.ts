@@ -70,7 +70,12 @@ export class LlmService {
       this.configService.get<string>('GEMINI_MODEL') ?? 'gemini-2.0-flash';
 
     const allProviders: Record<LlmProviderName, LlmProvider> = {
-      groq: new GroqProvider(groqApiKey, groqModel, groqTemperature, groqMaxTokens),
+      groq: new GroqProvider(
+        groqApiKey,
+        groqModel,
+        groqTemperature,
+        groqMaxTokens,
+      ),
       claude: new ClaudeProvider(claudeApiKey, claudeModel),
       gemini: new GeminiProvider(geminiApiKey, geminiModel),
     };

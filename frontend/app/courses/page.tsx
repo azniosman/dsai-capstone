@@ -9,6 +9,7 @@ import {
   TrendingUp,
   PlusCircle,
   GraduationCap,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -369,7 +370,7 @@ export default function CourseBrowser() {
             )}
             <div className="p-4 border-b border-slate-custom-100 dark:border-slate-custom-800 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-custom-800 dark:text-slate-custom-200">
-                Global Certification Inventory
+                Certification Inventory
               </h3>
               <div className="flex gap-2">
                 <button className="p-1 text-slate-custom-400 hover:text-slate-custom-600">
@@ -421,7 +422,7 @@ export default function CourseBrowser() {
                           <div className="size-8 rounded bg-slate-custom-100 dark:bg-slate-custom-800 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                             <GraduationCap className="text-slate-custom-400 group-hover:text-primary w-5 h-5" />
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <p className="text-xs font-bold text-slate-custom-800 dark:text-slate-custom-200">
                               {course.title}
                             </p>
@@ -436,6 +437,16 @@ export default function CourseBrowser() {
                               </span>
                             )}
                           </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openModal("courseIntel", course);
+                            }}
+                            className="p-1.5 ml-auto text-primary/40 hover:text-primary transition-colors hover:bg-primary/10 rounded"
+                            title="Generate AI Course Intel"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                       <td className="p-3 text-xs font-medium text-slate-custom-600 dark:text-slate-custom-400">

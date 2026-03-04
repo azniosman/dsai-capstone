@@ -6,6 +6,8 @@ import { AuthService } from '../src/auth/auth.service';
 import { UsersService } from '../src/users/users.service';
 import { LocalAuthGuard } from '../src/auth/guards/local-auth.guard';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 const mockGuard = {
   canActivate: (context: any) => {
@@ -40,6 +42,8 @@ describe('AuthController (e2e)', () => {
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: UsersService, useValue: mockUsersService },
+        { provide: JwtService, useValue: {} },
+        { provide: ConfigService, useValue: {} },
       ],
     })
       .overrideGuard(LocalAuthGuard)

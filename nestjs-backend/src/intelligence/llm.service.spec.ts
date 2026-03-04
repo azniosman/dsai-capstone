@@ -248,7 +248,9 @@ describe('LlmService', () => {
     };
 
     it('parses resume via Groq (primary)', async () => {
-      groqCreate.mockResolvedValue(groqResponse(JSON.stringify(expectedParsed)));
+      groqCreate.mockResolvedValue(
+        groqResponse(JSON.stringify(expectedParsed)),
+      );
 
       const actualResult = await service.parseResume(inputResumeText);
 
@@ -294,7 +296,9 @@ describe('LlmService', () => {
     ];
 
     it('returns advice array from Groq', async () => {
-      groqCreate.mockResolvedValue(groqResponse(JSON.stringify(expectedAdvice)));
+      groqCreate.mockResolvedValue(
+        groqResponse(JSON.stringify(expectedAdvice)),
+      );
 
       const actualResult = await service.generateSkillGapAdvice(
         inputRole,
