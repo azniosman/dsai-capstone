@@ -6,19 +6,22 @@
  *   1. **Ingestion**  — `storeChunks()`: split raw text into overlapping
  *      chunks, hash each for idempotency, embed, and persist via pgvector.
  *   2. **Retrieval**  — `query()`: hybrid semantic + keyword search with
- *      Reciprocal Rank Fusion (RRF) re-ranking.
+ *      Reciprocal Rank Fusion (RRF) and optional cross-encoder re-ranking.
  *   3. **Backfill**   — `backfill()`: re-embed NULL-embedding rows.
  *   4. **Feedback**   — `recordFeedback()`: persist thumbs-up/down signals.
  *
- * ### Hybrid Search (Phase 4)
- * `query()` runs two parallel branches and merges with RRF (k = 60):
+ * ### Hybrid Search (Phase 6 — single-trip CTE)
+ * `query()` executes one SQL CTE that combines pgvector HNSW and tsvector GIN
+ * branches via FULL OUTER JOIN, merging with Reciprocal Rank Fusion (k = 60).
+ * One DB round trip instead of the two concurrent queries used in Phase 5.
  *
- *   Semantic branch  — pgvector cosine similarity on `embedding` column
- *   Keyword branch   — PostgreSQL full-text search on `search_vector`
- *                      (tsvector generated column, GIN-indexed)
+ * If the hybrid CTE fails (e.g. `search_vector` column absent on a fresh DB),
+ * the service falls back to semantic-only retrieval automatically.
  *
- * If the keyword branch fails (e.g. `search_vector` column not yet created
- * on a fresh DB), the service gracefully falls back to semantic-only.
+ * ### Cross-Encoder Re-ranking (Phase 6)
+ * After RRF merge and feedback boost, `CrossEncoderService.rerank()` scores
+ * the top-N candidates using `ms-marco-MiniLM-L-6-v2`.  Disabled by default
+ * (`RERANKER_ENABLED=true` to activate) and non-fatal.
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -31,6 +34,7 @@ import { Tenant } from '@app/entities/tenant.entity';
 import { RagFeedback } from '@app/entities/rag-feedback.entity';
 import { emitEMF } from '@app/common/utils/metrics.util';
 import { EmbeddingService } from './embedding.service';
+import { CrossEncoderService } from './cross-encoder.service';
 
 /** A retrieved chunk with its similarity score. */
 export interface RetrievedChunk {
@@ -65,6 +69,20 @@ const CHUNK_OVERLAP = 200;
 /** Standard RRF constant — balances contribution of tail-ranked results. */
 const RRF_K = 60;
 
+/**
+ * Internal row shape returned by `cteHybridQuery` and `semanticOnlyQuery`.
+ * Both methods normalise to this interface before merging / sorting.
+ */
+interface HybridRow {
+  id: number;
+  content: string;
+  source_type: string;
+  chunk_index: number;
+  similarity: number;
+  /** Mutable RRF score — adjusted in-place by `applyFeedbackBoost`. */
+  rrfScore: number;
+}
+
 @Injectable()
 export class RagService {
   private readonly logger = new Logger(RagService.name);
@@ -74,6 +92,7 @@ export class RagService {
     private readonly chunkRepository: EntityRepository<DocumentChunk>,
     private readonly em: EntityManager,
     private readonly embeddingService: EmbeddingService,
+    private readonly crossEncoderService: CrossEncoderService,
   ) {}
 
   // ─── Ingestion ─────────────────────────────────────────────────────────────
@@ -141,11 +160,12 @@ export class RagService {
   // ─── Retrieval ─────────────────────────────────────────────────────────────
 
   /**
-   * Hybrid semantic + keyword search with Reciprocal Rank Fusion.
+   * Hybrid semantic + keyword search with Reciprocal Rank Fusion and optional
+   * cross-encoder re-ranking.
    *
-   * Runs both branches, merges with RRF (k=60), and returns the top-K chunks
-   * ranked by combined RRF score.  The keyword branch fails gracefully —
-   * if `search_vector` does not exist the method returns semantic results only.
+   * Executes a single SQL CTE combining pgvector HNSW and tsvector GIN via
+   * FULL OUTER JOIN (Phase 6).  Falls back to semantic-only on CTE failure
+   * (e.g. `search_vector` column absent on a fresh DB).
    *
    * @param queryText  The user's question or context string.
    * @param tenantId   Restricts search to this tenant's chunks.
@@ -183,31 +203,180 @@ export class RagService {
   }
 
   /**
-   * Runs semantic (pgvector) and keyword (tsvector) branches **concurrently**
-   * via `Promise.all`, then merges results using Reciprocal Rank Fusion (RRF).
+   * Orchestrates the full retrieval pipeline:
    *
-   * After RRF merge, `applyFeedbackBoost()` adjusts scores for authenticated
-   * users based on their stored `rag_feedback` signals (Phase 5).
-   *
-   * The keyword branch silently returns [] on any error (e.g. `search_vector`
-   * column absent on a fresh DB) — semantic-only results flow through unchanged.
+   *   1. **CTE hybrid query** — single SQL round trip (Phase 6); falls back
+   *      to semantic-only if the CTE fails.
+   *   2. **Feedback boost** — adjusts RRF scores in-place for authenticated
+   *      users based on stored `rag_feedback` signals (Phase 5).
+   *   3. **Cross-encoder re-ranking** — optional; rescores top-N candidates
+   *      with `ms-marco-MiniLM-L-6-v2` (Phase 6, off by default).
    */
   private async hybridQuery(
     queryText: string,
     queryEmbedding: number[],
     tenantId: number,
-    opts: Required<Pick<QueryOptions, 'topK' | 'threshold'>> & { profileId?: number },
+    opts: Required<Pick<QueryOptions, 'topK' | 'threshold'>> & {
+      profileId?: number;
+    },
   ): Promise<RetrievedChunk[]> {
     const { topK, threshold, profileId } = opts;
-    const overFetch = topK * 3;
+
+    // ── 1. Retrieve candidates (CTE → semantic fallback) ─────────────────────
+    let scored: HybridRow[];
+    try {
+      scored = await this.cteHybridQuery(
+        queryText,
+        queryEmbedding,
+        tenantId,
+        topK,
+        threshold,
+        profileId,
+      );
+    } catch (err) {
+      this.logger.debug(
+        `Hybrid CTE unavailable — degrading to semantic-only: ${(err as Error).message}`,
+      );
+      scored = await this.semanticOnlyQuery(
+        queryEmbedding,
+        tenantId,
+        topK,
+        threshold,
+        profileId,
+      );
+    }
+
+    // ── 2. Feedback-weighted re-ranking (Phase 5) ─────────────────────────────
+    if (profileId) {
+      await this.applyFeedbackBoost(scored, profileId);
+      scored.sort((a, b) => b.rrfScore - a.rrfScore);
+    }
+
+    // ── 3. Convert to output shape and cross-encoder re-rank (Phase 6) ───────
+    const preRanked: RetrievedChunk[] = scored.slice(0, topK).map((r) => ({
+      id: r.id,
+      content: r.content,
+      sourceType: r.source_type,
+      chunkIndex: r.chunk_index,
+      similarity: r.similarity,
+    }));
+
+    return this.crossEncoderService.rerank(queryText, preRanked);
+  }
+
+  /**
+   * Executes a single hybrid CTE combining pgvector HNSW (`semantic` branch)
+   * and tsvector GIN (`keyword` branch) via FULL OUTER JOIN, merging with
+   * Reciprocal Rank Fusion.
+   *
+   * One DB round trip replaces the Phase 5 `Promise.all([sem, kw])` approach.
+   *
+   * Throws if the `search_vector` column is absent — callers should catch
+   * and fall back to `semanticOnlyQuery()`.
+   */
+  private async cteHybridQuery(
+    queryText: string,
+    queryEmbedding: number[],
+    tenantId: number,
+    topK: number,
+    threshold: number,
+    profileId: number | undefined,
+  ): Promise<HybridRow[]> {
     const profileFilter = profileId ? `AND dc.profile_id = ${profileId}` : '';
     const vectorLiteral = `[${queryEmbedding.join(',')}]`;
+    const overFetch = topK * 3;
 
-    // ── Semantic + keyword branches run concurrently ──────────────────────────
-    type SemRow = { id: number; content: string; source_type: string; chunk_index: number; similarity: number };
-    type KwRow  = { id: number; content: string; source_type: string; chunk_index: number };
+    type CteRow = {
+      id: number;
+      content: string;
+      source_type: string;
+      chunk_index: number;
+      similarity: number;
+      rrf_score: number;
+    };
 
-    const semPromise: Promise<SemRow[]> = this.em.getConnection().execute(
+    const rows: CteRow[] = await this.em.getConnection().execute(
+      `
+      WITH
+        semantic AS (
+          SELECT
+            dc.id,
+            dc.content,
+            dc.source_type,
+            dc.chunk_index,
+            (1 - (dc.embedding <=> $1::vector))::float  AS similarity,
+            ROW_NUMBER() OVER (ORDER BY dc.embedding <=> $1::vector) AS sem_rank
+          FROM document_chunk dc
+          WHERE dc.tenant_id = $2
+            AND dc.embedding IS NOT NULL
+            AND (1 - (dc.embedding <=> $1::vector)) >= $3
+            ${profileFilter}
+          LIMIT $4
+        ),
+        keyword AS (
+          SELECT
+            dc.id,
+            dc.content,
+            dc.source_type,
+            dc.chunk_index,
+            ROW_NUMBER() OVER (
+              ORDER BY ts_rank(dc.search_vector, plainto_tsquery('english', $5)) DESC
+            ) AS kw_rank
+          FROM document_chunk dc
+          WHERE dc.tenant_id = $2
+            AND dc.search_vector @@ plainto_tsquery('english', $5)
+            ${profileFilter}
+          LIMIT $4
+        ),
+        rrf AS (
+          SELECT
+            COALESCE(s.id,          k.id)          AS id,
+            COALESCE(s.content,     k.content)     AS content,
+            COALESCE(s.source_type, k.source_type) AS source_type,
+            COALESCE(s.chunk_index, k.chunk_index) AS chunk_index,
+            COALESCE(s.similarity,  0.0)::float    AS similarity,
+            (
+              COALESCE(1.0 / ($6::float + s.sem_rank::float), 0.0) +
+              COALESCE(1.0 / ($6::float + k.kw_rank::float), 0.0)
+            )::float AS rrf_score
+          FROM      semantic s
+          FULL OUTER JOIN keyword k ON s.id = k.id
+        )
+      SELECT id, content, source_type, chunk_index, similarity, rrf_score
+      FROM   rrf
+      ORDER  BY rrf_score DESC
+      LIMIT  $7
+      `,
+      [vectorLiteral, tenantId, threshold, overFetch, queryText, RRF_K, overFetch],
+    );
+
+    return rows.map((r) => ({ ...r, rrfScore: r.rrf_score }));
+  }
+
+  /**
+   * Semantic-only fallback used when the hybrid CTE is unavailable.
+   * Runs the pgvector cosine query and synthesises an RRF score from rank.
+   */
+  private async semanticOnlyQuery(
+    queryEmbedding: number[],
+    tenantId: number,
+    topK: number,
+    threshold: number,
+    profileId: number | undefined,
+  ): Promise<HybridRow[]> {
+    const profileFilter = profileId ? `AND dc.profile_id = ${profileId}` : '';
+    const vectorLiteral = `[${queryEmbedding.join(',')}]`;
+    const overFetch = topK * 3;
+
+    type SemRow = {
+      id: number;
+      content: string;
+      source_type: string;
+      chunk_index: number;
+      similarity: number;
+    };
+
+    const rows: SemRow[] = await this.em.getConnection().execute(
       `
       SELECT
         dc.id,
@@ -226,70 +395,7 @@ export class RagService {
       [vectorLiteral, tenantId, threshold, overFetch],
     );
 
-    const kwPromise: Promise<KwRow[]> = (
-      this.em.getConnection().execute(
-        `
-        SELECT
-          dc.id,
-          dc.content,
-          dc.source_type,
-          dc.chunk_index
-        FROM document_chunk dc
-        WHERE dc.tenant_id = $1
-          AND dc.search_vector @@ plainto_tsquery('english', $2)
-          ${profileFilter}
-        ORDER BY ts_rank(dc.search_vector, plainto_tsquery('english', $2)) DESC
-        LIMIT $3
-        `,
-        [tenantId, queryText, overFetch],
-      ) as Promise<KwRow[]>
-    ).catch((err: Error): KwRow[] => {
-      this.logger.debug(
-        `Keyword branch unavailable — degrading to semantic-only: ${err.message}`,
-      );
-      return [];
-    });
-
-    const [semRows, kwRows] = await Promise.all([semPromise, kwPromise]);
-
-    // ── Reciprocal Rank Fusion ────────────────────────────────────────────────
-    // RRF score = Σ 1 / (k + rank_i) across branches.
-    // Chunks appearing in both branches receive a higher combined score.
-    const semMap = new Map(semRows.map((r, i) => [r.id, { ...r, semRank: i + 1 }]));
-    const kwMap  = new Map(kwRows.map((r, i) => [r.id, { ...r, kwRank: i + 1 }]));
-    const allIds = new Set([...semMap.keys(), ...kwMap.keys()]);
-
-    const scored = [...allIds].map((id) => {
-      const s = semMap.get(id);
-      const k = kwMap.get(id);
-      return {
-        id,
-        content: s?.content ?? k?.content ?? '',
-        source_type: s?.source_type ?? k?.source_type ?? 'resume',
-        chunk_index: s?.chunk_index ?? k?.chunk_index ?? 0,
-        similarity: s?.similarity ?? 0,
-        rrfScore:
-          (s ? 1 / (RRF_K + s.semRank) : 0) +
-          (k ? 1 / (RRF_K + k.kwRank) : 0),
-      };
-    });
-
-    scored.sort((a, b) => b.rrfScore - a.rrfScore);
-
-    // ── Feedback-weighted re-ranking (Phase 5) ────────────────────────────────
-    // Applies a ±α boost per chunk based on net user feedback for this profile.
-    if (profileId) {
-      await this.applyFeedbackBoost(scored, profileId);
-      scored.sort((a, b) => b.rrfScore - a.rrfScore);
-    }
-
-    return scored.slice(0, topK).map((r) => ({
-      id: r.id,
-      content: r.content,
-      sourceType: r.source_type,
-      chunkIndex: r.chunk_index,
-      similarity: r.similarity,
-    }));
+    return rows.map((r, i) => ({ ...r, rrfScore: 1 / (RRF_K + (i + 1)) }));
   }
 
   /**
@@ -304,7 +410,7 @@ export class RagService {
    * the original RRF scores are left unchanged and a debug log is emitted.
    */
   private async applyFeedbackBoost(
-    results: Array<{ id: number; rrfScore: number }>,
+    results: HybridRow[],
     profileId: number,
   ): Promise<void> {
     if (results.length === 0) return;

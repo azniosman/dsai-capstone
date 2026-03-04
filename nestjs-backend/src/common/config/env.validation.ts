@@ -109,6 +109,22 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   readonly EMBEDDING_MODEL?: string;
+
+  // Cross-encoder re-ranker (Phase 6) — all optional, disabled by default
+  // RERANKER_ENABLED: set to 'true' to activate (default: disabled)
+  // RERANKER_MODEL: HuggingFace model ID (default: 'Xenova/ms-marco-MiniLM-L-6-v2')
+  // RERANKER_TOP_N: how many RRF candidates to score (default: 20)
+  @IsString()
+  @IsOptional()
+  readonly RERANKER_ENABLED?: string;
+
+  @IsString()
+  @IsOptional()
+  readonly RERANKER_MODEL?: string;
+
+  @IsString()
+  @IsOptional()
+  readonly RERANKER_TOP_N?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

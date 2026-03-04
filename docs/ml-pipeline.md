@@ -339,9 +339,61 @@ aws logs start-query \
 
 ---
 
-## Phase 6 (Planned)
+## Phase 6 (Complete)
 
-- ONNX model upgrade: `all-MiniLM-L12-v2` for higher recall on technical queries
-- Hybrid CTE: single SQL query combining HNSW + GIN via FULL OUTER JOIN (one round trip)
-- Cross-encoder re-ranking: lightweight ML re-ranker on top-20 RRF candidates
-- Streaming RAG: inject retrieved context progressively into SSE chat responses
+### Hybrid CTE — single-trip retrieval
+
+`hybridQuery()` now executes one SQL CTE instead of two concurrent queries
+(`Promise.all` Phase 5 approach).  The CTE combines:
+
+- **`semantic` sub-CTE** — pgvector HNSW `<=>` cosine distance, filtered by
+  threshold and optional profile, ranked by `ROW_NUMBER()`.
+- **`keyword` sub-CTE** — tsvector GIN `@@` + `ts_rank`, ranked by
+  `ROW_NUMBER()`.
+- **`rrf` sub-CTE** — `FULL OUTER JOIN` of both branches; RRF score computed
+  as `COALESCE(1/(60+sem_rank), 0) + COALESCE(1/(60+kw_rank), 0)`.
+
+One DB round trip instead of two concurrent queries.  If the hybrid CTE fails
+(e.g. `search_vector` column absent on a fresh DB), `semanticOnlyQuery()`
+provides a seamless fallback that computes RRF score from semantic rank alone.
+
+### ONNX model upgrade
+
+`all-MiniLM-L12-v2` (higher recall, ~33 MB quantized) is available by setting
+`EMBEDDING_MODEL=Xenova/all-MiniLM-L12-v2`.  Both models output 384-dim
+vectors and are drop-in compatible with the existing pgvector schema.
+
+### Cross-encoder re-ranking (`CrossEncoderService`)
+
+**File**: `src/rag/cross-encoder.service.ts`
+
+After RRF merge and feedback boost, an optional second-pass re-ranker scores
+the top-N candidates using `Xenova/ms-marco-MiniLM-L-6-v2` — a lightweight
+cross-encoder fine-tuned on MS MARCO passage ranking.
+
+| Env var              | Default                            | Description                              |
+| -------------------- | ---------------------------------- | ---------------------------------------- |
+| `RERANKER_ENABLED`   | `false`                            | Set `true` to activate cross-encoder     |
+| `RERANKER_MODEL`     | `Xenova/ms-marco-MiniLM-L-6-v2`    | Any `@xenova/transformers`-compatible CE |
+| `RERANKER_TOP_N`     | `20`                               | How many RRF candidates are scored       |
+
+**Non-fatal**: if the model cannot load or inference throws, original RRF order
+is preserved.  Lazy-loaded like `EmbeddingService` — zero overhead for warm
+invocations once loaded.
+
+### Retrieval pipeline (Phase 6 end state)
+
+```
+embed(query)
+  → cteHybridQuery()          ← single SQL CTE (HNSW + GIN + FULL OUTER JOIN + RRF)
+      on failure → semanticOnlyQuery()    ← pgvector only, rrfScore from rank
+  → applyFeedbackBoost()      ← α·tanh(net_votes), sorted, auth users only
+  → CrossEncoderService.rerank()  ← ms-marco top-N scoring (optional)
+  → slice(0, topK)            ← final result set
+```
+
+### Streaming RAG (deferred)
+
+Streaming RAG context injection into SSE chat responses is deferred — it
+requires frontend and `IntelligenceService` changes not in scope for this
+phase.
