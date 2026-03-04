@@ -12,6 +12,7 @@ export type ModalType =
   | "roleMatch"
   | "skillsFutureCourses"
   | "matchIntelligence"
+  | "aiExecutiveBrief"
   | null;
 
 interface ModalStore {

@@ -43,6 +43,10 @@ const MatchIntelligenceModal = dynamic(
   () => import("@/components/modals/MatchIntelligenceModal"),
   { ssr: false },
 );
+const AiExecutiveBriefModal = dynamic(
+  () => import("@/components/modals/AiExecutiveBriefModal"),
+  { ssr: false },
+);
 
 export function ModalProvider() {
   const [mounted, setMounted] = useState(false);
@@ -74,6 +78,7 @@ export function ModalProvider() {
         <SkillsFutureCoursesModalAdapter />
       )}
       {type === "matchIntelligence" && isOpen && <MatchIntelligenceModal />}
+      {type === "aiExecutiveBrief" && isOpen && <AiExecutiveBriefModal />}
     </>
   );
 }

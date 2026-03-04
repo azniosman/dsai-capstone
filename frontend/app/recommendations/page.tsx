@@ -14,17 +14,16 @@ import {
   BadgeCheck,
   Banknote,
   Search,
-  Activity,
   CheckCircle2,
   XCircle,
   Sparkles,
-  RefreshCw,
   Zap,
   ArrowUpRight,
   TerminalSquare,
   Database,
   Network,
   Rocket,
+  Activity,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -54,64 +53,29 @@ interface Recommendation {
 export default function Recommendations() {
   const [recs, setRecs] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [hasProfile, setHasProfile] = useState(false);
   const [selected, setSelected] = useState<Recommendation | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [aiText, setAiText] = useState<string | null>(null);
 
   const router = useRouter();
   const { openModal } = useModalStore();
 
+  const [profileId, setProfileId] = useState<number | null>(null);
+
   useEffect(() => {
-    const profileId = localStorage.getItem("profileId");
-    if (!profileId) {
-      setLoading(false);
-      return;
-    }
-    setHasProfile(true);
+    if (!profileId) return;
 
     api
-      .post("/api/recommend", { profile_id: parseInt(profileId) })
+      .post("/api/recommend", { profile_id: profileId })
       .then((res) => {
         const data: Recommendation[] = res.data.recommendations || [];
         setRecs(data);
         if (data.length > 0) setSelected(data[0]);
       })
-      .catch((err) =>
-        setError(extractApiError(err, "Failed to load recommendations")),
-      )
+      .catch((err) => {
+        console.error(extractApiError(err, "Failed to load recommendations"));
+      })
       .finally(() => setLoading(false));
-  }, []);
-
-  const handleGenerateInsight = async () => {
-    if (!selected) return;
-    setGenerating(true);
-    setAiText(null);
-    try {
-      const pid = localStorage.getItem("profileId");
-      const prompt = `Give a 3-sentence career insight for the role "${selected.title}" with match score ${Math.round(selected.match_score * 100)}%. Key skills I'm missing: ${(selected.missing_skills || []).slice(0, 3).join(", ") || "none"}. Keep it concise and actionable.`;
-      const res = await api.post("/api/chat", {
-        profile_id: pid ? parseInt(pid) : null,
-        messages: [{ role: "user", content: prompt }],
-      });
-      let text = "";
-      if (typeof res.data === "string") {
-        text = res.data
-          .split("\n")
-          .filter((l: string) => !l.startsWith("[ENGINE:"))
-          .join("\n")
-          .trim();
-      } else {
-        text = res.data.reply ?? "";
-      }
-      setAiText(text || "Analysis complete.");
-    } catch {
-      setAiText("Unable to generate insight at this time.");
-    } finally {
-      setGenerating(false);
-    }
-  };
+  }, [profileId]);
 
   if (!hasProfile && !loading) {
     return (
@@ -168,7 +132,7 @@ export default function Recommendations() {
             <div className="flex items-center gap-2 mb-2">
               <Cpu className="text-primary w-8 h-8" />
               <h1 className="text-2xl font-bold tracking-tight text-slate-100">
-                Neural Intelligence Feed
+                SKLBR Intelligence Feed
               </h1>
             </div>
             <p className="font-mono text-[10px] uppercase tracking-widest text-primary/70">
@@ -256,7 +220,7 @@ export default function Recommendations() {
                 </p>
               </div>
             ) : (
-              recs.map((rec, idx) => {
+              recs.map((rec) => {
                 const score = Math.round(rec.match_score * 100);
                 const isSelected = selected?.role_id === rec.role_id;
 
@@ -265,7 +229,6 @@ export default function Recommendations() {
                     key={rec.role_id}
                     onClick={() => {
                       setSelected(rec);
-                      setAiText(null);
                     }}
                     className={cn(
                       "relative bg-card border-l-4 text-left border border-white/5 rounded-r-xl overflow-hidden group transition-all",
@@ -616,51 +579,21 @@ export default function Recommendations() {
                         </h3>
                       </div>
 
-                      {aiText ? (
-                        <div className="space-y-4 relative z-10">
-                          <div className="text-[10px] font-mono leading-relaxed text-slate-200 border-l border-primary/50 pl-3 uppercase tracking-wide">
-                            <motion.div
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ duration: 0.5 }}
-                            >
-                              {aiText.split("\n").map((line, i) => (
-                                <p key={i} className="mb-1">
-                                  &gt; {line}
-                                </p>
-                              ))}
-                            </motion.div>
-                          </div>
-                          <button
-                            onClick={handleGenerateInsight}
-                            className="flex items-center gap-1 font-mono text-[8px] uppercase font-bold text-primary hover:text-white transition-colors tracking-widest border border-primary/20 bg-primary/5 px-2 py-1 rounded"
-                          >
-                            <RefreshCw className="w-3 h-3" /> Re-calculate
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative z-10">
-                          <p className="font-mono text-[9px] uppercase tracking-widest leading-relaxed text-slate-400 mb-6 border-l border-slate-600 pl-3">
-                            &gt; Request focused AI debrief.
-                            <br />
-                            &gt; Synthesize match parameters.
-                          </p>
-                          <Button
-                            onClick={handleGenerateInsight}
-                            disabled={generating}
-                            className="w-full bg-primary/10 border border-primary text-primary hover:bg-primary hover:text-background-dark rounded-none font-mono font-bold uppercase text-[9px] tracking-widest h-10 transition-all shadow-[0_0_10px_rgba(37,157,244,0.1)]"
-                          >
-                            {generating ? (
-                              <span className="flex items-center gap-2 font-black">
-                                <span className="w-1.5 h-1.5 bg-primary animate-pulse rounded-full" />{" "}
-                                Processing...
-                              </span>
-                            ) : (
-                              "Synthesize Intel"
-                            )}
-                          </Button>
-                        </div>
-                      )}
+                      <div className="relative z-10">
+                        <p className="font-mono text-[9px] uppercase tracking-widest leading-relaxed text-slate-400 mb-6 border-l border-slate-600 pl-3">
+                          &gt; Request focused AI debrief.
+                          <br />
+                          &gt; Synthesize match parameters.
+                        </p>
+                        <Button
+                          onClick={() =>
+                            openModal("aiExecutiveBrief", selected)
+                          }
+                          className="w-full bg-primary/10 border border-primary text-primary hover:bg-primary hover:text-background-dark rounded-none font-mono font-bold uppercase text-[9px] tracking-widest h-10 transition-all shadow-[0_0_10px_rgba(37,157,244,0.1)]"
+                        >
+                          Synthesize Intel
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="p-6 bg-card border border-white/5 rounded-xl">
