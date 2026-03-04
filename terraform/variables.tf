@@ -34,14 +34,28 @@ variable "secret_key" {
   sensitive   = true
 }
 
-variable "bedrock_model_id" {
-  description = "Amazon Bedrock model ID for AI Coach"
+variable "groq_api_key" {
+  description = "Groq API key (primary LLM provider)"
   type        = string
-  default     = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+  default     = ""
+  sensitive   = true
+}
+
+variable "groq_model" {
+  description = "Groq model ID"
+  type        = string
+  default     = "llama-3.3-70b-versatile"
+}
+
+variable "anthropic_api_key" {
+  description = "Anthropic API key (Claude fallback)"
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "gemini_api_key" {
-  description = "Google Gemini API key (optional LLM fallback)"
+  description = "Google Gemini API key (tertiary LLM fallback)"
   type        = string
   default     = ""
   sensitive   = true

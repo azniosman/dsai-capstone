@@ -29,13 +29,14 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [engine, setEngine] = useState<string>("STANDBY");
+  const [profileId, setProfileId] = useState<number | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const profileId =
-    typeof window !== "undefined"
-      ? Number(localStorage.getItem("profileId")) || undefined
-      : undefined;
+  useEffect(() => {
+    const id = Number(localStorage.getItem("profileId")) || undefined;
+    setProfileId(id);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -69,7 +70,10 @@ export default function ChatPage() {
     // Build history from all non-loading messages + new user turn
     const history: ChatMessage[] = messages
       .filter((m) => !m.isLoading)
-      .map((m) => ({ role: m.sender === "ai" ? "assistant" : "user", content: m.text }));
+      .map((m) => ({
+        role: m.sender === "ai" ? "assistant" : "user",
+        content: m.text,
+      }));
     history.push({ role: "user", content: text.trim() });
 
     try {
@@ -96,9 +100,7 @@ export default function ChatPage() {
       );
 
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === loadingId ? { ...m, isLoading: false } : m,
-        ),
+        prev.map((m) => (m.id === loadingId ? { ...m, isLoading: false } : m)),
       );
     } catch (err: unknown) {
       const detail =
@@ -108,7 +110,12 @@ export default function ChatPage() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === loadingId
-            ? { ...m, text: detail, time: elapsedLabel(sentAt), isLoading: false }
+            ? {
+                ...m,
+                text: detail,
+                time: elapsedLabel(sentAt),
+                isLoading: false,
+              }
             : m,
         ),
       );
@@ -173,7 +180,9 @@ export default function ChatPage() {
         <div className="flex items-center gap-2">
           <div
             className={`size-1.5 rounded-full shadow-[0_0_5px_rgba(37,157,244,0.8)] ${
-              isLoading ? "bg-amber-400 animate-pulse" : "bg-primary animate-pulse"
+              isLoading
+                ? "bg-amber-400 animate-pulse"
+                : "bg-primary animate-pulse"
             }`}
           />
           <span className="text-[10px] font-mono text-primary tracking-widest uppercase font-bold">
@@ -188,7 +197,6 @@ export default function ChatPage() {
       {/* Chat Area */}
       <main className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-8 terminal-scroll">
         <div className="max-w-4xl mx-auto space-y-8">
-
           {/* Empty state */}
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center min-h-[40vh] text-center gap-4">
@@ -215,7 +223,7 @@ export default function ChatPage() {
                 <>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-mono text-primary font-bold tracking-widest uppercase px-2 py-0.5 border border-primary/30 bg-primary/10 shadow-[0_0_10px_rgba(37,157,244,0.1)]">
-                      SKILLBRIDGE_CORE
+                      SKLBR_CORE
                     </span>
                     <span className="text-[9px] font-mono text-slate-500 uppercase">
                       {msg.time}
@@ -226,7 +234,9 @@ export default function ChatPage() {
                       {msg.isLoading && !msg.text ? (
                         <div className="flex items-center gap-2 text-primary/60">
                           <Loader2 className="h-3 w-3 animate-spin" />
-                          <span className="text-[11px] tracking-widest">PROCESSING...</span>
+                          <span className="text-[11px] tracking-widest">
+                            PROCESSING...
+                          </span>
                         </div>
                       ) : (
                         <span className="whitespace-pre-wrap">{msg.text}</span>
@@ -261,7 +271,6 @@ export default function ChatPage() {
       {/* Footer / Input Area */}
       <footer className="relative z-20 bg-background-dark/90 backdrop-blur-md border-t border-primary/20 p-4 sm:p-6 pb-20 md:pb-6 space-y-4">
         <div className="max-w-4xl mx-auto">
-
           {/* Quick Commands */}
           <div className="flex gap-2 overflow-x-auto pb-4 terminal-scroll">
             {QUICK_COMMANDS.map((cmd) => (
@@ -283,7 +292,9 @@ export default function ChatPage() {
               className="relative flex items-center border border-primary/30 bg-(--card-dark) focus-within:border-primary focus-within:shadow-[0_0_15px_rgba(37,157,244,0.1)] transition-all"
             >
               <div className="pl-4 text-primary">
-                <span className="font-mono font-bold text-lg animate-pulse">&gt;</span>
+                <span className="font-mono font-bold text-lg animate-pulse">
+                  &gt;
+                </span>
               </div>
               <input
                 ref={inputRef}

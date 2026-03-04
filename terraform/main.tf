@@ -118,7 +118,9 @@ module "lambda_backend" {
   db_host                 = module.rds.db_address
   db_name                 = "skillbridge"
   db_username             = var.db_username
-  bedrock_model_id        = var.bedrock_model_id
+  groq_api_key            = var.groq_api_key
+  groq_model              = var.groq_model
+  anthropic_api_key       = var.anthropic_api_key
   gemini_api_key          = var.gemini_api_key
   secret_key              = var.secret_key
   opensearch_url          = var.enable_opensearch ? "https://${module.opensearch[0].opensearch_endpoint}" : ""

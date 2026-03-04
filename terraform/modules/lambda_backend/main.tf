@@ -43,10 +43,21 @@ resource "aws_lambda_function" "api" {
       POSTGRES_USER = var.db_username
       POSTGRES_PORT = "5432"
 
-      # AI / LLM
-      BEDROCK_MODEL_ID = var.bedrock_model_id
-      GEMINI_API_KEY   = var.gemini_api_key
-      GEMINI_MODEL     = "gemini-2.0-flash"
+      # AI / LLM — provider chain: groq → claude → gemini
+      PRIMARY_LLM   = "groq"
+      SECONDARY_LLM = "claude"
+      TERTIARY_LLM  = "gemini"
+
+      GROQ_API_KEY   = var.groq_api_key
+      GROQ_MODEL     = var.groq_model
+      AI_TEMPERATURE = "0.3"
+      AI_MAX_TOKENS  = "2048"
+
+      ANTHROPIC_API_KEY = var.anthropic_api_key
+      CLAUDE_MODEL      = "claude-3-5-sonnet-20241022"
+
+      GEMINI_API_KEY = var.gemini_api_key
+      GEMINI_MODEL   = "gemini-2.0-flash"
 
       # Auth — NestJS reads JWT_SECRET; SECRET_KEY kept for backward-compat
       JWT_SECRET                  = var.secret_key
@@ -86,7 +97,10 @@ locals {
     POSTGRES_DB          = var.db_name
     POSTGRES_USER        = var.db_username
     POSTGRES_PORT        = "5432"
-    BEDROCK_MODEL_ID     = var.bedrock_model_id
+    GROQ_API_KEY         = var.groq_api_key
+    GROQ_MODEL           = var.groq_model
+    ANTHROPIC_API_KEY    = var.anthropic_api_key
+    GEMINI_API_KEY       = var.gemini_api_key
     SECRET_KEY           = var.secret_key
     HF_HUB_OFFLINE       = "1"
     TRANSFORMERS_OFFLINE = "1"

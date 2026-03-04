@@ -55,9 +55,21 @@ variable "db_username" {
   default = "skillbridge"
 }
 
-variable "bedrock_model_id" {
+variable "groq_api_key" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "groq_model" {
   type    = string
-  default = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+  default = "llama-3.3-70b-versatile"
+}
+
+variable "anthropic_api_key" {
+  type      = string
+  default   = ""
+  sensitive = true
 }
 
 variable "gemini_api_key" {
