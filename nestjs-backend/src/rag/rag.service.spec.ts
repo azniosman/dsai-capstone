@@ -296,6 +296,73 @@ describe('RagService', () => {
     });
   });
 
+  // ── Feedback-weighted re-ranking (Phase 5) ────────────────────────────────
+
+  describe('query() — feedback-weighted re-ranking', () => {
+    it('promotes a chunk with net-positive feedback above a higher-RRF chunk', async () => {
+      // id=1 (semRank 1, higher RRF) vs id=2 (semRank 2, has positive feedback)
+      const semRows = [
+        { id: 1, content: 'no feedback', source_type: 'resume', chunk_index: 0, similarity: 0.9 },
+        { id: 2, content: 'thumbs up', source_type: 'resume', chunk_index: 1, similarity: 0.8 },
+      ];
+
+      mockEm.getConnection().execute
+        .mockResolvedValueOnce(semRows) // semantic
+        .mockResolvedValueOnce([])      // keyword
+        .mockResolvedValueOnce([{ chunk_id: 2, net_score: 3 }]); // feedback: id=2 boosted
+
+      const results = await service.query('test', 1, { topK: 2, profileId: 42 });
+
+      // id=2 should rank first despite lower semantic similarity
+      expect(results[0].id).toBe(2);
+    });
+
+    it('demotes a chunk with net-negative feedback below a lower-RRF chunk', async () => {
+      // id=2 starts at semRank 1 (highest similarity) but has negative feedback
+      const semRows = [
+        { id: 2, content: 'thumbs down', source_type: 'resume', chunk_index: 0, similarity: 0.9 },
+        { id: 1, content: 'no feedback', source_type: 'resume', chunk_index: 1, similarity: 0.7 },
+      ];
+
+      mockEm.getConnection().execute
+        .mockResolvedValueOnce(semRows)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ chunk_id: 2, net_score: -3 }]); // id=2 penalised
+
+      const results = await service.query('test', 1, { topK: 2, profileId: 42 });
+
+      // id=1 should rank first after id=2 is demoted
+      expect(results[0].id).toBe(1);
+    });
+
+    it('does not issue a feedback query when profileId is absent', async () => {
+      mockEm.getConnection().execute.mockResolvedValue([]);
+
+      await service.query('test', 1, { topK: 3 }); // no profileId
+
+      const callSQLs = (mockEm.getConnection().execute.mock.calls as [string, ...unknown[]][]).map(
+        (c) => c[0],
+      );
+      expect(callSQLs.some((sql) => sql.includes('rag_feedback'))).toBe(false);
+    });
+
+    it('returns correct results when the feedback query throws', async () => {
+      const semRows = [
+        { id: 1, content: 'ok chunk', source_type: 'resume', chunk_index: 0, similarity: 0.8 },
+      ];
+
+      mockEm.getConnection().execute
+        .mockResolvedValueOnce(semRows)
+        .mockResolvedValueOnce([])
+        .mockRejectedValueOnce(new Error('relation "rag_feedback" does not exist'));
+
+      const results = await service.query('test', 1, { topK: 3, profileId: 42 });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe(1);
+    });
+  });
+
   // ── recordFeedback() ───────────────────────────────────────────────────────
 
   describe('recordFeedback()', () => {

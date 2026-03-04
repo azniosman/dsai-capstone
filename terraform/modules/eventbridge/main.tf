@@ -591,3 +591,47 @@ resource "aws_cloudwatch_dashboard" "rag_observability" {
     ]
   })
 }
+
+# ─── CloudWatch Logs Insights Saved Queries (Phase 5) ────────────────────────
+# These query the raw EMF log lines emitted by RagService.query() to surface
+# miss-rate trends and similarity distributions over time.
+# Run them from the CloudWatch Logs Insights console or the rag-observability
+# dashboard's "Source" tab.
+
+resource "aws_cloudwatch_query_definition" "rag_latency_and_miss_rate" {
+  name = "${var.project_name}/${var.environment}/RAG/LatencyAndMissRate"
+
+  log_group_names = ["/aws/lambda/${var.backend_function_name}"]
+
+  query_string = <<-EOT
+    filter ispresent(RagQueryLatencyMs) and ispresent(RagChunksReturned)
+    | stats
+        count(*) as total_queries,
+        sum(if(RagChunksReturned == 0, 1, 0)) as miss_count,
+        (sum(if(RagChunksReturned == 0, 1, 0)) / count(*)) * 100 as miss_rate_pct,
+        avg(RagQueryLatencyMs) as avg_latency_ms,
+        pct(RagQueryLatencyMs, 99) as p99_latency_ms,
+        avg(RagSimilarityMean) as avg_similarity
+      by bin(1h)
+    | sort @timestamp desc
+  EOT
+}
+
+resource "aws_cloudwatch_query_definition" "rag_similarity_distribution" {
+  name = "${var.project_name}/${var.environment}/RAG/SimilarityDistribution"
+
+  log_group_names = ["/aws/lambda/${var.backend_function_name}"]
+
+  query_string = <<-EOT
+    filter ispresent(RagSimilarityMax)
+    | stats
+        avg(RagSimilarityMax) as avg_max_sim,
+        avg(RagSimilarityMean) as avg_mean_sim,
+        pct(RagSimilarityMax, 10) as p10_sim,
+        pct(RagSimilarityMax, 50) as p50_sim,
+        pct(RagSimilarityMax, 90) as p90_sim,
+        count(*) as queries
+      by bin(1d)
+    | sort @timestamp desc
+  EOT
+}

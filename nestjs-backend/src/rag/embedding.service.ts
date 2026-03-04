@@ -16,8 +16,14 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 
-/** ONNX model identifier on HuggingFace Hub. */
-const MODEL_ID = 'Xenova/all-MiniLM-L6-v2';
+/**
+ * ONNX model identifier on HuggingFace Hub.
+ * Configurable via `EMBEDDING_MODEL` env var (Phase 5).
+ * Supported values (both 384-dim, drop-in compatible):
+ *   `Xenova/all-MiniLM-L6-v2`  — default, fast, ~23 MB quantized
+ *   `Xenova/all-MiniLM-L12-v2` — higher quality, ~33 MB quantized
+ */
+const MODEL_ID = process.env.EMBEDDING_MODEL ?? 'Xenova/all-MiniLM-L6-v2';
 
 /** Expected output dimensions for this model. */
 export const EMBEDDING_DIM = 384;

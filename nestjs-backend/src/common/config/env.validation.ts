@@ -103,6 +103,12 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   readonly INTERNAL_AUTOMATION_TOKEN?: string;
+
+  // Embedding model — optional; both supported models output 384-dim vectors
+  // Valid values: 'Xenova/all-MiniLM-L6-v2' (default) | 'Xenova/all-MiniLM-L12-v2'
+  @IsString()
+  @IsOptional()
+  readonly EMBEDDING_MODEL?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

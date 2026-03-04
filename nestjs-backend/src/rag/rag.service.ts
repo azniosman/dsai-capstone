@@ -183,12 +183,14 @@ export class RagService {
   }
 
   /**
-   * Runs semantic (pgvector) and keyword (tsvector) branches in parallel,
-   * then merges results using Reciprocal Rank Fusion.
+   * Runs semantic (pgvector) and keyword (tsvector) branches **concurrently**
+   * via `Promise.all`, then merges results using Reciprocal Rank Fusion (RRF).
    *
-   * The keyword branch is wrapped in try/catch — if `search_vector` does not
-   * yet exist (e.g. a fresh DB before bootstrap runs) it returns empty and the
-   * merge degrades gracefully to semantic-only ranking.
+   * After RRF merge, `applyFeedbackBoost()` adjusts scores for authenticated
+   * users based on their stored `rag_feedback` signals (Phase 5).
+   *
+   * The keyword branch silently returns [] on any error (e.g. `search_vector`
+   * column absent on a fresh DB) — semantic-only results flow through unchanged.
    */
   private async hybridQuery(
     queryText: string,
@@ -201,14 +203,11 @@ export class RagService {
     const profileFilter = profileId ? `AND dc.profile_id = ${profileId}` : '';
     const vectorLiteral = `[${queryEmbedding.join(',')}]`;
 
-    // ── Semantic branch (pgvector cosine similarity) ─────────────────────────
-    const semRows: Array<{
-      id: number;
-      content: string;
-      source_type: string;
-      chunk_index: number;
-      similarity: number;
-    }> = await this.em.getConnection().execute(
+    // ── Semantic + keyword branches run concurrently ──────────────────────────
+    type SemRow = { id: number; content: string; source_type: string; chunk_index: number; similarity: number };
+    type KwRow  = { id: number; content: string; source_type: string; chunk_index: number };
+
+    const semPromise: Promise<SemRow[]> = this.em.getConnection().execute(
       `
       SELECT
         dc.id,
@@ -227,18 +226,8 @@ export class RagService {
       [vectorLiteral, tenantId, threshold, overFetch],
     );
 
-    // ── Keyword branch (PostgreSQL full-text search on tsvector) ─────────────
-    // Wrapped in try/catch: if search_vector column is absent (pre-bootstrap),
-    // the keyword branch silently returns empty and semantic-only results flow through.
-    let kwRows: Array<{
-      id: number;
-      content: string;
-      source_type: string;
-      chunk_index: number;
-    }> = [];
-
-    try {
-      kwRows = await this.em.getConnection().execute(
+    const kwPromise: Promise<KwRow[]> = (
+      this.em.getConnection().execute(
         `
         SELECT
           dc.id,
@@ -253,43 +242,46 @@ export class RagService {
         LIMIT $3
         `,
         [tenantId, queryText, overFetch],
-      );
-    } catch (err) {
+      ) as Promise<KwRow[]>
+    ).catch((err: Error): KwRow[] => {
       this.logger.debug(
-        `Keyword branch unavailable — degrading to semantic-only: ${(err as Error).message}`,
+        `Keyword branch unavailable — degrading to semantic-only: ${err.message}`,
       );
-    }
+      return [];
+    });
+
+    const [semRows, kwRows] = await Promise.all([semPromise, kwPromise]);
 
     // ── Reciprocal Rank Fusion ────────────────────────────────────────────────
     // RRF score = Σ 1 / (k + rank_i) across branches.
     // Chunks appearing in both branches receive a higher combined score.
-    const semMap = new Map(
-      semRows.map((r, i) => [r.id, { ...r, semRank: i + 1 }]),
-    );
-    const kwMap = new Map(
-      kwRows.map((r, i) => [r.id, { ...r, kwRank: i + 1 }]),
-    );
-
+    const semMap = new Map(semRows.map((r, i) => [r.id, { ...r, semRank: i + 1 }]));
+    const kwMap  = new Map(kwRows.map((r, i) => [r.id, { ...r, kwRank: i + 1 }]));
     const allIds = new Set([...semMap.keys(), ...kwMap.keys()]);
 
     const scored = [...allIds].map((id) => {
       const s = semMap.get(id);
       const k = kwMap.get(id);
-      const rrfScore =
-        (s ? 1 / (RRF_K + s.semRank) : 0) +
-        (k ? 1 / (RRF_K + k.kwRank) : 0);
-
       return {
         id,
         content: s?.content ?? k?.content ?? '',
         source_type: s?.source_type ?? k?.source_type ?? 'resume',
         chunk_index: s?.chunk_index ?? k?.chunk_index ?? 0,
         similarity: s?.similarity ?? 0,
-        rrfScore,
+        rrfScore:
+          (s ? 1 / (RRF_K + s.semRank) : 0) +
+          (k ? 1 / (RRF_K + k.kwRank) : 0),
       };
     });
 
     scored.sort((a, b) => b.rrfScore - a.rrfScore);
+
+    // ── Feedback-weighted re-ranking (Phase 5) ────────────────────────────────
+    // Applies a ±α boost per chunk based on net user feedback for this profile.
+    if (profileId) {
+      await this.applyFeedbackBoost(scored, profileId);
+      scored.sort((a, b) => b.rrfScore - a.rrfScore);
+    }
 
     return scored.slice(0, topK).map((r) => ({
       id: r.id,
@@ -298,6 +290,58 @@ export class RagService {
       chunkIndex: r.chunk_index,
       similarity: r.similarity,
     }));
+  }
+
+  /**
+   * Adjusts RRF scores in-place using stored feedback signals for `profileId`.
+   *
+   * Score adjustment: `rrfScore += α × tanh(net_feedback)` where:
+   *   - `net_feedback` = (positive votes) − (negative votes) for this chunk + profile
+   *   - `α = 0.01` — keeps feedback influence proportional to the RRF range (~0.016–0.033)
+   *   - `tanh` normalises: even 10 votes saturates at α, preventing runaway boosts
+   *
+   * Non-fatal: if `rag_feedback` is unavailable (fresh DB, permission issue, etc.),
+   * the original RRF scores are left unchanged and a debug log is emitted.
+   */
+  private async applyFeedbackBoost(
+    results: Array<{ id: number; rrfScore: number }>,
+    profileId: number,
+  ): Promise<void> {
+    if (results.length === 0) return;
+
+    const ALPHA = 0.01;
+    const chunkIds = results.map((r) => r.id);
+
+    try {
+      const rows: Array<{ chunk_id: number; net_score: number }> =
+        await this.em.getConnection().execute(
+          `
+          SELECT
+            chunk_id,
+            SUM(CASE WHEN is_positive THEN 1 ELSE -1 END)::int AS net_score
+          FROM rag_feedback
+          WHERE chunk_id = ANY($1::int[])
+            AND profile_id = $2
+          GROUP BY chunk_id
+          `,
+          [chunkIds, profileId],
+        );
+
+      if (rows.length === 0) return;
+
+      const feedbackMap = new Map(rows.map((r) => [r.chunk_id, Number(r.net_score)]));
+
+      for (const result of results) {
+        const net = feedbackMap.get(result.id) ?? 0;
+        if (net !== 0) {
+          result.rrfScore += ALPHA * Math.tanh(net);
+        }
+      }
+    } catch (err) {
+      this.logger.debug(
+        `Feedback boost unavailable — skipping re-rank: ${(err as Error).message}`,
+      );
+    }
   }
 
   // ─── Backfill ──────────────────────────────────────────────────────────────
