@@ -1,39 +1,37 @@
-"""Lambda handler — direct invocation wrapper for rag_query().
+"""Lambda handler — RAG query stub.
 
-Accepts: {query, profile_id?, user_id?}
-Returns: {statusCode, body: {answer, sources, engine}}
+⚠️  PHASE 2 STUB — NOT DEPLOYED / NOT FUNCTIONAL ⚠️
 
-CMD override: lambdas.rag_query_handler.handler
+This handler requires `app.services.rag_service.rag_query()` which does not
+yet exist.  Invoking it will always return HTTP 501.
+
+Planned implementation (Phase 2):
+  - Generate embedding for `query` via EmbeddingService
+  - Perform pgvector cosine similarity search against document_chunk table
+  - Inject top-K chunks into LLM system prompt
+  - Return structured {answer, sources, engine} response
+
+CMD override (when implemented): lambdas.rag_query_handler.handler
 """
 
 import json
 import logging
 
-from lambdas.base import bootstrap_env
-
-bootstrap_env()
-
 logger = logging.getLogger(__name__)
 
 
 def handler(event: dict, context) -> dict:
-    try:
-        query = event.get("query", "")
-        profile_id = event.get("profile_id")
-        user_id = event.get("user_id")
-
-        if not query:
-            return {"statusCode": 400, "body": json.dumps({"error": "query is required"})}
-
-        from app.database import SessionLocal
-        from app.services.rag_service import rag_query
-        db = SessionLocal()
-        try:
-            result = rag_query(db, query=query, profile_id=profile_id, user_id=user_id)
-            return {"statusCode": 200, "body": json.dumps(result)}
-        finally:
-            db.close()
-
-    except Exception as e:
-        logger.error("RAG query handler error: %s", e, exc_info=True)
-        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+    logger.warning(
+        "rag_query_handler invoked but RAG pipeline is not yet implemented (Phase 2 stub)"
+    )
+    return {
+        "statusCode": 501,
+        "body": json.dumps({
+            "error": "RAG query pipeline not yet implemented",
+            "phase": 2,
+            "message": (
+                "The embedding and vector retrieval layer is scheduled for Phase 2. "
+                "Use POST /api/chat for LLM-based career coaching in the interim."
+            ),
+        }),
+    }

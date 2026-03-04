@@ -331,9 +331,13 @@ resource "aws_scheduler_schedule" "market_insights" {
 }
 
 # Rule 7: Embedding Backfill — every 6 hours
+# DISABLED: The NestJS handler for /internal/embeddings/backfill does not yet
+# exist (Phase 2). Re-enable by setting state = "ENABLED" once the handler is
+# implemented in nestjs-backend/src/internal/internal.controller.ts.
 resource "aws_scheduler_schedule" "embedding_backfill" {
   name       = "${var.project_name}-${var.environment}-embedding-backfill"
   group_name = "default"
+  state      = "DISABLED"
 
   flexible_time_window { mode = "OFF" }
   schedule_expression          = "rate(6 hours)"

@@ -1,62 +1,38 @@
-# SkillBridge — ML Pipeline
+# SkillBridge — ML & Intelligence Pipeline
 
-## Models
+## Phase 1 (Current — Active in Production)
 
-| Model | Purpose | Dimensions |
+### Active Components
+
+| Component | Technology | Location |
 |---|---|---|
-| `all-MiniLM-L6-v2` | Skill embeddings (FAISS, recommendations) | 384 |
-| Amazon Titan Embed Text v1 | pgvector RAG pipeline | 1536 |
+| Resume text extraction | `pdf-parse` (PDF), `mammoth` (DOCX) | `nestjs-backend/src/common/utils/resume-parser.util.ts` |
+| Resume structured parsing | LLM (see provider chain below) | `LlmService.parseResume()` |
+| Skill matching | Set intersection (exact + case-insensitive) | `IntelligenceService.scoreRole()` |
+| Job recommendation ranking | Hybrid scoring formula (see below) | `IntelligenceService.getRecommendations()` |
+| Skill gap advice | LLM — one call per role batch | `LlmService.generateSkillGapAdvice()` |
+| JD match analysis | LLM skill extraction + set intersection | `LlmService.analyzeJobDescription()` |
+| Career chat | LLM with profile context injection | `IntelligenceService.chat()` |
+| Upskilling narrative | LLM | `LlmService.generateRoadmapNarrative()` |
 
-Both are encoded via `backend/app/ml/embeddings.py`.
+### LLM Provider Chain
 
-## Skill Embedding Pipeline
+Requests are routed in priority order. Each provider is skipped if its API key
+is absent. Order is configurable via env vars.
 
 ```
-encode_texts(texts)
-  → SageMaker endpoint (if SAGEMAKER_EMBEDDING_ENDPOINT set)
-  → SentenceTransformer local (fallback)
-  → np.ndarray, L2-normalised
+PRIMARY_LLM   (default: groq)   →  Groq  llama-3.3-70b-versatile
+SECONDARY_LLM (default: claude) →  Anthropic  claude-3-5-sonnet-20241022
+TERTIARY_LLM  (default: gemini) →  Google  gemini-2.0-flash
+                                →  HTTP 503 if all fail
 ```
 
-The model is a module-level singleton (`_model`), loaded once at startup.
+Config env vars: `PRIMARY_LLM`, `SECONDARY_LLM`, `TERTIARY_LLM`,
+`AI_TEMPERATURE` (default `0.3`), `AI_MAX_TOKENS` (default `2048`).
 
-## FAISS Index
+Implementation: `nestjs-backend/src/intelligence/llm.service.ts`
 
-- Built in `build_skill_index(skills)` — `IndexFlatIP` (inner product = cosine for L2-normalised vectors)
-- One index per user-skills list, cached by `@lru_cache(maxsize=1024)` in `skill_matcher.py`
-- Role skill embeddings pre-computed at warmup and stored in `_role_embedding_cache`
-
-## Skill Matching
-
-```python
-match_skills(user_skills, required_skills) → dict[skill, score]
-  score = 1.0  (strong:  cosine ≥ 0.85, or exact text match)
-  score = 0.5  (partial: cosine ≥ 0.60)
-  score = 0.0  (missing)
-```
-
-## Taxonomy Normalisation
-
-`backend/app/ml/taxonomy.py` — FAISS index over 150+ canonical skill names.
-Maps free-text skills (e.g. "tf", "tensorflow 2") to canonical form (e.g. "TensorFlow").
-Threshold: cosine ≥ 0.75.
-
-## Prerequisite Skill Graph
-
-`backend/app/ml/skill_graph.py` — hardcoded prerequisite DAG (~30 relationships).
-
-```python
-PREREQUISITES = {
-    "PyTorch": ["Python", "NumPy"],
-    "Kubernetes": ["Docker"],
-    ...
-}
-```
-
-`sort_by_prerequisites(gap_skills)` performs topological sort so foundational skills
-(e.g. Python, SQL) appear before advanced ones (e.g. PyTorch, dbt) in the gap list.
-
-## Hybrid Scoring Formula
+### Hybrid Scoring Formula
 
 ```
 match_score = 0.55 × content_score
@@ -64,28 +40,104 @@ match_score = 0.55 × content_score
             + 0.20 × career_switcher_bonus
 ```
 
-- `content_score` — weighted cosine similarity (critical_core × 1.3, technical × 1.0, generic × 0.8)
-- `rule_score` — education + experience ladder match (0–1)
-- `career_switcher_bonus` — tapers with experience: `max(0, 1 − years × 0.1)`
+- `content_score` — `matched_skills / total_required_skills` (exact string match)
+- `rule_score` — `1.0` if `profile.yearsExperience >= role.minExperienceYears`, else `0.5`
+- `career_switcher_bonus` — `1.0` if both `profile.isCareerSwitcher` and `role.careerSwitcherFriendly` are true, else `0.0`
 
-## Course Matching (Roadmap)
+Top 10 roles returned, top 3 enhanced with LLM-generated rationale.
+
+### Skill Gap Severity
+
+Gap severity is assigned positionally within `role.requiredSkills`:
+
+| Position | Severity | Required Level |
+|---|---|---|
+| Index 0–2 | `high` | required |
+| Index 3+ | `medium` | required |
+| Any | `low` | preferred |
+
+Top 5 gaps per role returned, sorted by severity descending. LLM advice is
+generated for all 3 role entries concurrently via `Promise.allSettled`.
+
+---
+
+## Phase 2 (Planned — Not Yet Implemented)
+
+> The components below are **stubs only**. The Lambda handlers exist in
+> `lambdas/` but return HTTP 501 and reference services that do not exist.
+> The EventBridge schedule for `embedding-backfill` is **DISABLED** until
+> the NestJS handler is implemented.
+
+### Embedding Pipeline
+
+**Planned model**: `all-MiniLM-L6-v2` (384-dim, sentence-transformers)
+**Planned library**: `@xenova/transformers` (Node.js ONNX runtime — no Python needed)
+**Vector store**: pgvector (extension already installed on PostgreSQL 16)
+
+Planned flow:
 
 ```
-for each gap skill:
-  1. Encode skill text → embedding
-  2. For each course: cosine_similarity(skill_emb, course_emb) ≥ 0.45
-  3. Among matches: prefer highest (similarity + 0.1 × multi-skill coverage)
-  4. Fallback to keyword match if no embed match
+Text (resume chunk / skill / query)
+    │
+    ▼
+EmbeddingService.embed(text) → float32[384]  (all-MiniLM-L6-v2)
+    │
+    ▼
+ProfileEmbedding / DocumentChunk entity
+  .embedding  pgvector column  vector(384)
+    │
+    ▼
+CREATE INDEX ... USING hnsw (embedding vector_cosine_ops)
 ```
 
-Course embeddings are module-level cached (`_course_embedding_cache`) on first call.
+### Document Chunking
 
-## LLM Fallback Chain
+Planned strategy:
+- Chunk size: 512 tokens
+- Overlap: 64 tokens
+- Metadata per chunk: `profile_id`, `source`, `chunk_index`, `created_at`, `content_hash`
+- Idempotency: SHA-256 hash of content — skip re-embedding if hash matches
+
+### RAG Retrieval Flow
 
 ```
-chat / interview / narrative:
-  Gemini 2.0 Flash (primary)  →  AWS Bedrock Claude 3.5 Sonnet (fallback)  →  503
-
-extract_skills() (resume parser):
-  Gemini (primary)  →  regex keyword scan against taxonomy (fallback)
+User query
+    │
+    ▼
+EmbeddingService.embed(query)
+    │
+    ▼
+pgvector cosine similarity search (top-K, threshold ≥ 0.65)
+    │
+    ▼
+Chunks injected into LLM system prompt:
+  [SYSTEM INSTRUCTIONS]
+  [RETRIEVED CONTEXT — up to 3 chunks]
+  [USER QUESTION]
+    │
+    ▼
+LLM provider chain (Groq → Claude → Gemini)
 ```
+
+### Phase 2 Stub Files
+
+| File | Status | Reason |
+|---|---|---|
+| `lambdas/rag_query_handler.py` | STUB — returns 501 | `app.services.rag_service` does not exist |
+| `lambdas/embedding_generator.py` | STUB — returns 501 | `app.services.rag_service` does not exist |
+| `lambdas/resume_upload_handler.py` | STUB — returns 501 | `app.services.rag_service` does not exist |
+| EventBridge `embedding-backfill` schedule | DISABLED | `/internal/embeddings/backfill` NestJS handler not yet implemented |
+
+### Phase 2 Implementation Checklist
+
+- [ ] `EmbeddingService` — NestJS injectable wrapping `@xenova/transformers`
+- [ ] `ProfileEmbedding` entity with `vector(384)` pgvector column
+- [ ] `DocumentChunk` entity with `vector(384)` pgvector column + metadata fields
+- [ ] Migration: `CREATE INDEX ... USING hnsw (embedding vector_cosine_ops)`
+- [ ] `RagService.query(queryText, topK, tenantId)` — embed + similarity search
+- [ ] `POST /api/rag/query` NestJS controller
+- [ ] `POST /internal/embeddings/backfill` NestJS controller (then re-enable EventBridge schedule)
+- [ ] On resume upload: chunk + embed + store with idempotency
+- [ ] Inject retrieved chunks into `IntelligenceService.chat()` system prompt
+- [ ] Unit tests for `EmbeddingService` and `RagService`
+- [ ] Log similarity scores per query to CloudWatch

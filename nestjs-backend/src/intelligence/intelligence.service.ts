@@ -281,23 +281,34 @@ export class IntelligenceService {
       };
     });
 
-    // Enhance gaps with LLM-generated advice (non-blocking)
-    try {
-      for (const entry of results) {
-        if (entry.gaps.length === 0) continue;
-        const advice = await this.llmService.generateSkillGapAdvice(
+    // Enhance gaps with LLM-generated advice — all 3 roles fire concurrently.
+    // Promise.allSettled ensures one provider failure doesn't block the others.
+    const adviceResults = await Promise.allSettled(
+      results.map((entry) => {
+        if (entry.gaps.length === 0) return Promise.resolve([]);
+        return this.llmService.generateSkillGapAdvice(
           entry.role_title,
           entry.gaps.map((g: any) => ({
             skill: g.skill,
             gap_severity: g.gap_severity,
           })),
         );
-        for (let i = 0; i < Math.min(advice.length, entry.gaps.length); i++) {
-          entry.gaps[i].ai_advice = advice[i];
+      }),
+    );
+
+    for (let r = 0; r < results.length; r++) {
+      const settled = adviceResults[r];
+      if (settled.status === 'fulfilled') {
+        const advice = settled.value;
+        for (
+          let i = 0;
+          i < Math.min(advice.length, results[r].gaps.length);
+          i++
+        ) {
+          results[r].gaps[i].ai_advice = advice[i];
         }
       }
-    } catch {
-      // Keep empty ai_advice on LLM failure
+      // On rejection: gaps retain empty ai_advice — already initialised above
     }
 
     return results;

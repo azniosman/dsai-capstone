@@ -64,6 +64,10 @@ export class LlmService {
     const claudeModel =
       this.configService.get<string>('CLAUDE_MODEL') ??
       'claude-3-5-sonnet-20241022';
+    const claudeMaxTokens = parseInt(
+      this.configService.get<string>('AI_MAX_TOKENS') ?? '2048',
+      10,
+    );
 
     const geminiApiKey = this.configService.get<string>('GEMINI_API_KEY');
     const geminiModel =
@@ -76,7 +80,7 @@ export class LlmService {
         groqTemperature,
         groqMaxTokens,
       ),
-      claude: new ClaudeProvider(claudeApiKey, claudeModel),
+      claude: new ClaudeProvider(claudeApiKey, claudeModel, claudeMaxTokens),
       gemini: new GeminiProvider(geminiApiKey, geminiModel),
     };
 

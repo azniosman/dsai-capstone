@@ -6,6 +6,7 @@
  * It reads:
  * - `ANTHROPIC_API_KEY` — API key for the Anthropic API
  * - `CLAUDE_MODEL` — model name (default: `claude-3-5-sonnet-20241022`)
+ * - `AI_MAX_TOKENS` — max tokens for completions (default: `2048`)
  */
 
 import { Logger } from '@nestjs/common';
@@ -25,9 +26,11 @@ export class ClaudeProvider implements LlmProvider {
   private readonly logger = new Logger(ClaudeProvider.name);
   private readonly client: any;
   private readonly modelId: string;
+  private readonly maxTokens: number;
 
-  constructor(apiKey: string | undefined, modelId: string) {
+  constructor(apiKey: string | undefined, modelId: string, maxTokens = 2048) {
     this.modelId = modelId;
+    this.maxTokens = maxTokens;
 
     if (!apiKey) {
       this.logger.warn(
@@ -81,7 +84,7 @@ export class ClaudeProvider implements LlmProvider {
 
     const response = await this.client.messages.create({
       model: this.modelId,
-      max_tokens: 2048,
+      max_tokens: this.maxTokens,
       system: systemPrompt,
       messages: anthropicMessages,
     });
