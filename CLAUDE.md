@@ -36,6 +36,7 @@ npm run test          # unit tests (Jest)
 npm run test:watch    # Jest watch mode
 npm run test:e2e      # e2e tests
 npm run test:cov      # coverage report
+npm test -- --testPathPatterns="rag.service"   # run a single spec file (pattern match)
 
 # Frontend development
 cd frontend
@@ -46,7 +47,7 @@ npm run build         # production build (must pass before PR)
 
 # Database seeding (via MikroORM seeder)
 cd nestjs-backend
-npm run seed          # or: npx mikro-orm seeder:run
+npx mikro-orm seeder:run
 
 # AWS deployment scripts
 bash scripts/build_and_push.sh      # builds Docker images and pushes to ECR
@@ -72,6 +73,10 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `SSG_API_BASE_URL`, `SSG_TOKEN_URL` — SSG API endpoints (optional)
 - `SSG_CACHE_TTL_SECONDS` — how long to cache SSG responses in PostgreSQL (optional)
 - `INTERNAL_AUTOMATION_TOKEN` — shared secret validated by `InternalTokenGuard`; injected from Secrets Manager in production; required for automation Lambdas to call `/internal/*` endpoints
+- `EMBEDDING_MODEL` — ONNX model for sentence embeddings (default: `Xenova/all-MiniLM-L6-v2`; upgrade to `Xenova/all-MiniLM-L12-v2` for higher recall; both output 384-dim)
+- `RERANKER_ENABLED` — set `true` to activate cross-encoder re-ranking after RRF (default: disabled)
+- `RERANKER_MODEL` — cross-encoder model (default: `Xenova/ms-marco-MiniLM-L-6-v2`)
+- `RERANKER_TOP_N` — how many RRF candidates the cross-encoder scores (default: `20`)
 
 ## Architecture
 
@@ -83,7 +88,7 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 
 **App config/validation**: `src/common/config/env.validation.ts` — class-validator schema for env vars.
 
-**Entities** (`src/entities/`): `user.entity.ts`, `user-profile.entity.ts`, `skill.entity.ts`, `job-role.entity.ts`, `sctp-course.entity.ts`, `skill-progress.entity.ts`, `market-insight.entity.ts`, `profile-snapshot.entity.ts`, `tenant.entity.ts`, `ssg-cache.entity.ts`
+**Entities** (`src/entities/`): `user.entity.ts`, `user-profile.entity.ts`, `skill.entity.ts`, `job-role.entity.ts`, `sctp-course.entity.ts`, `skill-progress.entity.ts`, `market-insight.entity.ts`, `profile-snapshot.entity.ts`, `tenant.entity.ts`, `ssg-cache.entity.ts`, `document-chunk.entity.ts` (RAG vector chunks + tsvector generated column), `rag-feedback.entity.ts` (thumbs-up/down signals for re-ranking)
 
 **Modules** (`src/`):
 - `auth/` — Passport.js JWT + Local strategies; `AuthController`, `AuthService`
@@ -96,6 +101,7 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `roles/` — job role listing
 - `courses/` — SCTP course catalog
 - `domain/` — Singapore labor market insights; also owns `GET /api/dashboard/summary`
+- `rag/` — RAG pipeline: `EmbeddingService` (ONNX sentence embeddings via `@xenova/transformers`), `RagService` (hybrid CTE search: pgvector HNSW + tsvector GIN → RRF → feedback boost → optional cross-encoder), `CrossEncoderService` (`ms-marco-MiniLM-L-6-v2`, off by default), `RagController` (`POST /api/rag/query`, `POST /api/rag/feedback`). Bootstrap in `main.ts` adds the `search_vector` tsvector generated column + GIN index at cold start.
 - `ssg/` — SkillsFuture/WSG API integration with three-tier fallback: PostgreSQL cache → live SSG API → seeded SCTPCourse rows
 - `internal/` — `InternalController` + `InternalModule`; automation endpoints invoked exclusively via Lambda Invoke API, never via public API Gateway. Guarded by `InternalTokenGuard` (`common/guards/`) which validates `X-Internal-Token` header against `INTERNAL_AUTOMATION_TOKEN`. `GET /internal/health` has no auth guard (used by warmup ping).
 - `common/` — shared config, filters, interceptors, utils (`resume-parser.util.ts`)
@@ -145,7 +151,7 @@ Python Lambda functions triggered by EventBridge Scheduler. All reuse the backen
 - `recommendation_refresh.py` — recommendation pre-compute + LLM rationale pre-gen (daily 02:00 / 02:30 UTC; Phase 2 stubs)
 - `cache_cleanup.py` — bulk-delete expired `ssg_cache` rows (daily 03:00 UTC)
 - `market_insights.py` — aggregate market insight metrics (daily 04:00 UTC)
-- `embedding_backfill.py` — Titan embedding backfill (every 6 hours; Phase 2 stub)
+- `embedding_backfill.py` — ONNX embedding backfill via `POST /internal/embeddings/backfill` (every 6 hours; Phase 2 stub)
 - `lambda_warmup.py` — warm-up ping to `GET /internal/health` (every 5 minutes, optional)
 
 ### Infrastructure
@@ -192,19 +198,11 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 
 - **`skip_terraform=true` Lambda update**: The workflow explicitly calls `aws lambda update-function-code` for all Lambda functions. Without this, the new ECR image is pushed but Lambda keeps the old one.
 
-- **Bedrock requires console opt-in**: AWS accounts must enable model access in the Bedrock console (Model access → request Claude 3.5 Sonnet v2). IAM permissions alone are insufficient — a missing opt-in returns `ValidationException: Operation not allowed`.
-
 - **`trailingSlash: true` breaks S3 routing**: Never set `trailingSlash: true` in `next.config.ts` when `NEXT_OUTPUT=export`. It nests output as `login/index.html` instead of flat `login.html`, breaking the CloudFront routing script.
 
 - **`/internal/*` endpoints are Lambda Invoke only**: Do NOT add API Gateway routes for them. The `InternalTokenGuard` is a second layer of defence, not the primary one — the primary guard is that they have no public route. The automation Lambdas call `base_automation.call_internal_endpoint()` which constructs a Lambda Invoke payload mimicking an API Gateway event. The NestJS Lambda handler processes it identically to a real HTTP request.
 
-- **`POST /api/chat` returns SSE**: Response is `text/event-stream`. `res.data.reply` is always `undefined`. Parse as:
-  ```typescript
-  if (typeof res.data === "string") {
-    const lines = res.data.split("\n");
-    const reply = lines.filter((l) => !l.startsWith("[ENGINE:")).join("\n").trim();
-  }
-  ```
+- **`POST /api/chat` returns JSON, not SSE**: Despite `[ENGINE: groq]` prefix lines in raw output, `chatApi.sendStream()` in `lib/api.ts` adapts the response to a streaming callback interface. The backend returns `{ reply, engine }` JSON; `res.data.reply` contains the assistant message. Do not treat `/api/chat` as a raw SSE stream from the frontend.
 
 - **`OMP_NUM_THREADS=1` in Docker**: The docker-compose backend sets `OMP_NUM_THREADS=1`. Without this, FAISS and sentence-transformer model loading can exhaust container memory or hang. Set this env var in any container or Lambda that runs ML inference.
 
@@ -215,10 +213,12 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 - **Hybrid scoring**: `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
 - **Skill levels**: 0 (missing), 0.5 (partial), 1.0 (strong)
 - **FAISS in-memory** for vector similarity (rebuilt on startup; no external vector store needed)
-- **LLM provider chain**: configurable via `PRIMARY_LLM` / `SECONDARY_LLM` / `TERTIARY_LLM` env vars (default order: Bedrock → Claude API → Gemini → HTTP 503). All three providers are optional; the chain skips unconfigured providers.
+- **LLM provider chain**: configurable via `PRIMARY_LLM` / `SECONDARY_LLM` / `TERTIARY_LLM` env vars (default order: Groq → Claude API → Gemini → HTTP 503). All three providers are optional; the chain skips unconfigured providers.
 - **Auth is optional**: core features work without login via `OptionalJwtAuthGuard`; unauthenticated requests default to the Global tenant (ID `1`)
 - **Multi-tenancy**: all entities have `tenant` relation; a `Global` tenant is auto-created on startup
 - **Recommendation cache**: in-memory TTL cache (300s)
+- **RAG retrieval pipeline**: `embed(query)` → single SQL CTE (HNSW cosine + tsvector GIN via FULL OUTER JOIN → RRF k=60) → `applyFeedbackBoost()` (α·tanh(net_votes), authenticated users only) → `CrossEncoderService.rerank()` (opt-in) → `slice(0, topK)`. CTE failure degrades to semantic-only automatically.
+- **RAG feedback re-ranking**: `rrfScore += 0.01 × tanh(net_feedback)`. `tanh` normalises vote counts so even 10 votes saturates at ±0.01, proportional to the RRF score range (~0.016–0.033).
 - **Schema migrations**: `updateSchema()` runs on every cold start (additive-only — never drops). Write new migrations to `nestjs-backend/src/migrations/` for destructive changes.
 
 ## Further Reference
@@ -242,22 +242,17 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 | GET    | /api/skill-gap/{id}           | Skill gap analysis                    |
 | GET    | /api/upskilling/{id}          | Upskilling roadmap                    |
 | POST   | /api/jd-match                 | Match profile against job description |
-| POST   | /api/chat                     | Career coach chatbot (SSE response)   |
-| POST   | /api/interview                | Mock interview simulator              |
+| POST   | /api/chat                     | Career coach chatbot (JSON `{reply,engine}`) |
 | GET    | /api/market-insights          | Singapore labor market data           |
 | POST   | /api/compare-roles            | Multi-role comparison                 |
 | GET    | /api/roles                    | List all roles                        |
-| GET    | /api/peer-comparison/{id}     | Anonymized peer comparison            |
-| GET    | /api/project-suggestions/{id} | Portfolio project ideas               |
 | POST   | /api/progress                 | Record skill progress                 |
 | GET    | /api/progress/{id}            | Get progress dashboard                |
 | GET    | /api/progress/{id}/timeline   | Progress timeline data                |
-| GET    | /api/export/roadmap/{id}      | Export roadmap as PDF                 |
 | GET    | /api/courses                  | List SCTP courses                     |
 | POST   | /api/calculate-subsidy        | Calculate SkillsFuture subsidy        |
-| POST   | /api/rag/query                | RAG-based document retrieval          |
-| POST   | /api/gap-analysis             | Async skill gap analysis              |
-| POST   | /api/voice                    | Voice coaching session                |
+| POST   | /api/rag/query                | Hybrid RAG retrieval (pgvector + tsvector RRF) |
+| POST   | /api/rag/feedback             | Thumbs-up/down signal for re-ranking  |
 | GET    | /api/dashboard/summary        | Authenticated user's dashboard KPIs   |
 | POST   | /api/resume-rewriter          | Rewrite a resume bullet for a role    |
 | GET    | /api/ssg/courses/search       | Search SkillsFuture courses (paginated; falls back to seeded data) |
@@ -275,5 +270,5 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 | POST   | /internal/cache/cleanup                   | Bulk-delete expired ssg_cache rows         |
 | POST   | /internal/recommendations/precompute      | Pre-compute recommendation scores (Phase 2)|
 | POST   | /internal/recommendations/rationale-pregen| Pre-gen LLM rationale (Phase 2)           |
-| POST   | /internal/embeddings/backfill             | Titan embedding backfill (Phase 2)         |
+| POST   | /internal/embeddings/backfill             | ONNX embedding backfill (Phase 2)          |
 | POST   | /internal/analytics/aggregate             | Pre-compute market insight metrics         |
