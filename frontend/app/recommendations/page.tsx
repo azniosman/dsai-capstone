@@ -62,6 +62,18 @@ export default function Recommendations() {
   const [profileId, setProfileId] = useState<number | null>(null);
 
   useEffect(() => {
+    const pidStr = localStorage.getItem("profileId");
+    setTimeout(() => {
+      if (pidStr) {
+        setHasProfile(true);
+        setProfileId(parseInt(pidStr));
+      } else {
+        setLoading(false);
+      }
+    }, 0);
+  }, []);
+
+  useEffect(() => {
     if (!profileId) return;
 
     api

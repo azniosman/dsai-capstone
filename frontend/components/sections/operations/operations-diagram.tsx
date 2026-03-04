@@ -254,7 +254,7 @@ export function OperationsDiagram() {
                 <div className="flex items-center gap-2 text-neutral-600">
                   <Terminal className="w-4 h-4" />
                   <span className="tactical-label text-[9px]">
-                    AWS_REGION: SG_NODE_01
+                    AWS_REGION: US-EAST-1
                   </span>
                 </div>
               </div>
