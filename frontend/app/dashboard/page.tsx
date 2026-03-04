@@ -23,15 +23,21 @@ import {
 } from "lucide-react";
 import api from "@/lib/api-client";
 
+const satelliteCoords = [
+  { cx: "40%", cy: "30%" },
+  { cx: "60%", cy: "40%" },
+  { cx: "35%", cy: "65%" },
+  { cx: "65%", cy: "70%" },
+];
+
 export default function Dashboard() {
   const router = useRouter();
-  // const { openModal } = useModalStore(); // Removed useModalStore import and usage
 
   if (typeof window !== "undefined" && !localStorage.getItem("token")) {
     router.push("/login");
   }
 
-  useQuery({
+  const { data: summary } = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: async () => {
       const res = await api.get("/api/dashboard/summary");
@@ -41,6 +47,26 @@ export default function Dashboard() {
       return res.data;
     },
   });
+
+  const { data: topRec } = useQuery({
+    queryKey: ["dashboard-recommendations", summary?.profile_id],
+    enabled: !!summary?.profile_id,
+    queryFn: async () => {
+      const res = await api.post("/api/recommend", {
+        profile_id: summary.profile_id,
+      });
+      const recs = res.data?.recommendations || [];
+      return recs.length > 0 ? recs[0] : null;
+    },
+  });
+
+  const skillsToShow: string[] = topRec?.matched_skills?.slice(0, 4) || [
+    "Python",
+    "PyTorch",
+    "MLOps",
+    "SQL",
+  ];
+  const topRoleTitle: string = topRec?.title || "Senior Data Scientist";
 
   return (
     <div className="flex flex-1 overflow-hidden h-screen -m-12 bg-background-dark font-display text-slate-100 p-6 pt-16">
@@ -235,92 +261,63 @@ export default function Dashboard() {
                         filter: "drop-shadow(0 0 8px rgba(37,157,244,0.8))",
                       }}
                     ></circle>
-                    <circle
-                      cx="40%"
-                      cy="30%"
-                      fill="#259df4"
-                      r="4"
-                      opacity="0.8"
-                    ></circle>
-                    <circle
-                      cx="60%"
-                      cy="40%"
-                      fill="#259df4"
-                      r="4"
-                      opacity="0.8"
-                    ></circle>
-                    <circle
-                      cx="35%"
-                      cy="65%"
-                      fill="#259df4"
-                      r="4"
-                      opacity="0.8"
-                    ></circle>
-                    <circle
-                      cx="65%"
-                      cy="70%"
-                      fill="#259df4"
-                      r="4"
-                      opacity="0.8"
-                    ></circle>
-                    <line
-                      stroke="#259df4"
-                      strokeWidth="1"
-                      x1="50%"
-                      x2="40%"
-                      y1="50%"
-                      y2="30%"
-                      opacity="0.6"
-                    ></line>
-                    <line
-                      stroke="#259df4"
-                      strokeWidth="1"
-                      x1="50%"
-                      x2="60%"
-                      y1="50%"
-                      y2="40%"
-                      opacity="0.6"
-                    ></line>
-                    <line
-                      stroke="#259df4"
-                      strokeWidth="1"
-                      x1="50%"
-                      x2="35%"
-                      y1="50%"
-                      y2="65%"
-                      opacity="0.6"
-                    ></line>
-                    <line
-                      stroke="#259df4"
-                      strokeWidth="1"
-                      x1="50%"
-                      x2="65%"
-                      y1="50%"
-                      y2="70%"
-                      opacity="0.6"
-                    ></line>
+                    {skillsToShow.map((skill, index) => {
+                      const coord =
+                        satelliteCoords[index % satelliteCoords.length];
+                      return (
+                        <g key={`node-${index}`}>
+                          <circle
+                            cx={coord.cx}
+                            cy={coord.cy}
+                            fill="#259df4"
+                            r="4"
+                            opacity="0.8"
+                          ></circle>
+                          <line
+                            stroke="#259df4"
+                            strokeWidth="1"
+                            x1="50%"
+                            x2={coord.cx}
+                            y1="50%"
+                            y2={coord.cy}
+                            opacity="0.6"
+                          ></line>
+                          <text
+                            x={coord.cx}
+                            y={coord.cy}
+                            dy="-10"
+                            dx={index % 2 === 0 ? "-20" : "10"}
+                            fill="#259df4"
+                            fontSize="8"
+                            fontFamily="monospace"
+                            className="uppercase tracking-widest opacity-80"
+                          >
+                            {skill}
+                          </text>
+                        </g>
+                      );
+                    })}
                   </g>
                 </svg>
                 <div className="absolute inset-0 flex flex-col p-4 pointer-events-none">
-                  <div className="mt-auto bg-background-dark/90 backdrop-blur-md border border-primary/40 p-3 w-max self-end pointer-events-auto relative">
+                  <div className="mt-auto bg-background-dark/90 backdrop-blur-md border border-primary/40 p-3 w-max self-end pointer-events-auto relative max-w-[200px]">
                     <div className="absolute top-0 right-0 w-1.5 h-1.5 border-t border-r border-primary"></div>
                     <div className="absolute bottom-0 left-0 w-1.5 h-1.5 border-b border-l border-primary"></div>
                     <div className="text-[9px] font-mono font-bold text-primary/60 uppercase tracking-widest mb-2 border-b border-primary/20 pb-1">
                       SELECTED NODE
                     </div>
-                    <div className="text-sm font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]">
-                      Senior Data Scientist
+                    <div className="text-sm font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)] truncate">
+                      {topRoleTitle}
                     </div>
-                    <div className="flex gap-2 mt-2 font-mono">
-                      <span className="text-[9px] px-1 bg-primary/20 text-primary border border-primary/30 uppercase tracking-widest">
-                        Python
-                      </span>
-                      <span className="text-[9px] px-1 bg-primary/20 text-primary border border-primary/30 uppercase tracking-widest">
-                        PyTorch
-                      </span>
-                      <span className="text-[9px] px-1 bg-primary/20 text-primary border border-primary/30 uppercase tracking-widest">
-                        MLOps
-                      </span>
+                    <div className="flex gap-2 mt-2 font-mono flex-wrap">
+                      {skillsToShow.map((skill) => (
+                        <span
+                          key={skill}
+                          className="text-[9px] px-1 bg-primary/20 text-primary border border-primary/30 uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
+                        >
+                          {skill}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 </div>
