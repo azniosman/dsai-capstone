@@ -619,14 +619,14 @@ export default function Recommendations() {
                           }
                           className="w-full bg-slate-100 text-background-dark hover:bg-primary rounded-lg font-display font-bold uppercase text-[10px] tracking-widest h-10 transition-all flex items-center justify-center gap-2"
                         >
-                          <Zap className="w-4 h-4" /> Init Match Protocol
+                          <Zap className="w-4 h-4" /> ANALYZE MATCH
                         </Button>
                         <Button
                           variant="outline"
                           onClick={() => openModal("jdMatch")}
                           className="w-full border-white/10 text-slate-300 hover:border-white/30 hover:bg-white/5 hover:text-white rounded-lg font-display font-bold uppercase text-[10px] tracking-widest h-10 transition-all flex items-center justify-center gap-2 bg-transparent"
                         >
-                          Custom Target <ArrowUpRight className="w-4 h-4" />
+                          JOB MATCH <ArrowUpRight className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>

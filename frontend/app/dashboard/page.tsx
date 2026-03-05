@@ -22,6 +22,27 @@ import {
   Scale,
 } from "lucide-react";
 import api from "@/lib/api-client";
+import { motion, Variants } from "framer-motion";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 24 },
+  },
+};
 
 const satelliteCoords = [
   { cx: "40%", cy: "30%" },
@@ -71,7 +92,11 @@ export default function Dashboard() {
   return (
     <div className="flex flex-1 overflow-hidden h-screen -m-12 bg-background-dark font-display text-slate-100 p-6 pt-16">
       <main className="flex-1 flex flex-col overflow-hidden text-slate-100">
-        <div className="bg-background-dark border-b border-primary/20 p-4 flex items-center justify-between pb-6">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-background-dark border-b border-primary/20 p-4 flex items-center justify-between pb-6"
+        >
           <div>
             <div className="flex items-center gap-2 text-[10px] text-primary/60 mb-1 font-mono uppercase tracking-widest">
               <span>Projects</span> <ChevronRight className="w-3.5 h-3.5" />
@@ -79,7 +104,7 @@ export default function Dashboard() {
               <span className="text-primary">Executive Summary</span>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]">
-              Singapore Tech Ecosystem Insight
+              SINGAPORE TECH INSIGHTS
             </h2>
           </div>
           <div className="flex items-center gap-4">
@@ -96,16 +121,23 @@ export default function Dashboard() {
               Export
             </button>
           </div>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
           className="flex-1 overflow-y-auto pt-6 space-y-4 data-grid cyber-grid pr-4"
           style={
             { "--grid-color": "rgba(37,157,244,0.05)" } as React.CSSProperties
           }
         >
           <div className="grid grid-cols-4 gap-4">
-            <div className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm">
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ y: -4 }}
+              className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm"
+            >
               <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors"></div>
               <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors"></div>
               <div className="flex items-center justify-between mb-4">
@@ -115,20 +147,31 @@ export default function Dashboard() {
                 <Waves className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]">
-                  84.2
-                </span>
+                <AnimatedCounter
+                  value={84.2}
+                  decimals={1}
+                  className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]"
+                />
                 <span className="text-[10px] text-primary font-bold bg-primary/10 px-1 border border-primary/20 flex items-center gap-1 font-mono">
                   <ArrowUp className="w-3 h-3" />
                   2.4%
                 </span>
               </div>
               <div className="w-full bg-background-dark/80 h-1 mt-4 overflow-hidden border border-primary/20">
-                <div className="bg-primary h-full w-[84%] shadow-[0_0_8px_rgba(37,157,244,0.8)]"></div>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: "84%" }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                  className="bg-primary h-full shadow-[0_0_8px_rgba(37,157,244,0.8)]"
+                ></motion.div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm">
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ y: -4 }}
+              className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm"
+            >
               <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors"></div>
               <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors"></div>
               <div className="flex items-center justify-between mb-4">
@@ -138,20 +181,31 @@ export default function Dashboard() {
                 <TrendingUp className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]">
-                  128.5
-                </span>
+                <AnimatedCounter
+                  value={128.5}
+                  decimals={1}
+                  className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]"
+                />
                 <span className="text-[10px] text-accent-coral font-bold bg-accent-coral/10 px-1 border border-accent-coral/20 flex items-center gap-1 font-mono animate-pulse">
                   <ArrowDown className="w-3 h-3" />
                   1.2%
                 </span>
               </div>
               <div className="w-full bg-background-dark/80 h-1 mt-4 overflow-hidden border border-primary/20">
-                <div className="bg-accent-coral h-full w-[65%] shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: "65%" }}
+                  transition={{ duration: 1.5, ease: "easeOut", delay: 0.1 }}
+                  className="bg-accent-coral h-full shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+                ></motion.div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm">
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ y: -4 }}
+              className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm"
+            >
               <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors"></div>
               <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors"></div>
               <div className="flex items-center justify-between mb-4">
@@ -161,23 +215,38 @@ export default function Dashboard() {
                 <Users className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]">
-                  42,400
-                </span>
+                <AnimatedCounter
+                  value={42400}
+                  className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]"
+                />
                 <span className="text-[10px] text-primary font-bold bg-primary/10 px-1 border border-primary/20 flex items-center gap-1 font-mono">
                   <ArrowUp className="w-3 h-3" />
                   5.8%
                 </span>
               </div>
               <div className="flex gap-1 mt-4">
-                <div className="w-1/4 h-1 bg-primary shadow-[0_0_8px_rgba(37,157,244,0.8)]"></div>
-                <div className="w-1/4 h-1 bg-primary shadow-[0_0_8px_rgba(37,157,244,0.8)]"></div>
+                <motion.div
+                  initial={{ scaleY: 0 }}
+                  animate={{ scaleY: 1 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="w-1/4 h-1 bg-primary origin-left shadow-[0_0_8px_rgba(37,157,244,0.8)]"
+                ></motion.div>
+                <motion.div
+                  initial={{ scaleY: 0 }}
+                  animate={{ scaleY: 1 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  className="w-1/4 h-1 bg-primary origin-left shadow-[0_0_8px_rgba(37,157,244,0.8)]"
+                ></motion.div>
                 <div className="w-1/4 h-1 bg-primary/20"></div>
                 <div className="w-1/4 h-1 bg-primary/10"></div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm">
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ y: -4 }}
+              className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm"
+            >
               <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors"></div>
               <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors"></div>
               <div className="flex items-center justify-between mb-4">
@@ -187,20 +256,31 @@ export default function Dashboard() {
                 <GraduationCap className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]">
-                  14.7%
-                </span>
+                <AnimatedCounter
+                  value={14.7}
+                  decimals={1}
+                  suffix="%"
+                  className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]"
+                />
                 <span className="text-[10px] text-slate-400 font-bold bg-slate-800/50 px-1 border border-slate-700 flex items-center font-mono">
                   STABLE
                 </span>
               </div>
               <div className="w-full bg-background-dark/80 h-1 mt-4 overflow-hidden border border-primary/20">
-                <div className="bg-slate-400 h-full w-[14%]"></div>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: "14%" }}
+                  transition={{ duration: 1.5, ease: "easeOut", delay: 0.3 }}
+                  className="bg-slate-400 h-full"
+                ></motion.div>
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          <div className="grid grid-cols-3 gap-6 h-[400px]">
+          <motion.div
+            variants={itemVariants}
+            className="grid grid-cols-3 gap-6 h-[400px]"
+          >
             <div className="col-span-2 bg-background-dark/60 backdrop-blur-sm border border-primary/30 flex flex-col overflow-hidden relative group">
               <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors z-10"></div>
               <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors z-10"></div>
@@ -265,14 +345,32 @@ export default function Dashboard() {
                       const coord =
                         satelliteCoords[index % satelliteCoords.length];
                       return (
-                        <g key={`node-${index}`}>
-                          <circle
+                        <motion.g
+                          key={`node-${index}`}
+                          initial={{ opacity: 0, scale: 0 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{
+                            delay: 0.5 + index * 0.1,
+                            type: "spring",
+                          }}
+                        >
+                          <motion.circle
+                            animate={{
+                              r: [4, 5, 4],
+                              opacity: [0.8, 1, 0.8],
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              repeatType: "reverse",
+                              delay: index * 0.2,
+                            }}
                             cx={coord.cx}
                             cy={coord.cy}
                             fill="#259df4"
                             r="4"
                             opacity="0.8"
-                          ></circle>
+                          ></motion.circle>
                           <line
                             stroke="#259df4"
                             strokeWidth="1"
@@ -294,7 +392,7 @@ export default function Dashboard() {
                           >
                             {skill}
                           </text>
-                        </g>
+                        </motion.g>
                       );
                     })}
                   </g>
@@ -304,7 +402,7 @@ export default function Dashboard() {
                     <div className="absolute top-0 right-0 w-1.5 h-1.5 border-t border-r border-primary"></div>
                     <div className="absolute bottom-0 left-0 w-1.5 h-1.5 border-b border-l border-primary"></div>
                     <div className="text-[9px] font-mono font-bold text-primary/60 uppercase tracking-widest mb-2 border-b border-primary/20 pb-1">
-                      SELECTED NODE
+                      TOP MATCHED ROLE
                     </div>
                     <div className="text-sm font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)] truncate">
                       {topRoleTitle}
@@ -411,7 +509,7 @@ export default function Dashboard() {
                 </table>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-2 gap-6 pt-4 border-t border-primary/20 mt-4">
             <div className="bg-background-dark/60 backdrop-blur-sm border border-primary/30 flex flex-col min-h-[300px] relative group h-full">
@@ -456,7 +554,7 @@ export default function Dashboard() {
               <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors z-10"></div>
               <div className="p-4 border-b border-primary/20 flex items-center justify-between">
                 <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary">
-                  Live Ecosystem Signals
+                  Live Skills Update
                 </h3>
                 <button className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary/70 hover:text-primary transition-colors">
                   [ View Logs ]
@@ -538,10 +636,15 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </main>
 
-      <aside className="w-80 border-l border-primary/20 bg-background-dark flex flex-col shrink-0 text-slate-100 overflow-y-auto h-full relative">
+      <motion.aside
+        initial={{ x: 50, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="w-80 border-l border-primary/20 bg-background-dark flex flex-col shrink-0 text-slate-100 overflow-y-auto h-full relative"
+      >
         <div className="absolute left-0 top-0 bottom-0 w-px bg-linear-to-b from-primary/0 via-primary/30 to-primary/0"></div>
         <div className="p-6 border-b border-primary/20">
           <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary/60 mb-6 flex items-center gap-2">
@@ -607,30 +710,42 @@ export default function Dashboard() {
             <span className="w-1.5 h-1.5 bg-primary/40"></span> Related Entities
           </h3>
           <div className="space-y-2 font-mono">
-            <div className="p-3 border border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 cursor-pointer flex items-center justify-between transition-all group">
+            <motion.div
+              whileHover={{ x: 4, backgroundColor: "rgba(37, 157, 244, 0.15)" }}
+              className="p-3 border border-primary/20 bg-primary/5 cursor-pointer flex items-center justify-between transition-all group"
+            >
               <span className="text-[10px] uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors">
                 Large Language Models
               </span>
               <ChevronRight className="w-3.5 h-3.5 text-primary/50 group-hover:text-primary transition-colors" />
-            </div>
-            <div className="p-3 border border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 cursor-pointer flex items-center justify-between transition-all group">
+            </motion.div>
+            <motion.div
+              whileHover={{ x: 4, backgroundColor: "rgba(37, 157, 244, 0.15)" }}
+              className="p-3 border border-primary/20 bg-primary/5 cursor-pointer flex items-center justify-between transition-all group"
+            >
               <span className="text-[10px] uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors">
                 Vector Databases
               </span>
               <ChevronRight className="w-3.5 h-3.5 text-primary/50 group-hover:text-primary transition-colors" />
-            </div>
-            <div className="p-3 border border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 cursor-pointer flex items-center justify-between transition-all group">
+            </motion.div>
+            <motion.div
+              whileHover={{ x: 4, backgroundColor: "rgba(37, 157, 244, 0.15)" }}
+              className="p-3 border border-primary/20 bg-primary/5 cursor-pointer flex items-center justify-between transition-all group"
+            >
               <span className="text-[10px] uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors">
                 Prompt Engineering
               </span>
               <ChevronRight className="w-3.5 h-3.5 text-primary/50 group-hover:text-primary transition-colors" />
-            </div>
-            <div className="p-3 border border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 cursor-pointer flex items-center justify-between transition-all group">
+            </motion.div>
+            <motion.div
+              whileHover={{ x: 4, backgroundColor: "rgba(37, 157, 244, 0.15)" }}
+              className="p-3 border border-primary/20 bg-primary/5 cursor-pointer flex items-center justify-between transition-all group"
+            >
               <span className="text-[10px] uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors">
                 GPU Orchestration
               </span>
               <ChevronRight className="w-3.5 h-3.5 text-primary/50 group-hover:text-primary transition-colors" />
-            </div>
+            </motion.div>
           </div>
         </div>
         <div className="p-6 bg-background-dark/95 border-t border-primary/20 shrink-0">
@@ -638,7 +753,7 @@ export default function Dashboard() {
             Open in Ontology Graph
           </button>
         </div>
-      </aside>
+      </motion.aside>
     </div>
   );
 }

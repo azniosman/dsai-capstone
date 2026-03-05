@@ -4,6 +4,7 @@
 
 SkillBridge is a serverless, full-stack AI platform that helps SCTP learners and mid-career professionals navigate Singapore's evolving tech job market. It combines a six-phase hybrid Retrieval-Augmented Generation (RAG) pipeline, multi-provider LLM orchestration, and an interactive AI career coach — all grounded in real SkillsFuture course data, SSG/WSG salary benchmarks, and live market intelligence.
 
+![Orchestrating](misc/images/orchestrating.png)
 ![Overview](misc/images/aioverview.png)
 
 **Enterprise Roadmap:** See [Enterprise-Technical_Roadmap.md](Enterprise-Technical_Roadmap.md)
@@ -61,49 +62,49 @@ SkillBridge is deployed on AWS serverless infrastructure. The backend is a **con
 
 ### Backend
 
-| Layer | Technology |
-|---|---|
-| Runtime | NestJS 11 + TypeScript 5.7 |
-| ORM | MikroORM 6 (PostgreSQL driver) |
-| Database | PostgreSQL 16 + pgvector extension |
-| Vector index | HNSW (`vector_cosine_ops`) + tsvector GIN |
-| Auth | Passport.js — JWT + Local strategies |
-| Embedding model | `Xenova/all-MiniLM-L6-v2` (ONNX, 384-dim, runs in-process) |
-| Re-ranking model | `Xenova/ms-marco-MiniLM-L-6-v2` (cross-encoder, optional) |
-| LLM providers | Groq (`llama-3.3-70b-versatile`), Anthropic Claude (`claude-3-5-sonnet-20241022`), Google Gemini (`gemini-2.0-flash`) |
-| File parsing | `pdf-parse` (PDF), `mammoth` (DOCX) |
-| Validation | `class-validator` + `class-transformer` |
+| Layer            | Technology                                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Runtime          | NestJS 11 + TypeScript 5.7                                                                                            |
+| ORM              | MikroORM 6 (PostgreSQL driver)                                                                                        |
+| Database         | PostgreSQL 16 + pgvector extension                                                                                    |
+| Vector index     | HNSW (`vector_cosine_ops`) + tsvector GIN                                                                             |
+| Auth             | Passport.js — JWT + Local strategies                                                                                  |
+| Embedding model  | `Xenova/all-MiniLM-L6-v2` (ONNX, 384-dim, runs in-process)                                                            |
+| Re-ranking model | `Xenova/ms-marco-MiniLM-L-6-v2` (cross-encoder, optional)                                                             |
+| LLM providers    | Groq (`llama-3.3-70b-versatile`), Anthropic Claude (`claude-3-5-sonnet-20241022`), Google Gemini (`gemini-2.0-flash`) |
+| File parsing     | `pdf-parse` (PDF), `mammoth` (DOCX)                                                                                   |
+| Validation       | `class-validator` + `class-transformer`                                                                               |
 
 ### Frontend
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router) + React 19 |
-| Language | TypeScript 5 |
-| Styling | Tailwind CSS 4 + shadcn/ui (New York style) |
-| State | Zustand 5 (modal store, profile builder store) |
-| Data fetching | TanStack Query v5 (React Query) |
-| Charts | Recharts 3 |
-| Animation | Framer Motion 12 |
-| 3D | Three.js (landing page, architecture diagram) |
-| HTTP client | Axios (auto JWT attach + 401 refresh) |
+| Layer         | Technology                                     |
+| ------------- | ---------------------------------------------- |
+| Framework     | Next.js 16 (App Router) + React 19             |
+| Language      | TypeScript 5                                   |
+| Styling       | Tailwind CSS 4 + shadcn/ui (New York style)    |
+| State         | Zustand 5 (modal store, profile builder store) |
+| Data fetching | TanStack Query v5 (React Query)                |
+| Charts        | Recharts 3                                     |
+| Animation     | Framer Motion 12                               |
+| 3D            | Three.js (landing page, architecture diagram)  |
+| HTTP client   | Axios (auto JWT attach + 401 refresh)          |
 
 ### Infrastructure
 
-| Layer | Technology |
-|---|---|
-| Compute | AWS Lambda (containerized NestJS) |
-| API | API Gateway HTTP API v2 |
-| Database | Aurora Serverless v2 (PostgreSQL 16 compatible) |
-| CDN / Frontend | S3 + CloudFront |
-| Registry | Amazon ECR |
-| Automation | EventBridge Scheduler + Python Lambda functions |
-| Monitoring | CloudWatch (EMF metrics, dashboards, alarms) |
-| Secrets | AWS Secrets Manager |
-| IaC | Terraform 1.9 |
-| CI/CD | GitHub Actions (manual dispatch) |
-| Local dev | Docker Compose |
-| Workflow automation | n8n |
+| Layer               | Technology                                      |
+| ------------------- | ----------------------------------------------- |
+| Compute             | AWS Lambda (containerized NestJS)               |
+| API                 | API Gateway HTTP API v2                         |
+| Database            | Aurora Serverless v2 (PostgreSQL 16 compatible) |
+| CDN / Frontend      | S3 + CloudFront                                 |
+| Registry            | Amazon ECR                                      |
+| Automation          | EventBridge Scheduler + Python Lambda functions |
+| Monitoring          | CloudWatch (EMF metrics, dashboards, alarms)    |
+| Secrets             | AWS Secrets Manager                             |
+| IaC                 | Terraform 1.9                                   |
+| CI/CD               | GitHub Actions (manual dispatch)                |
+| Local dev           | Docker Compose                                  |
+| Workflow automation | n8n                                             |
 
 ---
 
@@ -212,14 +213,14 @@ AI_MAX_TOKENS=2048
 
 Six Python Lambda functions triggered by EventBridge Scheduler handle all background processing. They communicate with the NestJS backend exclusively via Lambda Invoke API (not HTTP), calling `/internal/*` endpoints that are not exposed on API Gateway.
 
-| Function | Schedule (UTC) | Purpose |
-|---|---|---|
-| `ssg_sync` | Daily 01:00 / 01:30 | Sync SSG courses and WSG job roles into PostgreSQL cache |
-| `recommendation_refresh` | Daily 02:00 / 02:30 | Pre-compute recommendation scores (Phase 2 stub) |
-| `cache_cleanup` | Daily 03:00 | Bulk-delete expired `ssg_cache` rows |
-| `market_insights` | Daily 04:00 | Aggregate market insight metrics |
-| `embedding_backfill` | Every 6 hours | ONNX embedding backfill for NULL-embedding chunks (Phase 2 stub) |
-| `lambda_warmup` | Every 5 minutes | Keep-alive ping to prevent cold starts |
+| Function                 | Schedule (UTC)      | Purpose                                                          |
+| ------------------------ | ------------------- | ---------------------------------------------------------------- |
+| `ssg_sync`               | Daily 01:00 / 01:30 | Sync SSG courses and WSG job roles into PostgreSQL cache         |
+| `recommendation_refresh` | Daily 02:00 / 02:30 | Pre-compute recommendation scores (Phase 2 stub)                 |
+| `cache_cleanup`          | Daily 03:00         | Bulk-delete expired `ssg_cache` rows                             |
+| `market_insights`        | Daily 04:00         | Aggregate market insight metrics                                 |
+| `embedding_backfill`     | Every 6 hours       | ONNX embedding backfill for NULL-embedding chunks (Phase 2 stub) |
+| `lambda_warmup`          | Every 5 minutes     | Keep-alive ping to prevent cold starts                           |
 
 All automation functions share `base_automation.py` for token retrieval (from Secrets Manager), Lambda Invoke construction, and CloudWatch EMF metric emission. The `INTERNAL_AUTOMATION_TOKEN` is cached in module scope across warm invocations.
 
@@ -291,6 +292,7 @@ terraform destroy \
 ```
 
 **Infrastructure components provisioned by Terraform:**
+
 - VPC with public/private subnets + NAT Gateway
 - ECR repository for Docker images
 - Aurora Serverless v2 cluster (PostgreSQL 16 + pgvector)
@@ -328,6 +330,7 @@ docker compose up
 ```
 
 On first start, the backend automatically:
+
 1. Enables the `pgvector` extension
 2. Creates/updates the schema (additive-only)
 3. Adds HNSW and GIN indexes
@@ -373,65 +376,65 @@ Create a `.env` file at the project root. See `.env.example` for a complete temp
 
 ### Database
 
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | — | Full Postgres connection string (overrides individual vars) |
-| `DATABASE_USER` | `capstone` | PostgreSQL username |
-| `DATABASE_PASSWORD` | `changeme` | PostgreSQL password |
-| `DATABASE_HOST` | `localhost` | PostgreSQL host |
-| `DATABASE_PORT` | `5432` | PostgreSQL port |
-| `DATABASE_NAME` | `capstone` | Database name |
+| Variable            | Default     | Description                                                 |
+| ------------------- | ----------- | ----------------------------------------------------------- |
+| `DATABASE_URL`      | —           | Full Postgres connection string (overrides individual vars) |
+| `DATABASE_USER`     | `capstone`  | PostgreSQL username                                         |
+| `DATABASE_PASSWORD` | `changeme`  | PostgreSQL password                                         |
+| `DATABASE_HOST`     | `localhost` | PostgreSQL host                                             |
+| `DATABASE_PORT`     | `5432`      | PostgreSQL port                                             |
+| `DATABASE_NAME`     | `capstone`  | Database name                                               |
 
 ### Auth & Backend
 
-| Variable | Default | Description |
-|---|---|---|
-| `JWT_SECRET` | — | JWT signing key (required) |
-| `CORS_ALLOWED_ORIGINS` | `["http://localhost:3000","http://localhost:5173"]` | Allowed origins (JSON array or comma-separated) |
-| `INTERNAL_AUTOMATION_TOKEN` | — | Shared secret for `/internal/*` endpoints; validated by `InternalTokenGuard` |
+| Variable                    | Default                                             | Description                                                                  |
+| --------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `JWT_SECRET`                | —                                                   | JWT signing key (required)                                                   |
+| `CORS_ALLOWED_ORIGINS`      | `["http://localhost:3000","http://localhost:5173"]` | Allowed origins (JSON array or comma-separated)                              |
+| `INTERNAL_AUTOMATION_TOKEN` | —                                                   | Shared secret for `/internal/*` endpoints; validated by `InternalTokenGuard` |
 
 ### LLM Providers
 
-| Variable | Default | Description |
-|---|---|---|
-| `PRIMARY_LLM` | `groq` | First provider to attempt (`groq \| claude \| gemini`) |
-| `SECONDARY_LLM` | `claude` | Second provider |
-| `TERTIARY_LLM` | `gemini` | Third provider |
-| `GROQ_API_KEY` | — | Groq API key |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Groq model ID |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key |
-| `CLAUDE_MODEL` | `claude-3-5-sonnet-20241022` | Claude model ID |
-| `GEMINI_API_KEY` | — | Google Gemini API key |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model ID |
-| `AI_TEMPERATURE` | `0.3` | Sampling temperature (all providers) |
-| `AI_MAX_TOKENS` | `2048` | Max output tokens (all providers) |
+| Variable            | Default                      | Description                                            |
+| ------------------- | ---------------------------- | ------------------------------------------------------ |
+| `PRIMARY_LLM`       | `groq`                       | First provider to attempt (`groq \| claude \| gemini`) |
+| `SECONDARY_LLM`     | `claude`                     | Second provider                                        |
+| `TERTIARY_LLM`      | `gemini`                     | Third provider                                         |
+| `GROQ_API_KEY`      | —                            | Groq API key                                           |
+| `GROQ_MODEL`        | `llama-3.3-70b-versatile`    | Groq model ID                                          |
+| `ANTHROPIC_API_KEY` | —                            | Anthropic API key                                      |
+| `CLAUDE_MODEL`      | `claude-3-5-sonnet-20241022` | Claude model ID                                        |
+| `GEMINI_API_KEY`    | —                            | Google Gemini API key                                  |
+| `GEMINI_MODEL`      | `gemini-2.0-flash`           | Gemini model ID                                        |
+| `AI_TEMPERATURE`    | `0.3`                        | Sampling temperature (all providers)                   |
+| `AI_MAX_TOKENS`     | `2048`                       | Max output tokens (all providers)                      |
 
 ### Embedding & RAG
 
-| Variable | Default | Description |
-|---|---|---|
-| `EMBEDDING_MODEL` | `Xenova/all-MiniLM-L6-v2` | ONNX sentence embedding model (384-dim) |
-| `RERANKER_ENABLED` | `false` | Set `true` to activate cross-encoder re-ranking |
-| `RERANKER_MODEL` | `Xenova/ms-marco-MiniLM-L-6-v2` | Cross-encoder model |
-| `RERANKER_TOP_N` | `20` | Number of RRF candidates to score with cross-encoder |
-| `TRANSFORMERS_CACHE` | `.cache/huggingface` | Model cache directory (use `/tmp/.transformers_cache` on Lambda) |
+| Variable             | Default                         | Description                                                      |
+| -------------------- | ------------------------------- | ---------------------------------------------------------------- |
+| `EMBEDDING_MODEL`    | `Xenova/all-MiniLM-L6-v2`       | ONNX sentence embedding model (384-dim)                          |
+| `RERANKER_ENABLED`   | `false`                         | Set `true` to activate cross-encoder re-ranking                  |
+| `RERANKER_MODEL`     | `Xenova/ms-marco-MiniLM-L-6-v2` | Cross-encoder model                                              |
+| `RERANKER_TOP_N`     | `20`                            | Number of RRF candidates to score with cross-encoder             |
+| `TRANSFORMERS_CACHE` | `.cache/huggingface`            | Model cache directory (use `/tmp/.transformers_cache` on Lambda) |
 
 ### SSG / SkillsFuture Integration
 
-| Variable | Default | Description |
-|---|---|---|
-| `SSG_CLIENT_ID` | — | SSG/WSG OAuth client ID (optional; falls back to seeded data) |
-| `SSG_CLIENT_SECRET` | — | SSG/WSG OAuth client secret |
-| `SSG_API_BASE_URL` | `https://uat-api.ssg-wsg.gov.sg` | SSG API base URL |
-| `SSG_TOKEN_URL` | — | SSG OAuth token endpoint |
-| `SSG_CACHE_TTL_SECONDS` | `3600` | How long to cache SSG responses in PostgreSQL |
+| Variable                | Default                          | Description                                                   |
+| ----------------------- | -------------------------------- | ------------------------------------------------------------- |
+| `SSG_CLIENT_ID`         | —                                | SSG/WSG OAuth client ID (optional; falls back to seeded data) |
+| `SSG_CLIENT_SECRET`     | —                                | SSG/WSG OAuth client secret                                   |
+| `SSG_API_BASE_URL`      | `https://uat-api.ssg-wsg.gov.sg` | SSG API base URL                                              |
+| `SSG_TOKEN_URL`         | —                                | SSG OAuth token endpoint                                      |
+| `SSG_CACHE_TTL_SECONDS` | `3600`                           | How long to cache SSG responses in PostgreSQL                 |
 
 ### Frontend
 
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | Backend URL (default: `http://localhost:8000`) |
-| `NEXT_OUTPUT` | Set to `export` for S3 static export (disables API rewrites) |
+| Variable              | Description                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| `NEXT_PUBLIC_API_URL` | Backend URL (default: `http://localhost:8000`)               |
+| `NEXT_OUTPUT`         | Set to `export` for S3 static export (disables API rewrites) |
 
 ---
 
@@ -439,49 +442,49 @@ Create a `.env` file at the project root. See `.env.example` for a complete temp
 
 ### Public Endpoints
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/auth/register` | User registration |
-| `POST` | `/api/auth/login` | Login → returns JWT |
-| `GET` | `/api/auth/me` | Current user info |
-| `POST` | `/api/profile` | Create user profile |
-| `POST` | `/api/upload-resume` | Upload PDF/DOCX resume for parsing |
-| `POST` | `/api/recommend` | Get job recommendations (auth optional) |
-| `GET` | `/api/skill-gap/{id}` | Skill gap analysis for a role |
-| `GET` | `/api/upskilling/{id}` | Upskilling roadmap for a role |
-| `POST` | `/api/jd-match` | Match profile against job description (auth optional) |
-| `POST` | `/api/chat` | Career coach chat — returns `{ reply, engine }` JSON |
-| `GET` | `/api/market-insights` | Singapore labor market data |
-| `POST` | `/api/compare-roles` | Multi-role comparison |
-| `GET` | `/api/roles` | List all job roles |
-| `POST` | `/api/progress` | Record skill progress |
-| `GET` | `/api/progress/{id}` | Progress dashboard |
-| `GET` | `/api/progress/{id}/timeline` | Progress timeline |
-| `GET` | `/api/courses` | List SCTP courses |
-| `POST` | `/api/calculate-subsidy` | Calculate SkillsFuture subsidy |
-| `POST` | `/api/rag/query` | Hybrid RAG retrieval (pgvector HNSW + tsvector GIN + RRF) |
-| `POST` | `/api/rag/feedback` | Submit thumbs-up/down for a retrieved chunk |
-| `GET` | `/api/dashboard/summary` | Authenticated user's dashboard KPIs |
-| `POST` | `/api/resume-rewriter` | AI-rewrite a resume bullet for a target role |
-| `GET` | `/api/ssg/courses/search` | Search SkillsFuture courses (paginated) |
-| `GET` | `/api/ssg/courses/:ref` | Get a single SSG course by reference number |
-| `GET` | `/api/ssg/job-roles` | List WSG SkillsFramework job roles |
-| `POST` | `/api/ssg/recommendations` | Personalised SSG courses by skill overlap |
+| Method | Path                          | Description                                               |
+| ------ | ----------------------------- | --------------------------------------------------------- |
+| `POST` | `/api/auth/register`          | User registration                                         |
+| `POST` | `/api/auth/login`             | Login → returns JWT                                       |
+| `GET`  | `/api/auth/me`                | Current user info                                         |
+| `POST` | `/api/profile`                | Create user profile                                       |
+| `POST` | `/api/upload-resume`          | Upload PDF/DOCX resume for parsing                        |
+| `POST` | `/api/recommend`              | Get job recommendations (auth optional)                   |
+| `GET`  | `/api/skill-gap/{id}`         | Skill gap analysis for a role                             |
+| `GET`  | `/api/upskilling/{id}`        | Upskilling roadmap for a role                             |
+| `POST` | `/api/jd-match`               | Match profile against job description (auth optional)     |
+| `POST` | `/api/chat`                   | Career coach chat — returns `{ reply, engine }` JSON      |
+| `GET`  | `/api/market-insights`        | Singapore labor market data                               |
+| `POST` | `/api/compare-roles`          | Multi-role comparison                                     |
+| `GET`  | `/api/roles`                  | List all job roles                                        |
+| `POST` | `/api/progress`               | Record skill progress                                     |
+| `GET`  | `/api/progress/{id}`          | Progress dashboard                                        |
+| `GET`  | `/api/progress/{id}/timeline` | Progress timeline                                         |
+| `GET`  | `/api/courses`                | List SCTP courses                                         |
+| `POST` | `/api/calculate-subsidy`      | Calculate SkillsFuture subsidy                            |
+| `POST` | `/api/rag/query`              | Hybrid RAG retrieval (pgvector HNSW + tsvector GIN + RRF) |
+| `POST` | `/api/rag/feedback`           | Submit thumbs-up/down for a retrieved chunk               |
+| `GET`  | `/api/dashboard/summary`      | Authenticated user's dashboard KPIs                       |
+| `POST` | `/api/resume-rewriter`        | AI-rewrite a resume bullet for a target role              |
+| `GET`  | `/api/ssg/courses/search`     | Search SkillsFuture courses (paginated)                   |
+| `GET`  | `/api/ssg/courses/:ref`       | Get a single SSG course by reference number               |
+| `GET`  | `/api/ssg/job-roles`          | List WSG SkillsFramework job roles                        |
+| `POST` | `/api/ssg/recommendations`    | Personalised SSG courses by skill overlap                 |
 
 ### Internal Automation Endpoints
 
 These are accessed via Lambda Invoke API only — not exposed on API Gateway. All require the `X-Internal-Token` header (except health check).
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/internal/health` | Keep-alive health check (no auth) |
-| `POST` | `/internal/sync/ssg/courses` | Populate SSG course cache |
-| `POST` | `/internal/sync/ssg/jobroles` | Populate SSG job role cache |
-| `POST` | `/internal/cache/cleanup` | Delete expired `ssg_cache` rows |
-| `POST` | `/internal/recommendations/precompute` | Pre-compute recommendation scores |
-| `POST` | `/internal/recommendations/rationale-pregen` | Pre-generate LLM rationale |
-| `POST` | `/internal/embeddings/backfill` | Re-embed NULL-embedding chunks |
-| `POST` | `/internal/analytics/aggregate` | Pre-compute market insight metrics |
+| Method | Path                                         | Description                        |
+| ------ | -------------------------------------------- | ---------------------------------- |
+| `GET`  | `/internal/health`                           | Keep-alive health check (no auth)  |
+| `POST` | `/internal/sync/ssg/courses`                 | Populate SSG course cache          |
+| `POST` | `/internal/sync/ssg/jobroles`                | Populate SSG job role cache        |
+| `POST` | `/internal/cache/cleanup`                    | Delete expired `ssg_cache` rows    |
+| `POST` | `/internal/recommendations/precompute`       | Pre-compute recommendation scores  |
+| `POST` | `/internal/recommendations/rationale-pregen` | Pre-generate LLM rationale         |
+| `POST` | `/internal/embeddings/backfill`              | Re-embed NULL-embedding chunks     |
+| `POST` | `/internal/analytics/aggregate`              | Pre-compute market insight metrics |
 
 **Chat note**: `POST /api/chat` returns `{ reply: string, engine: string }` JSON — not a server-sent events stream. The `engine` field identifies which LLM provider served the request.
 
@@ -594,11 +597,13 @@ dsai-capstone/
 ## Future Roadmap
 
 **Phase 2 (stubs ready):**
+
 - Pre-computed recommendation rationale (LLM generation at sync time)
 - Embedding backfill via EventBridge scheduler
 - Recommendation score pre-computation
 
 **Enterprise roadmap** (see [Enterprise-Technical_Roadmap.md](Enterprise-Technical_Roadmap.md)):
+
 - ECS Fargate migration (always-on compute)
 - WebSocket API for real-time voice coaching
 - OpenSearch integration for enterprise-scale retrieval

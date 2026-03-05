@@ -10,12 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 const SEVERITY_CLASSES: Record<string, string> = {
-  none: "bg-muted-cyan/10 border-muted-cyan/30 text-muted-cyan",
+  none: "bg-primary/10 border-primary/30 text-primary",
   low: "bg-amber-500/10 border-amber-500/30 text-amber-500",
   medium: "bg-orange-500/10 border-orange-500/30 text-orange-500",
-  high: "bg-soft-coral/10 border-soft-coral/30 text-soft-coral",
+  high: "bg-accent-coral/10 border-accent-coral/30 text-accent-coral",
 };
 
 interface Gap {
@@ -32,27 +33,25 @@ interface Props {
   onHoverSkill?: (skill: string | null) => void;
 }
 
-import { motion } from "framer-motion";
-
 export default function GapTable({ gaps, hoveredSkill, onHoverSkill }: Props) {
   return (
-    <div className="border border-muted-cyan/30 bg-[#18181b] overflow-x-auto shadow-[0_0_15px_rgba(37,157,244,0.05)]">
+    <div className="border border-primary/30 bg-background-dark/80 backdrop-blur-sm overflow-x-auto shadow-[0_0_15px_rgba(37,157,244,0.05)]">
       <Table>
-        <TableHeader className="bg-muted-cyan/5">
-          <TableRow className="border-b border-muted-cyan/20 hover:bg-transparent">
-            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+        <TableHeader className="bg-primary/5">
+          <TableRow className="border-b border-primary/20 hover:bg-transparent">
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-primary h-10">
               Node ID
             </TableHead>
-            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-primary h-10">
               Target Spec
             </TableHead>
-            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-primary h-10">
               Current Vol
             </TableHead>
-            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-primary h-10">
               Delta
             </TableHead>
-            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-muted-cyan h-10">
+            <TableHead className="font-mono text-[9px] uppercase tracking-widest text-primary h-10">
               Criticality
             </TableHead>
           </TableRow>
@@ -67,8 +66,8 @@ export default function GapTable({ gaps, hoveredSkill, onHoverSkill }: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
                 className={cn(
-                  "border-b border-muted-cyan/10 transition-colors data-[state=selected]:bg-muted-cyan/5 cursor-default group",
-                  isActive ? "bg-muted-cyan/10" : "hover:bg-muted-cyan/5",
+                  "border-b border-primary/10 transition-colors data-[state=selected]:bg-primary/5 cursor-default group",
+                  isActive ? "bg-primary/10" : "hover:bg-primary/5",
                 )}
                 onMouseEnter={() => onHoverSkill?.(gap.skill)}
                 onMouseLeave={() => onHoverSkill?.(null)}
@@ -76,10 +75,10 @@ export default function GapTable({ gaps, hoveredSkill, onHoverSkill }: Props) {
                 <TableCell
                   className={cn(
                     "font-mono text-xs text-white/80 transition-colors",
-                    isActive && "text-muted-cyan font-bold",
+                    isActive && "text-primary font-bold",
                   )}
                 >
-                  <span className="opacity-0 group-hover:opacity-100 text-muted-cyan mr-2 transition-opacity">
+                  <span className="opacity-0 group-hover:opacity-100 text-primary mr-2 transition-opacity">
                     &gt;
                   </span>
                   {gap.skill}
