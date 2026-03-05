@@ -713,17 +713,21 @@ jobs:
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
 
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          REGION="${{ env.AWS_REGION }}"
+
           import_cw_query() {
             local addr="$1" name="$2"
-            local qid
+            local qid arn
             qid=$(aws logs describe-query-definitions \
               --query-definition-name-prefix "${name}" \
               --query "queryDefinitions[?name=='${name}'].queryDefinitionId | [0]" \
               --output text 2>/dev/null)
             if [ -n "$qid" ] && [ "$qid" != "None" ] && [ "$qid" != "null" ]; then
-              echo "Importing CW query definition ${name}: ${qid}"
+              arn="arn:aws:logs:${REGION}:${ACCOUNT}:query-definition:${qid}"
+              echo "Importing CW query definition ${name}: ${arn}"
               terraform state rm "$addr" 2>/dev/null || true
-              terraform import -input=false "$addr" "$qid" 2>&1 | grep -v "^$" || true
+              terraform import -input=false "$addr" "$arn" 2>&1 | grep -v "^$" || true
             else
               echo "No existing CW query definition ${name} — Terraform will create it"
             fi
