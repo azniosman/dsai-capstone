@@ -33,6 +33,7 @@ import {
   Download,
   ChevronDown,
   Filter,
+  Timer,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,7 +55,14 @@ type ConnectionStatus = "connecting" | "connected" | "polling" | "error";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MAX_ENTRIES = 500;
-const POLL_INTERVAL_MS = 3_000;
+
+const POLL_OPTIONS: { label: string; ms: number }[] = [
+  { label: "1s", ms: 1_000 },
+  { label: "3s", ms: 3_000 },
+  { label: "5s", ms: 5_000 },
+  { label: "10s", ms: 10_000 },
+  { label: "30s", ms: 30_000 },
+];
 
 /**
  * Builds an absolute URL for a given API path.
@@ -186,8 +194,9 @@ export default function LogsPage() {
     new Set(ALL_TYPES),
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [pollIntervalMs, setPollIntervalMs] = useState(3_000);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
   // ── Ring buffer append ─────────────────────────────────────────────────────
@@ -234,7 +243,7 @@ export default function LogsPage() {
       };
 
       poll();
-      pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+      pollTimer = setInterval(poll, pollIntervalMs);
     };
 
     const connect = () => {
@@ -276,22 +285,23 @@ export default function LogsPage() {
       es?.close();
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, [appendEntries]);
+  }, [appendEntries, pollIntervalMs]);
 
-  // ── Auto-scroll ───────────────────────────────────────────────────────────
+  // ── Auto-scroll (newest-at-top → scroll to top) ───────────────────────────
 
   useEffect(() => {
-    if (autoScroll && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (autoScroll && topRef.current) {
+      topRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [entries, autoScroll]);
 
   const handleScroll = useCallback(() => {
     const el = tableRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    if (atBottom && !autoScroll) setAutoScroll(true);
-    if (!atBottom && autoScroll) setAutoScroll(false);
+    // When newest is at top, auto-scroll engages when user scrolls back to top.
+    const atTop = el.scrollTop < 40;
+    if (atTop && !autoScroll) setAutoScroll(true);
+    if (!atTop && autoScroll) setAutoScroll(false);
   }, [autoScroll]);
 
   // ── Filters ───────────────────────────────────────────────────────────────
@@ -319,7 +329,8 @@ export default function LogsPage() {
           e.type.toLowerCase().includes(q),
       );
     }
-    return list;
+    // Newest first
+    return [...list].reverse();
   }, [entries, activeTypes, search]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -338,7 +349,7 @@ export default function LogsPage() {
       },
       polling: {
         icon: <RefreshCw className="w-3 h-3" />,
-        label: "POLLING_3s",
+        label: `POLL_${POLL_OPTIONS.find((o) => o.ms === pollIntervalMs)?.label ?? "?"}`,
         color: "text-[#259df4] border-[#259df4]/30 bg-[#259df4]/10",
       },
       error: {
@@ -377,7 +388,28 @@ export default function LogsPage() {
               </h1>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Polling interval selector */}
+              <div className="inline-flex items-center gap-1.5 border border-border rounded px-2 py-1.5">
+                <Timer className="w-3 h-3 text-muted-foreground" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-1">
+                  Poll
+                </span>
+                {POLL_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.ms}
+                    onClick={() => setPollIntervalMs(opt.ms)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-widest transition-all ${
+                      pollIntervalMs === opt.ms
+                        ? "bg-[#259df4]/20 text-[#259df4] border border-[#259df4]/40"
+                        : "text-muted-foreground/50 hover:text-muted-foreground border border-transparent"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
               <button
                 onClick={() => setAutoScroll((v) => !v)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-bold uppercase tracking-widest transition-all ${
@@ -386,12 +418,12 @@ export default function LogsPage() {
                     : "border-border text-muted-foreground hover:border-[#00f2f2]/30"
                 }`}
               >
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="w-3 h-3 rotate-180" />
                 Auto-scroll
               </button>
 
               <button
-                onClick={() => downloadLogs(filtered)}
+                onClick={() => downloadLogs([...filtered].reverse())}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-border text-xs font-bold uppercase tracking-widest text-muted-foreground hover:border-[#259df4]/40 hover:text-[#259df4] transition-all"
               >
                 <Download className="w-3 h-3" />
@@ -476,13 +508,14 @@ export default function LogsPage() {
               <span className="w-[160px] shrink-0 hidden lg:block">Meta</span>
             </div>
 
-            {/* Scrollable rows container */}
+            {/* Scrollable rows container — newest at top */}
             <div
               ref={tableRef}
               onScroll={handleScroll}
               className="flex-1 overflow-y-auto custom-scrollbar"
               style={{ contain: "strict" } as React.CSSProperties}
             >
+              <div ref={topRef} />
               <AnimatePresence initial={false}>
                 {filtered.map((entry) => {
                   const s = TYPE_STYLES[entry.type];
@@ -579,7 +612,6 @@ export default function LogsPage() {
                   );
                 })}
               </AnimatePresence>
-              <div ref={bottomRef} />
             </div>
           </>
         )}
