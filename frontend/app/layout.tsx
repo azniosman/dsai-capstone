@@ -23,7 +23,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SkillBridge Analytical",
+  title: "SKLBR - Career Intelligence",
+  keywords: "SKILLBRIDGE, SKLBR, SKLBR_ANALYTICAL",
   description: "AI-Powered Career Intelligence Platform",
 };
 

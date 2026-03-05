@@ -55,8 +55,10 @@ type ConnectionStatus = "connecting" | "connected" | "polling" | "error";
 
 const MAX_ENTRIES = 500;
 const POLL_INTERVAL_MS = 3_000;
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+
+/** Next.js proxy routes — agnostic to backend URL and environment config. */
+const LOGS_RECENT_URL = "/api/logs/recent";
+const LOGS_STREAM_URL = "/api/logs/stream";
 
 const ALL_TYPES: LogType[] = [
   "RAG",
@@ -196,7 +198,7 @@ export default function LogsPage() {
 
       const poll = async () => {
         try {
-          const res = await fetch(`${BACKEND_URL}/logs/recent?n=200`);
+          const res = await fetch(`${LOGS_RECENT_URL}?n=200`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = (await res.json()) as Array<Omit<LogEntry, "_id">>;
 
@@ -223,7 +225,7 @@ export default function LogsPage() {
       setConnectionStatus("connecting");
 
       try {
-        es = new EventSource(`${BACKEND_URL}/logs/stream`);
+        es = new EventSource(LOGS_STREAM_URL);
 
         es.onopen = () => {
           if (!destroyed) setConnectionStatus("connected");
