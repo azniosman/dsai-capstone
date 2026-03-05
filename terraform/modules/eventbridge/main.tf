@@ -516,7 +516,10 @@ resource "aws_cloudwatch_dashboard" "rag_observability" {
       # Row 1 — Latency & Throughput
       {
         type   = "metric"
-        x      = 0; y = 0; width = 12; height = 6
+        x      = 0
+        y      = 0
+        width  = 12
+        height = 6
         properties = {
           title  = "RAG Query Latency (ms)"
           view   = "timeSeries"
@@ -525,9 +528,9 @@ resource "aws_cloudwatch_dashboard" "rag_observability" {
           region = var.aws_region
           metrics = [
             ["SkillBridge/RAG", "RagQueryLatencyMs", "Service", "RagService",
-              { label = "Avg latency", color = "#6366f1" }],
+            { label = "Avg latency", color = "#6366f1" }],
             ["SkillBridge/RAG", "RagQueryLatencyMs", "Service", "RagService",
-              { label = "Max latency", stat = "Maximum", color = "#f43f5e" }],
+            { label = "Max latency", stat = "Maximum", color = "#f43f5e" }],
           ]
           annotations = {
             horizontal = [{ label = "Alarm threshold", value = 8000, color = "#f43f5e" }]
@@ -536,7 +539,10 @@ resource "aws_cloudwatch_dashboard" "rag_observability" {
       },
       {
         type   = "metric"
-        x      = 12; y = 0; width = 12; height = 6
+        x      = 12
+        y      = 0
+        width  = 12
+        height = 6
         properties = {
           title  = "RAG Chunks Returned per Query"
           view   = "timeSeries"
@@ -545,7 +551,7 @@ resource "aws_cloudwatch_dashboard" "rag_observability" {
           region = var.aws_region
           metrics = [
             ["SkillBridge/RAG", "RagChunksReturned", "Service", "RagService",
-              { label = "Avg chunks returned", color = "#0d9488" }],
+            { label = "Avg chunks returned", color = "#0d9488" }],
           ]
           annotations = {
             horizontal = [{ label = "Miss (0 chunks)", value = 0, color = "#f43f5e" }]
@@ -555,7 +561,10 @@ resource "aws_cloudwatch_dashboard" "rag_observability" {
       # Row 2 — Similarity Quality
       {
         type   = "metric"
-        x      = 0; y = 6; width = 12; height = 6
+        x      = 0
+        y      = 6
+        width  = 12
+        height = 6
         properties = {
           title  = "RAG Similarity Scores (0–1)"
           view   = "timeSeries"
@@ -563,16 +572,19 @@ resource "aws_cloudwatch_dashboard" "rag_observability" {
           region = var.aws_region
           metrics = [
             ["SkillBridge/RAG", "RagSimilarityMax", "Service", "RagService",
-              { label = "Max similarity", stat = "Average", color = "#6366f1" }],
+            { label = "Max similarity", stat = "Average", color = "#6366f1" }],
             ["SkillBridge/RAG", "RagSimilarityMean", "Service", "RagService",
-              { label = "Mean similarity", stat = "Average", color = "#0d9488" }],
+            { label = "Mean similarity", stat = "Average", color = "#0d9488" }],
           ]
         }
       },
       # Row 2 — Miss-rate proxy (sum of zero-chunk invocations)
       {
         type   = "metric"
-        x      = 12; y = 6; width = 12; height = 6
+        x      = 12
+        y      = 6
+        width  = 12
+        height = 6
         properties = {
           title  = "RAG Miss Count (chunks returned = 0 indicates no relevant context)"
           view   = "timeSeries"
@@ -581,7 +593,7 @@ resource "aws_cloudwatch_dashboard" "rag_observability" {
           region = var.aws_region
           metrics = [
             ["SkillBridge/RAG", "RagChunksReturned", "Service", "RagService",
-              { id = "m1", visible = false }],
+            { id = "m1", visible = false }],
           ]
           # CloudWatch Metric Math: count invocations where chunks = 0
           # approximated here via low-sum filter; exact miss-rate requires
