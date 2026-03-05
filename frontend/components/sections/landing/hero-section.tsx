@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search,
-  Map as MapIcon,
+  Activity,
   Layers,
   MousePointer2,
   Plus,
@@ -13,20 +12,41 @@ import {
   X,
 } from "lucide-react";
 import ProfileBuilderPage from "@/app/profile-builder/page";
+import ViewLiveMatrixPage from "@/app/view_live_matrix/page";
+import TacticalMapCanvas from "@/components/dashboard/TacticalMapCanvas";
 
 export function HeroSection() {
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showMatrixModal, setShowMatrixModal] = useState(false);
 
   return (
     <section className="relative w-full min-h-screen flex flex-col items-center justify-center overflow-hidden bg-background">
-      {/* Background Pre-rendered Map */}
+      {/* ── Layered tactical map background ── */}
       <div className="absolute inset-0 z-0">
+        {/* Layer 1: Static pre-rendered tactical map base */}
         <div className="absolute inset-0 opacity-60 pointer-events-none">
-          {/* Tactical pre-rendered background */}
           <div className="w-full h-full bg-[url('/tactical-map-sg.png')] bg-cover bg-center" />
         </div>
-        <div className="absolute inset-0 map-vignette z-1" />
-        <div className="absolute inset-0 grid-pattern opacity-20 z-1" />
+        {/* Layer 2: Live canvas animation on top of static map */}
+        <TacticalMapCanvas
+          config={{
+            nodeCount: 45,
+            connectionDistance: 220,
+            speed: 0.8,
+            opacity: 0.7,
+            glowRadius: 18,
+            particleCount: 70,
+            lineOpacity: 0.22,
+            glitchIntervalMs: 5000,
+          }}
+          className="z-1"
+        />
+        {/* Layer 3: Depth vignette — keeps edges dark so text reads clearly */}
+        <div className="absolute inset-0 map-vignette z-2 pointer-events-none" />
+        {/* Layer 4: Subtle grid overlay */}
+        <div className="absolute inset-0 grid-pattern opacity-15 z-2 pointer-events-none" />
+        {/* Layer 5: Scanline CRT texture */}
+        <div className="absolute inset-0 scanline opacity-[0.04] z-2 pointer-events-none" />
       </div>
 
       <div className="relative z-10 w-full max-w-[1400px] px-8 h-full flex flex-col justify-center pt-20">
@@ -100,8 +120,12 @@ export function HeroSection() {
             `}</style>
           </button>
 
-          <button className="h-16 px-8 border border-[#00f2f2]/30 text-[#00f2f2] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-[#00f2f2]/10 transition-all backdrop-blur-md">
-            VIEW_LIVE_MATRIX
+          <button
+            onClick={() => setShowMatrixModal(true)}
+            className="h-16 px-8 border border-[#00f2f2]/30 text-[#00f2f2] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-[#00f2f2]/10 transition-all backdrop-blur-md"
+          >
+            <Activity className="w-5 h-5" />
+            <span>VIEW_LIVE_MATRIX</span>
           </button>
         </motion.div>
 
@@ -166,6 +190,31 @@ export function HeroSection() {
 
       {/* Background scanline effect overlay */}
       <div className="absolute inset-0 pointer-events-none z-30 opacity-[0.03] scanline" />
+
+      {/* Live Matrix Modal Overlay */}
+      <AnimatePresence>
+        {showMatrixModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+              className="relative w-full max-w-[1400px] h-[90vh] bg-background border border-[#00f2f2]/30 rounded-xl overflow-hidden shadow-[0_0_50px_rgba(0,242,242,0.15)] flex flex-col"
+            >
+              <button
+                onClick={() => setShowMatrixModal(false)}
+                className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-[#00f2f2]/20 text-muted-foreground hover:text-[#00f2f2] border border-white/10 hover:border-[#00f2f2]/50 rounded-full backdrop-blur-md transition-all group"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex-1 w-full h-full overflow-y-auto">
+                <ViewLiveMatrixPage />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Profile Builder Profile Modal Overlay */}
       <AnimatePresence>

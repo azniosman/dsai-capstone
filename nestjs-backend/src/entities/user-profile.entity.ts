@@ -8,6 +8,7 @@ import {
   Rel,
   OptionalProps,
 } from '@mikro-orm/core';
+import type { CareerIntelligence } from '../intelligence/dto/copilot.dto';
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';
 import { ProfileSnapshot } from './profile-snapshot.entity';
@@ -21,7 +22,8 @@ export class UserProfile {
     | 'isCareerSwitcher'
     | 'email'
     | 'phone'
-    | 'location';
+    | 'location'
+    | 'careerIntelligence';
 
   @PrimaryKey()
   id!: number;
@@ -61,6 +63,14 @@ export class UserProfile {
 
   @Property({ default: false })
   isCareerSwitcher: boolean = false;
+
+  /**
+   * AI-extracted career intelligence profile.
+   * Populated by `CopilotService.extractCareerProfile()` after resume analysis.
+   * Persisted as JSONB for efficient querying.
+   */
+  @Property({ type: 'json', nullable: true })
+  careerIntelligence?: CareerIntelligence;
 
   @Property({ type: 'datetime', defaultRaw: 'CURRENT_TIMESTAMP' })
   createdAt: Date = new Date();

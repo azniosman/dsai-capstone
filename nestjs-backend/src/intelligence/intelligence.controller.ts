@@ -4,10 +4,12 @@ import {
   Get,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
 import { IntelligenceService } from './intelligence.service';
+import { CopilotService } from './copilot.service';
 import {
   ChatRequestDto,
   RecommendRequestDto,
@@ -15,12 +17,21 @@ import {
 } from './dto/intelligence.dto';
 import { ResumeRewriterDto } from './dto/resume-rewriter.dto';
 import { InterviewRequestDto } from './dto/interview-request.dto';
+import {
+  CopilotChatDto,
+  ExtractProfileDto,
+  CareerPlanDto,
+  ResumeTipsDto,
+} from './dto/copilot.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
 
 @Controller()
 export class IntelligenceController {
-  constructor(private readonly intelligenceService: IntelligenceService) {}
+  constructor(
+    private readonly intelligenceService: IntelligenceService,
+    private readonly copilotService: CopilotService,
+  ) {}
 
   /**
    * Health and smoke test for the Intelligence controller.
@@ -30,6 +41,8 @@ export class IntelligenceController {
   smokeTest() {
     return { status: 'Intelligence Controller OK' };
   }
+
+  // ─── Original Intelligence Endpoints ──────────────────────────────────────
 
   /** Send a chat message to the career coach via the multi-LLM provider chain. */
   @UseGuards(OptionalJwtAuthGuard)
@@ -112,6 +125,103 @@ export class IntelligenceController {
       payload.job_description,
       payload.job_title,
       tenantId,
+    );
+  }
+
+  // ─── Copilot Endpoints ────────────────────────────────────────────────────
+
+  /**
+   * Phase 1: Extract and persist structured career intelligence from the
+   * user's stored resume text using the LLM.
+   *
+   * POST /copilot/extract
+   */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('copilot/extract')
+  async extractCareerProfile(
+    @Request() req: OptionalAuthenticatedRequest,
+    @Body() payload: ExtractProfileDto,
+    @Query('force') force?: string,
+  ) {
+    const tenantId = req.user ? req.user.tenant.id : 1;
+    return this.copilotService.extractCareerProfile(
+      payload.profile_id,
+      tenantId,
+      force === 'true',
+    );
+  }
+
+  /**
+   * Phase 2: Enriched Copilot chat — injects career intelligence + RAG context
+   * into every message for personalised career advice.
+   *
+   * POST /copilot/chat
+   */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('copilot/chat')
+  async copilotChat(
+    @Request() req: OptionalAuthenticatedRequest,
+    @Body() payload: CopilotChatDto,
+  ) {
+    const tenantId = req.user ? req.user.tenant.id : 1;
+    return this.copilotService.copilotChat(
+      payload.profile_id,
+      payload.messages,
+      tenantId,
+    );
+  }
+
+  /**
+   * Phase 3: Generate a full structured career analysis report for the profile.
+   *
+   * GET /copilot/analyze/:profileId
+   */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('copilot/analyze/:profileId')
+  async analyzeCareer(
+    @Request() req: OptionalAuthenticatedRequest,
+    @Param('profileId') profileId: string,
+  ) {
+    const tenantId = req.user ? req.user.tenant.id : 1;
+    return this.copilotService.analyzeCareer(+profileId, tenantId);
+  }
+
+  /**
+   * Phase 4: Generate a structured N-month career transition plan.
+   *
+   * POST /copilot/career-plan
+   */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('copilot/career-plan')
+  async careerPlan(
+    @Request() req: OptionalAuthenticatedRequest,
+    @Body() payload: CareerPlanDto,
+  ) {
+    const tenantId = req.user ? req.user.tenant.id : 1;
+    return this.copilotService.generateCareerPlan(
+      payload.profile_id,
+      tenantId,
+      payload.target_role,
+      payload.months ?? 12,
+    );
+  }
+
+  /**
+   * Phase 5: Return targeted resume improvement tips.
+   *
+   * POST /copilot/resume-tips
+   */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('copilot/resume-tips')
+  async resumeTips(
+    @Request() req: OptionalAuthenticatedRequest,
+    @Body() payload: ResumeTipsDto,
+  ) {
+    const tenantId = req.user ? req.user.tenant.id : 1;
+    return this.copilotService.getResumeTips(
+      payload.profile_id,
+      tenantId,
+      payload.target_role,
     );
   }
 }

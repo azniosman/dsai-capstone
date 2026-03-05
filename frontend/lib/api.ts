@@ -670,6 +670,92 @@ export const ragApi = {
 };
 
 // ─────────────────────────────────────────────
+// AI Career Copilot
+// ─────────────────────────────────────────────
+
+export interface CareerIntelligence {
+  experience_level: string;
+  top_skills: string[];
+  industries: string[];
+  strengths: string[];
+  improvement_areas: string[];
+  career_paths: string[];
+  professional_summary: string;
+  analyzed_at: string;
+}
+
+export interface CareerMilestone {
+  month: number;
+  title: string;
+  actions: string[];
+  outcome: string;
+}
+
+export interface CareerPlan {
+  target_role: string;
+  total_months: number;
+  milestones: CareerMilestone[];
+  key_resources: string[];
+  singapore_programmes: string[];
+}
+
+export const copilotApi = {
+  /**
+   * Phase 1: Extract structured career intelligence from the stored resume.
+   * Call this once after resume upload; subsequent calls return cached data.
+   */
+  extract: (profileId: number, force = false) =>
+    api
+      .post<{ intelligence: CareerIntelligence; fresh: boolean; engine: string }>(
+        `/api/copilot/extract${force ? "?force=true" : ""}`,
+        { profile_id: profileId },
+      )
+      .then((r) => r.data),
+
+  /**
+   * Phase 2: Enriched chat — injects career intelligence + RAG context.
+   * Adapts to the streaming callback interface used by the chat page.
+   */
+  chat: async (
+    payload: {
+      profile_id?: number | null;
+      messages: ChatMessage[];
+      command?: string;
+    },
+    onChunk: (chunk: string) => void,
+  ): Promise<void> => {
+    const res = await api.post<ChatResponse>("/api/copilot/chat", payload);
+    const { reply, engine } = res.data;
+    if (engine) onChunk(`[ENGINE: ${engine}]\n`);
+    onChunk(reply ?? "");
+  },
+
+  /** Phase 3: Full career analysis report for a profile. */
+  analyze: (profileId: number) =>
+    api
+      .get<{ analysis: string; intelligence: CareerIntelligence | null; engine: string }>(
+        `/api/copilot/analyze/${profileId}`,
+      )
+      .then((r) => r.data),
+
+  /** Phase 4: Generate a structured career transition plan. */
+  careerPlan: (payload: {
+    profile_id: number;
+    target_role?: string;
+    months?: number;
+  }) =>
+    api
+      .post<{ plan: CareerPlan; engine: string }>("/api/copilot/career-plan", payload)
+      .then((r) => r.data),
+
+  /** Phase 5: Resume improvement tips. */
+  resumeTips: (payload: { profile_id: number; target_role?: string }) =>
+    api
+      .post<{ tips: string[]; engine: string }>("/api/copilot/resume-tips", payload)
+      .then((r) => r.data),
+};
+
+// ─────────────────────────────────────────────
 // Export convenience re-export of raw axios client
 // ─────────────────────────────────────────────
 export { default as apiClient } from "./api-client";

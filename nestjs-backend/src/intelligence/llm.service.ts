@@ -21,6 +21,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { LogBusService } from '@app/common/log-bus.service';
 
 import type {
   LlmProvider,
@@ -47,7 +48,10 @@ export class LlmService {
    */
   private lastUsedProvider: LlmProviderName | null = null;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly logBus: LogBusService,
+  ) {
     // ── Build individual providers ─────────────────────────────────────────
     const groqApiKey = this.configService.get<string>('GROQ_API_KEY');
     const groqModel =
@@ -138,6 +142,11 @@ export class LlmService {
     systemPrompt: string,
   ): Promise<string> {
     if (this.providerChain.length === 0) {
+      this.logBus.emit({
+        type: 'ERROR',
+        component: 'LlmService',
+        message: `[${label}] No LLM providers configured — request rejected`,
+      });
       throw new ServiceUnavailableException(
         'No LLM providers are configured. Set AWS credentials, ANTHROPIC_API_KEY, or GEMINI_API_KEY.',
       );
@@ -145,12 +154,24 @@ export class LlmService {
 
     for (const provider of this.providerChain) {
       const start = Date.now();
+      this.logBus.emit({
+        type: 'LLM',
+        component: 'LlmService',
+        message: `[${label}] Invoking provider: ${provider.name}`,
+        meta: { label, provider: provider.name },
+      });
       try {
         const result = await provider.generate(messages, systemPrompt);
         const latencyMs = Date.now() - start;
         this.logger.log(
           `[${label}] Using provider: ${provider.name} (${latencyMs}ms)`,
         );
+        this.logBus.emit({
+          type: 'LLM',
+          component: 'LlmService',
+          message: `[${label}] Response from ${provider.name} in ${latencyMs}ms`,
+          meta: { label, provider: provider.name, latencyMs },
+        });
         this.lastUsedProvider = provider.name;
         return result;
       } catch (err) {
@@ -162,10 +183,22 @@ export class LlmService {
             `[${label}] ${provider.name} failed after ${latencyMs}ms (${(err as Error).message}), ` +
               `trying ${nextProvider.name}`,
           );
+          this.logBus.emit({
+            type: 'WARN',
+            component: 'LlmService',
+            message: `[${label}] ${provider.name} failed (${latencyMs}ms) — falling back to ${nextProvider.name}`,
+            meta: { label, provider: provider.name, fallback: nextProvider.name, latencyMs },
+          });
         } else {
           this.logger.error(
             `[${label}] All providers failed. Last error from ${provider.name}: ${(err as Error).message}`,
           );
+          this.logBus.emit({
+            type: 'ERROR',
+            component: 'LlmService',
+            message: `[${label}] All LLM providers failed. Last: ${provider.name} — ${(err as Error).message}`,
+            meta: { label, provider: provider.name, latencyMs },
+          });
         }
       }
     }
@@ -362,4 +395,158 @@ export class LlmService {
       systemPrompt,
     );
   }
+
+  // ─── Copilot Methods ──────────────────────────────────────────────────────
+
+  /**
+   * Extracts structured career intelligence from a plain-text resume.
+   * Returns a `CareerIntelligence` object with experience level, skills,
+   * industries, strengths, improvement areas, career paths, and a professional
+   * summary — ready to be persisted in the `careerIntelligence` column on
+   * `UserProfile`.
+   *
+   * @param resumeText - Raw resume text (truncated to 6 000 chars).
+   * @returns Structured `CareerIntelligence` profile.
+   */
+  async extractCareerIntelligence(resumeText: string): Promise<{
+    experience_level: string;
+    top_skills: string[];
+    industries: string[];
+    strengths: string[];
+    improvement_areas: string[];
+    career_paths: string[];
+    professional_summary: string;
+    analyzed_at: string;
+  }> {
+    const systemPrompt =
+      'You are a senior career strategist specialising in Singapore tech sector talent. ' +
+      'Analyse resumes deeply and respond ONLY in the exact JSON format requested. ' +
+      'Be specific, professional, and grounded in Singapore labour market context.';
+
+    const userPrompt =
+      `Analyse this resume thoroughly and extract a structured career intelligence profile.\n\n` +
+      `Resume:\n${resumeText.substring(0, 6000)}\n\n` +
+      `Respond ONLY with this JSON (no markdown, no explanation):\n` +
+      `{\n` +
+      `  "experience_level": "junior|mid-level|senior|executive",\n` +
+      `  "top_skills": ["skill1", "skill2", ...],\n` +
+      `  "industries": ["industry1", ...],\n` +
+      `  "strengths": ["strength1", "strength2", ...],\n` +
+      `  "improvement_areas": ["area1", "area2", ...],\n` +
+      `  "career_paths": ["path1", "path2", "path3"],\n` +
+      `  "professional_summary": "2-4 sentence professional narrative"\n` +
+      `}\n` +
+      `Be precise. Base career_paths on Singapore market demand.`;
+
+    const raw = await this.withFallback(
+      'extractCareerIntelligence',
+      [{ role: 'user', content: userPrompt }],
+      systemPrompt,
+    );
+
+    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
+    const cleaned = jsonMatch[1].trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      ...parsed,
+      analyzed_at: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Generates a structured 12-month career transition plan.
+   *
+   * @param profileSummary - Brief summary of the candidate's background.
+   * @param targetRole - Target job role the plan leads toward.
+   * @param currentSkills - Skills the candidate currently possesses.
+   * @param months - Duration of the plan (default: 12).
+   * @returns A `CareerPlan` with monthly milestones and Singapore-specific resources.
+   */
+  async generateCareerPlan(
+    profileSummary: string,
+    targetRole: string,
+    currentSkills: string[],
+    months: number = 12,
+  ): Promise<{
+    target_role: string;
+    total_months: number;
+    milestones: Array<{
+      month: number;
+      title: string;
+      actions: string[];
+      outcome: string;
+    }>;
+    key_resources: string[];
+    singapore_programmes: string[];
+  }> {
+    const systemPrompt =
+      'You are an expert Singapore career transition strategist. ' +
+      'Create actionable plans grounded in real SkillsFuture, WSG, and SCTP programmes. ' +
+      'Respond ONLY in the exact JSON format requested.';
+
+    const userPrompt =
+      `Create a ${months}-month career transition plan.\n\n` +
+      `Profile: ${profileSummary}\n` +
+      `Current skills: ${currentSkills.join(', ')}\n` +
+      `Target role: ${targetRole}\n\n` +
+      `Respond ONLY with this JSON (no markdown):\n` +
+      `{\n` +
+      `  "target_role": "${targetRole}",\n` +
+      `  "total_months": ${months},\n` +
+      `  "milestones": [\n` +
+      `    { "month": 1, "title": "...", "actions": ["action1", "action2"], "outcome": "..." },\n` +
+      `    ... (one object per month, grouped into logical phases)\n` +
+      `  ],\n` +
+      `  "key_resources": ["resource1", ...],\n` +
+      `  "singapore_programmes": ["SkillsFuture ...", "SCTP ...", "WSG ..."]\n` +
+      `}\n` +
+      `Group milestones into phases: Foundation (months 1-3), Development (4-8), Transition (9-12). ` +
+      `Be specific and actionable.`;
+
+    const raw = await this.withFallback(
+      'generateCareerPlan',
+      [{ role: 'user', content: userPrompt }],
+      systemPrompt,
+    );
+
+    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
+    return JSON.parse(jsonMatch[1].trim());
+  }
+
+  /**
+   * Generates targeted resume improvement tips for a given candidate and role.
+   *
+   * @param resumeText - Raw resume text (truncated to 4 000 chars).
+   * @param targetRole - Target role for contextual tips.
+   * @returns Array of specific, actionable improvement tips.
+   */
+  async generateResumeTips(
+    resumeText: string,
+    targetRole?: string,
+  ): Promise<string[]> {
+    const systemPrompt =
+      'You are a professional resume coach specialising in Singapore tech roles. ' +
+      'Respond ONLY in the JSON array format requested.';
+
+    const roleCtx = targetRole
+      ? `The candidate is targeting a ${targetRole} role.`
+      : 'Focus on general improvements for Singapore tech market.';
+
+    const userPrompt =
+      `Review this resume and provide specific improvement tips.\n\n` +
+      `${roleCtx}\n\n` +
+      `Resume:\n${resumeText.substring(0, 4000)}\n\n` +
+      `Respond ONLY with a JSON array of 6–8 specific, actionable tips. No markdown.\n` +
+      `Example: ["Quantify impact in bullet points (e.g. reduced costs by 30%)", ...]`;
+
+    const raw = await this.withFallback(
+      'generateResumeTips',
+      [{ role: 'user', content: userPrompt }],
+      systemPrompt,
+    );
+
+    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
+    return JSON.parse(jsonMatch[1].trim());
+  }
 }
+

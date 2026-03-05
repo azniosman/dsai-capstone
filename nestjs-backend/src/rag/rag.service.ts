@@ -36,6 +36,7 @@ import { UserProfile } from '@app/entities/user-profile.entity';
 import { Tenant } from '@app/entities/tenant.entity';
 import { RagFeedback } from '@app/entities/rag-feedback.entity';
 import { emitEMF } from '@app/common/utils/metrics.util';
+import { LogBusService } from '@app/common/log-bus.service';
 import { EmbeddingService } from './embedding.service';
 import { CrossEncoderService } from './cross-encoder.service';
 
@@ -96,6 +97,7 @@ export class RagService {
     private readonly em: EntityManager,
     private readonly embeddingService: EmbeddingService,
     private readonly crossEncoderService: CrossEncoderService,
+    private readonly logBus: LogBusService,
   ) {}
 
   // ─── Ingestion ─────────────────────────────────────────────────────────────
@@ -113,6 +115,13 @@ export class RagService {
   ): Promise<StoreResult> {
     const chunks = RagService.splitText(text);
     if (chunks.length === 0) return { stored: 0, skipped: 0 };
+
+    this.logBus.emit({
+      type: 'RAG',
+      component: 'RagService',
+      message: `Ingestion started: ${chunks.length} chunks from source=${sourceType}`,
+      meta: { profileId: profileId ?? 'anon', sourceType, chunkCount: chunks.length },
+    });
 
     const hashes = chunks.map((c) => RagService.sha256(c));
 
@@ -133,6 +142,13 @@ export class RagService {
       }
 
       const embedding = await this.embeddingService.embed(chunks[i]);
+
+      this.logBus.emit({
+        type: 'RAG',
+        component: 'EmbeddingService',
+        message: `Embedding generated for chunk ${i} (profile=${profileId ?? 'anon'})`,
+        meta: { chunkIndex: i, dims: embedding.length },
+      });
 
       const chunk = this.chunkRepository.create({
         content: chunks[i],
@@ -155,6 +171,12 @@ export class RagService {
       this.logger.log(
         `Stored ${stored} new chunks (skipped ${skipped}) for profile=${profileId ?? 'anon'} source=${sourceType}`,
       );
+      this.logBus.emit({
+        type: 'RAG',
+        component: 'RagService',
+        message: `Vector DB write: stored=${stored} skipped=${skipped} (profile=${profileId ?? 'anon'})`,
+        meta: { stored, skipped, sourceType },
+      });
     }
 
     return { stored, skipped };
@@ -182,9 +204,21 @@ export class RagService {
     const { topK = 3, threshold = 0.5, profileId } = opts;
     const t0 = Date.now();
 
+    this.logBus.emit({
+      type: 'RAG',
+      component: 'RagService',
+      message: `Hybrid RAG query started (tenant=${tenantId} topK=${topK})`,
+      meta: { tenantId, topK, threshold, profileId: profileId ?? 'anon' },
+    });
+
     const queryEmbedding = await this.embeddingService.embed(queryText);
     if (queryEmbedding.length === 0) {
       this.logger.warn('RAG query skipped — embedding service unavailable');
+      this.logBus.emit({
+        type: 'WARN',
+        component: 'EmbeddingService',
+        message: 'RAG query skipped — embedding service unavailable',
+      });
       this.emitQueryMetrics(Date.now() - t0, []);
       return [];
     }
@@ -206,6 +240,13 @@ export class RagService {
     this.logger.log(
       `RAG query returned ${results.length} chunks (tenant=${tenantId} topK=${topK} threshold=${threshold} latencyMs=${latencyMs})`,
     );
+
+    this.logBus.emit({
+      type: 'RAG',
+      component: 'RagService',
+      message: `Hybrid RAG query complete: ${results.length} chunks returned (${latencyMs}ms)`,
+      meta: { chunks: results.length, latencyMs, topK, threshold },
+    });
 
     return results;
   }
@@ -245,6 +286,11 @@ export class RagService {
       this.logger.debug(
         `Hybrid CTE unavailable — degrading to semantic-only: ${(err as Error).message}`,
       );
+      this.logBus.emit({
+        type: 'WARN',
+        component: 'RagService',
+        message: `Hybrid CTE failed — fallback to semantic-only search: ${(err as Error).message}`,
+      });
       scored = await this.semanticOnlyQuery(
         queryEmbedding,
         tenantId,
@@ -504,6 +550,12 @@ export class RagService {
     this.logger.log(
       `Backfill complete: processed=${processed} errors=${errors}`,
     );
+    this.logBus.emit({
+      type: 'RAG',
+      component: 'RagService',
+      message: `Embedding backfill complete: processed=${processed} errors=${errors}`,
+      meta: { processed, errors },
+    });
     return { processed, errors };
   }
 

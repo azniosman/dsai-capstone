@@ -1,6 +1,8 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { validate } from './config/env.validation';
+import { LogBusService } from './log-bus.service';
+import { LogController } from './log.controller';
 
 @Global()
 @Module({
@@ -11,6 +13,9 @@ import { validate } from './config/env.validation';
       envFilePath: ['.env'],
     }),
   ],
-  exports: [ConfigModule],
+  controllers: [LogController],
+  providers: [LogBusService],
+  exports: [ConfigModule, LogBusService],
 })
 export class CommonModule {}
+
