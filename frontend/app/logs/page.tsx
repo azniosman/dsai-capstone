@@ -56,9 +56,26 @@ type ConnectionStatus = "connecting" | "connected" | "polling" | "error";
 const MAX_ENTRIES = 500;
 const POLL_INTERVAL_MS = 3_000;
 
-/** Next.js proxy routes — agnostic to backend URL and environment config. */
-const LOGS_RECENT_URL = "/api/logs/recent";
-const LOGS_STREAM_URL = "/api/logs/stream";
+/**
+ * Builds an absolute URL for a given API path.
+ *
+ * Handles two deployment modes:
+ *  - Static export (S3/CloudFront): browser calls API Gateway directly via
+ *    `NEXT_PUBLIC_API_URL`. Trailing slash is stripped; `/api` is added once.
+ *  - Standalone server: Next.js rewrites proxy `/api/:path*` to the backend,
+ *    so we just use the relative path `/api/...`.
+ */
+const buildApiUrl = (path: string): string => {
+  const raw = process.env.NEXT_PUBLIC_API_URL;
+  if (!raw) return `/api${path}`; // local dev: Next.js rewrite handles it
+  const base = raw.replace(/\/+$/, ""); // strip all trailing slashes
+  // Avoid doubling `/api` if the env var already ends with it
+  const prefix = base.endsWith("/api") ? base : `${base}/api`;
+  return `${prefix}${path}`;
+};
+
+const LOGS_RECENT_URL = buildApiUrl("/logs/recent");
+const LOGS_STREAM_URL = buildApiUrl("/logs/stream");
 
 const ALL_TYPES: LogType[] = [
   "RAG",
