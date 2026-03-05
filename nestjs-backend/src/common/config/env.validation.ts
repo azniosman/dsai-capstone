@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MinLength,
   validateSync,
 } from 'class-validator';
 
@@ -27,8 +28,8 @@ export class EnvironmentVariables {
   readonly DATABASE_URL?: string;
 
   @IsString()
-  @IsOptional()
-  readonly JWT_SECRET?: string;
+  @MinLength(32)
+  readonly JWT_SECRET!: string;
 
   // SSG/WSG API — optional; if absent, service falls back to seeded data
   @IsString()

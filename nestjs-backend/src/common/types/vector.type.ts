@@ -28,7 +28,7 @@ export class VectorType extends Type<number[], string> {
   convertToJSValue(value: string | number[] | null): number[] {
     if (value === null || value === undefined) return [];
     if (Array.isArray(value)) return value;
-    const str = (value as string).trim();
+    const str = value.trim();
     if (!str || str === '[]') return [];
     // Strip leading/trailing brackets then split
     const inner = str.startsWith('[') ? str.slice(1, -1) : str;

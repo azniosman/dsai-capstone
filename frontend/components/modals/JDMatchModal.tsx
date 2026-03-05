@@ -29,7 +29,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useModalStore } from "@/store/modalStore";
-import api from "@/lib/api-client";
+import { jdMatchApi } from "@/lib/api";
 import { GAP_COLOR, CHART_AXIS, TOOLTIP_STYLE } from "@/lib/chart-colors";
 
 interface Gap {
@@ -69,14 +69,14 @@ export default function JDMatchModal() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post("/api/jd-match", {
+      const data = await jdMatchApi.match({
         profile_id: parseInt(profileId),
         job_description: jd,
-        job_title: title || null,
+        job_title: title || undefined,
       });
-      setResult(res.data);
+      setResult(data);
       toast.success(
-        `Analysis complete — ${Math.round(res.data.match_score * 100)}% match!`,
+        `Analysis complete — ${Math.round(data.match_score * 100)}% match!`,
       );
     } catch (err: unknown) {
       const msg =

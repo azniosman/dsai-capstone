@@ -28,7 +28,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityManager, EntityRepository } from '@mikro-orm/postgresql';
 import { createHash } from 'crypto';
-import { DocumentChunk, ChunkSourceType } from '@app/entities/document-chunk.entity';
+import {
+  DocumentChunk,
+  ChunkSourceType,
+} from '@app/entities/document-chunk.entity';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { Tenant } from '@app/entities/tenant.entity';
 import { RagFeedback } from '@app/entities/rag-feedback.entity';
@@ -186,11 +189,16 @@ export class RagService {
       return [];
     }
 
-    const results = await this.hybridQuery(queryText, queryEmbedding, tenantId, {
-      topK,
-      threshold,
-      profileId,
-    });
+    const results = await this.hybridQuery(
+      queryText,
+      queryEmbedding,
+      tenantId,
+      {
+        topK,
+        threshold,
+        profileId,
+      },
+    );
 
     const latencyMs = Date.now() - t0;
     this.emitQueryMetrics(latencyMs, results);
@@ -347,7 +355,15 @@ export class RagService {
       ORDER  BY rrf_score DESC
       LIMIT  $7
       `,
-      [vectorLiteral, tenantId, threshold, overFetch, queryText, RRF_K, overFetch],
+      [
+        vectorLiteral,
+        tenantId,
+        threshold,
+        overFetch,
+        queryText,
+        RRF_K,
+        overFetch,
+      ],
     );
 
     return rows.map((r) => ({ ...r, rrfScore: r.rrf_score }));
@@ -419,8 +435,9 @@ export class RagService {
     const chunkIds = results.map((r) => r.id);
 
     try {
-      const rows: Array<{ chunk_id: number; net_score: number }> =
-        await this.em.getConnection().execute(
+      const rows: Array<{ chunk_id: number; net_score: number }> = await this.em
+        .getConnection()
+        .execute(
           `
           SELECT
             chunk_id,
@@ -435,7 +452,9 @@ export class RagService {
 
       if (rows.length === 0) return;
 
-      const feedbackMap = new Map(rows.map((r) => [r.chunk_id, Number(r.net_score)]));
+      const feedbackMap = new Map(
+        rows.map((r) => [r.chunk_id, Number(r.net_score)]),
+      );
 
       for (const result of results) {
         const net = feedbackMap.get(result.id) ?? 0;
@@ -482,7 +501,9 @@ export class RagService {
     }
 
     if (processed > 0) await this.em.flush();
-    this.logger.log(`Backfill complete: processed=${processed} errors=${errors}`);
+    this.logger.log(
+      `Backfill complete: processed=${processed} errors=${errors}`,
+    );
     return { processed, errors };
   }
 
@@ -508,7 +529,9 @@ export class RagService {
   ): Promise<void> {
     const feedback = this.em.create(RagFeedback, {
       chunk: this.em.getReference(DocumentChunk, chunkId),
-      profile: profileId ? this.em.getReference(UserProfile, profileId) : undefined,
+      profile: profileId
+        ? this.em.getReference(UserProfile, profileId)
+        : undefined,
       queryText,
       isPositive,
       createdAt: new Date(),
@@ -595,7 +618,8 @@ export class RagService {
   static formatContext(chunks: RetrievedChunk[]): string {
     if (chunks.length === 0) return '';
     const lines = chunks.map(
-      (c, i) => `[${i + 1}] (similarity: ${c.similarity.toFixed(2)})\n${c.content}`,
+      (c, i) =>
+        `[${i + 1}] (similarity: ${c.similarity.toFixed(2)})\n${c.content}`,
     );
     return `\n\nRelevant context from your documents:\n${lines.join('\n\n')}`;
   }

@@ -58,8 +58,13 @@ export class UploadController {
       text = await ResumeParser.extractText(file.buffer, file.mimetype);
     } catch (e: unknown) {
       const error = e as Error;
-      this.logger.error('Resume text extraction failed', error?.stack ?? error?.message);
-      throw new BadRequestException(`Failed to process resume: ${error.message}`);
+      this.logger.error(
+        'Resume text extraction failed',
+        error?.stack ?? error?.message,
+      );
+      throw new BadRequestException(
+        `Failed to process resume: ${error.message}`,
+      );
     }
 
     // Parse resume (primary response — always awaited)

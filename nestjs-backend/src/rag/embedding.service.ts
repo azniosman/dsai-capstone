@@ -36,7 +36,9 @@ export class EmbeddingService {
   private pipeline: ((...args: any[]) => Promise<any>) | null = null;
 
   /** Ongoing init promise — prevents parallel model downloads on concurrent requests. */
-  private pipelineInit: Promise<((...args: any[]) => Promise<any>) | null> | null = null;
+  private pipelineInit: Promise<
+    ((...args: any[]) => Promise<any>) | null
+  > | null = null;
 
   /**
    * Generates a 384-dim embedding for `text`.
@@ -53,9 +55,11 @@ export class EmbeddingService {
         pooling: 'mean',
         normalize: true,
       });
-      return Array.from(output.data) as number[];
+      return Array.from(output.data);
     } catch (err) {
-      this.logger.warn(`Embedding generation failed: ${(err as Error).message}`);
+      this.logger.warn(
+        `Embedding generation failed: ${(err as Error).message}`,
+      );
       return [];
     }
   }
@@ -90,9 +94,7 @@ export class EmbeddingService {
           quantized: true,
         });
 
-        this.logger.log(
-          `Embedding model ready (${Date.now() - start} ms)`,
-        );
+        this.logger.log(`Embedding model ready (${Date.now() - start} ms)`);
         return this.pipeline;
       } catch (err) {
         this.pipelineInit = null; // Allow retry on next call

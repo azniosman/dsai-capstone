@@ -39,6 +39,18 @@ export class AuthService {
     };
   }
 
+  /**
+   * Logout is intentionally a no-op: this app uses stateless JWTs with no
+   * server-side token store. The client clears its token.
+   *
+   * TODO: for production hardening, implement a token blocklist (e.g. Redis SET
+   * with TTL = token remaining lifetime) so revoked JWTs are rejected before
+   * they expire. See: https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html#token-explicit-revocation-by-the-user
+   */
+  logout(): void {
+    // no-op — stateless JWT; client is responsible for clearing its token
+  }
+
   async hashPassword(password: string): Promise<string> {
     const saltOrRounds = 10;
     return bcrypt.hash(password, saltOrRounds);

@@ -3,6 +3,7 @@ import { InternalController } from './internal.controller';
 import { SsgModule } from '../ssg/ssg.module';
 import { DomainModule } from '../domain/domain.module';
 import { RagModule } from '../rag/rag.module';
+import { IntelligenceModule } from '../intelligence/intelligence.module';
 
 /**
  * Module that registers the internal automation endpoints.
@@ -12,7 +13,7 @@ import { RagModule } from '../rag/rag.module';
  * public API Gateway route.
  */
 @Module({
-  imports: [SsgModule, DomainModule, RagModule],
+  imports: [SsgModule, DomainModule, RagModule, IntelligenceModule],
   controllers: [InternalController],
 })
 export class InternalModule {}

@@ -13,6 +13,8 @@ import {
   RecommendRequestDto,
   JdMatchDto,
 } from './dto/intelligence.dto';
+import { ResumeRewriterDto } from './dto/resume-rewriter.dto';
+import { InterviewRequestDto } from './dto/interview-request.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
 
@@ -74,6 +76,27 @@ export class IntelligenceController {
       profile_id: +profileId,
       gaps,
     };
+  }
+
+  /** Rewrite a resume bullet point to be stronger and more relevant for a target role. */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('resume-rewriter')
+  rewriteResume(@Body() payload: ResumeRewriterDto) {
+    return this.intelligenceService.rewriteResume(
+      payload.bullet,
+      payload.target_role,
+    );
+  }
+
+  /** Mock interview session with the AI interviewer for a given job title. */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('interview')
+  async interview(
+    @Request() req: OptionalAuthenticatedRequest,
+    @Body() payload: InterviewRequestDto,
+  ) {
+    const tenantId = req.user ? req.user.tenant.id : 1;
+    return this.intelligenceService.interview(payload, tenantId);
   }
 
   /** Score how well a profile matches a given job description. */

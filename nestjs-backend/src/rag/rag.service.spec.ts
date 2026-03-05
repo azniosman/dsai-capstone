@@ -135,7 +135,13 @@ describe('RagService', () => {
 
     it('includes chunk content and similarity score', () => {
       const ctx = RagService.formatContext([
-        { id: 1, content: 'Python is popular', sourceType: 'resume', chunkIndex: 0, similarity: 0.82 },
+        {
+          id: 1,
+          content: 'Python is popular',
+          sourceType: 'resume',
+          chunkIndex: 0,
+          similarity: 0.82,
+        },
       ]);
       expect(ctx).toContain('Python is popular');
       expect(ctx).toContain('0.82');
@@ -161,9 +167,7 @@ describe('RagService', () => {
       const hash = RagService.sha256(text);
 
       // Pre-populate "existing" chunks so all are skipped
-      mockRepo.find.mockResolvedValue([
-        { contentHash: hash } as DocumentChunk,
-      ]);
+      mockRepo.find.mockResolvedValue([{ contentHash: hash } as DocumentChunk]);
 
       const result = await service.storeChunks(text, 1, 'resume', 1);
 
@@ -243,9 +247,30 @@ describe('RagService', () => {
     it('returns chunks in rrf_score order from the CTE', async () => {
       // CTE pre-sorts by rrf_score DESC: id=2 ranked first (both branches)
       const cteRows = [
-        { id: 2, content: 'both',     source_type: 'resume', chunk_index: 1, similarity: 0.7, rrf_score: 0.032 },
-        { id: 1, content: 'sem-only', source_type: 'resume', chunk_index: 0, similarity: 0.9, rrf_score: 0.016 },
-        { id: 3, content: 'kw-only',  source_type: 'jd',     chunk_index: 2, similarity: 0.0, rrf_score: 0.015 },
+        {
+          id: 2,
+          content: 'both',
+          source_type: 'resume',
+          chunk_index: 1,
+          similarity: 0.7,
+          rrf_score: 0.032,
+        },
+        {
+          id: 1,
+          content: 'sem-only',
+          source_type: 'resume',
+          chunk_index: 0,
+          similarity: 0.9,
+          rrf_score: 0.016,
+        },
+        {
+          id: 3,
+          content: 'kw-only',
+          source_type: 'jd',
+          chunk_index: 2,
+          similarity: 0.0,
+          rrf_score: 0.015,
+        },
       ];
 
       mockEm.getConnection().execute.mockResolvedValueOnce(cteRows);
@@ -260,8 +285,22 @@ describe('RagService', () => {
 
     it('includes keyword-only chunks (similarity=0) from the CTE FULL OUTER JOIN', async () => {
       const cteRows = [
-        { id: 1,  content: 'sem-only',           source_type: 'resume', chunk_index: 0, similarity: 0.8,  rrf_score: 0.016 },
-        { id: 99, content: 'keyword-only chunk',  source_type: 'jd',    chunk_index: 0, similarity: 0.0,  rrf_score: 0.015 },
+        {
+          id: 1,
+          content: 'sem-only',
+          source_type: 'resume',
+          chunk_index: 0,
+          similarity: 0.8,
+          rrf_score: 0.016,
+        },
+        {
+          id: 99,
+          content: 'keyword-only chunk',
+          source_type: 'jd',
+          chunk_index: 0,
+          similarity: 0.0,
+          rrf_score: 0.015,
+        },
       ];
 
       mockEm.getConnection().execute.mockResolvedValueOnce(cteRows);
@@ -269,17 +308,28 @@ describe('RagService', () => {
       const results = await service.query('test', 1, { topK: 5 });
 
       expect(results.some((r) => r.id === 99)).toBe(true);
-      expect(results.find((r) => r.id === 99)?.content).toBe('keyword-only chunk');
+      expect(results.find((r) => r.id === 99)?.content).toBe(
+        'keyword-only chunk',
+      );
     });
 
     it('falls back to semantic-only when the hybrid CTE throws', async () => {
       const semRows = [
-        { id: 1, content: 'fallback', source_type: 'resume', chunk_index: 0, similarity: 0.75 },
+        {
+          id: 1,
+          content: 'fallback',
+          source_type: 'resume',
+          chunk_index: 0,
+          similarity: 0.75,
+        },
       ];
 
-      mockEm.getConnection().execute
-        .mockRejectedValueOnce(new Error('column "search_vector" does not exist')) // CTE fails
-        .mockResolvedValueOnce(semRows);                                            // semantic fallback
+      mockEm
+        .getConnection()
+        .execute.mockRejectedValueOnce(
+          new Error('column "search_vector" does not exist'),
+        ) // CTE fails
+        .mockResolvedValueOnce(semRows); // semantic fallback
 
       const results = await service.query('test', 1, { topK: 3 });
 
@@ -311,15 +361,33 @@ describe('RagService', () => {
     it('promotes a chunk with net-positive feedback above a higher-RRF chunk', async () => {
       // id=1 (rrf_score 0.016) vs id=2 (rrf_score 0.015 but positive feedback)
       const cteRows = [
-        { id: 1, content: 'no feedback', source_type: 'resume', chunk_index: 0, similarity: 0.9, rrf_score: 0.016 },
-        { id: 2, content: 'thumbs up',   source_type: 'resume', chunk_index: 1, similarity: 0.8, rrf_score: 0.015 },
+        {
+          id: 1,
+          content: 'no feedback',
+          source_type: 'resume',
+          chunk_index: 0,
+          similarity: 0.9,
+          rrf_score: 0.016,
+        },
+        {
+          id: 2,
+          content: 'thumbs up',
+          source_type: 'resume',
+          chunk_index: 1,
+          similarity: 0.8,
+          rrf_score: 0.015,
+        },
       ];
 
-      mockEm.getConnection().execute
-        .mockResolvedValueOnce(cteRows)                                    // CTE
-        .mockResolvedValueOnce([{ chunk_id: 2, net_score: 3 }]);           // feedback: id=2 boosted
+      mockEm
+        .getConnection()
+        .execute.mockResolvedValueOnce(cteRows) // CTE
+        .mockResolvedValueOnce([{ chunk_id: 2, net_score: 3 }]); // feedback: id=2 boosted
 
-      const results = await service.query('test', 1, { topK: 2, profileId: 42 });
+      const results = await service.query('test', 1, {
+        topK: 2,
+        profileId: 42,
+      });
 
       // id=2 should rank first after feedback boost
       expect(results[0].id).toBe(2);
@@ -328,15 +396,33 @@ describe('RagService', () => {
     it('demotes a chunk with net-negative feedback below a lower-RRF chunk', async () => {
       // id=2 starts first (highest rrf_score) but has negative feedback
       const cteRows = [
-        { id: 2, content: 'thumbs down', source_type: 'resume', chunk_index: 0, similarity: 0.9, rrf_score: 0.016 },
-        { id: 1, content: 'no feedback', source_type: 'resume', chunk_index: 1, similarity: 0.7, rrf_score: 0.015 },
+        {
+          id: 2,
+          content: 'thumbs down',
+          source_type: 'resume',
+          chunk_index: 0,
+          similarity: 0.9,
+          rrf_score: 0.016,
+        },
+        {
+          id: 1,
+          content: 'no feedback',
+          source_type: 'resume',
+          chunk_index: 1,
+          similarity: 0.7,
+          rrf_score: 0.015,
+        },
       ];
 
-      mockEm.getConnection().execute
-        .mockResolvedValueOnce(cteRows)                                    // CTE
-        .mockResolvedValueOnce([{ chunk_id: 2, net_score: -3 }]);          // feedback: id=2 penalised
+      mockEm
+        .getConnection()
+        .execute.mockResolvedValueOnce(cteRows) // CTE
+        .mockResolvedValueOnce([{ chunk_id: 2, net_score: -3 }]); // feedback: id=2 penalised
 
-      const results = await service.query('test', 1, { topK: 2, profileId: 42 });
+      const results = await service.query('test', 1, {
+        topK: 2,
+        profileId: 42,
+      });
 
       // id=1 should rank first after id=2 is demoted
       expect(results[0].id).toBe(1);
@@ -355,14 +441,27 @@ describe('RagService', () => {
 
     it('returns correct results when the feedback query throws', async () => {
       const cteRows = [
-        { id: 1, content: 'ok chunk', source_type: 'resume', chunk_index: 0, similarity: 0.8, rrf_score: 0.016 },
+        {
+          id: 1,
+          content: 'ok chunk',
+          source_type: 'resume',
+          chunk_index: 0,
+          similarity: 0.8,
+          rrf_score: 0.016,
+        },
       ];
 
-      mockEm.getConnection().execute
-        .mockResolvedValueOnce(cteRows)                                                // CTE
-        .mockRejectedValueOnce(new Error('relation "rag_feedback" does not exist'));   // feedback fails
+      mockEm
+        .getConnection()
+        .execute.mockResolvedValueOnce(cteRows) // CTE
+        .mockRejectedValueOnce(
+          new Error('relation "rag_feedback" does not exist'),
+        ); // feedback fails
 
-      const results = await service.query('test', 1, { topK: 3, profileId: 42 });
+      const results = await service.query('test', 1, {
+        topK: 3,
+        profileId: 42,
+      });
 
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe(1);
@@ -383,7 +482,10 @@ describe('RagService', () => {
     it('persists anonymous (null profile) feedback', async () => {
       await service.recordFeedback(5, 'React hooks', false, null);
 
-      const createCall = mockEm.create.mock.calls[0][1] as Record<string, unknown>;
+      const createCall = mockEm.create.mock.calls[0][1] as Record<
+        string,
+        unknown
+      >;
       expect(createCall.profile).toBeUndefined();
       expect(createCall.isPositive).toBe(false);
       expect(mockEm.flush).toHaveBeenCalled();
@@ -396,7 +498,9 @@ describe('RagService', () => {
     let writeSpy: jest.SpyInstance;
 
     beforeEach(() => {
-      writeSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      writeSpy = jest
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true);
     });
 
     afterEach(() => {
@@ -460,8 +564,16 @@ describe('RagService', () => {
   describe('backfill()', () => {
     it('re-embeds chunks with null embeddings', async () => {
       const nullChunks = [
-        { id: 1, content: 'chunk one', embedding: null } as unknown as DocumentChunk,
-        { id: 2, content: 'chunk two', embedding: null } as unknown as DocumentChunk,
+        {
+          id: 1,
+          content: 'chunk one',
+          embedding: null,
+        } as unknown as DocumentChunk,
+        {
+          id: 2,
+          content: 'chunk two',
+          embedding: null,
+        } as unknown as DocumentChunk,
       ];
       mockRepo.find.mockResolvedValue(nullChunks);
 
@@ -475,8 +587,16 @@ describe('RagService', () => {
 
     it('counts embed() failures as errors and continues processing', async () => {
       mockRepo.find.mockResolvedValue([
-        { id: 1, content: 'good chunk', embedding: null } as unknown as DocumentChunk,
-        { id: 2, content: 'bad chunk',  embedding: null } as unknown as DocumentChunk,
+        {
+          id: 1,
+          content: 'good chunk',
+          embedding: null,
+        } as unknown as DocumentChunk,
+        {
+          id: 2,
+          content: 'bad chunk',
+          embedding: null,
+        } as unknown as DocumentChunk,
       ]);
 
       embeddingService.embed

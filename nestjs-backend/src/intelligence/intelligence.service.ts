@@ -365,6 +365,86 @@ export class IntelligenceService {
     }
   }
 
+  async rewriteResume(
+    bullet: string,
+    targetRole: string,
+  ): Promise<{ rewritten_bullet: string; engine: string }> {
+    const prompt = `Rewrite this resume bullet to be stronger and more relevant for a ${targetRole} role. Return only the rewritten bullet, no explanation.\n\nOriginal: ${bullet}`;
+    const reply = await this.llmService.chat(
+      [{ role: 'user', content: prompt }],
+      'You are a professional resume writer specialising in tech roles in Singapore.',
+    );
+    const providerUsed = this.llmService.getLastUsedProvider();
+    const engineLabel =
+      {
+        groq: 'Groq',
+        claude: 'Anthropic Claude',
+        gemini: 'Google Gemini',
+      }[providerUsed ?? 'groq'] ?? 'LLM Router';
+    return { rewritten_bullet: reply.trim(), engine: engineLabel };
+  }
+
+  async interview(
+    dto: {
+      profile_id?: number;
+      job_title: string;
+      messages: Array<{ role: string; content: string }>;
+    },
+    tenantId: number,
+  ): Promise<{ reply: string; engine: string }> {
+    let profileContext = '';
+    if (dto.profile_id) {
+      const profile = await this.profileRepository.findOne({
+        id: dto.profile_id,
+        tenant: tenantId,
+      });
+      if (profile) {
+        profileContext = ` The candidate's skills include: ${(profile.skills ?? []).join(', ')}.`;
+      }
+    }
+
+    // Augment with RAG context if available
+    let ragContext = '';
+    try {
+      const lastUserMsg = [...dto.messages]
+        .reverse()
+        .find((m) => m.role === 'user');
+      if (lastUserMsg) {
+        const chunks = await this.ragService.query(
+          lastUserMsg.content,
+          tenantId,
+          {
+            topK: 2,
+            threshold: 0.5,
+          },
+        );
+        ragContext = RagService.formatContext(chunks);
+      }
+    } catch {
+      // RAG enrichment is best-effort
+    }
+
+    const systemPrompt =
+      `You are a professional interviewer conducting a mock interview for a ${dto.job_title} position.` +
+      ` Ask one focused question at a time, provide constructive feedback, and help the candidate improve.` +
+      ` Singapore tech industry context: SkillsFuture, SCTP programmes, WSG career guidance.` +
+      profileContext +
+      ragContext;
+
+    const reply = await this.llmService.chat(
+      dto.messages as Array<{ role: string; content: string }>,
+      systemPrompt,
+    );
+    const providerUsed = this.llmService.getLastUsedProvider();
+    const engineLabel =
+      {
+        groq: 'Groq',
+        claude: 'Anthropic Claude',
+        gemini: 'Google Gemini',
+      }[providerUsed ?? 'groq'] ?? 'LLM Router';
+    return { reply, engine: engineLabel };
+  }
+
   async analyzeJdMatch(
     profileId: number,
     jobDescription: string,

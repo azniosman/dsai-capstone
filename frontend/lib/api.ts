@@ -43,17 +43,16 @@ export interface Profile {
 }
 
 export interface Recommendation {
-  // Core fields returned by NestJS backend (mocked)
   title: string;
   match_score: number;
   skill_match_quality: "strong" | "moderate" | "developing" | "high" | "medium" | "low";
-  // Fields from full Python implementation (optional for now)
   role_id?: number;
   category?: string;
   salary_range?: string;
   content_score?: number;
   rule_score?: number;
   career_switcher_bonus?: number;
+  career_switcher_friendly?: boolean;
   matched_skills?: string[];
   missing_skills?: string[];
   rationale?: string;
@@ -66,10 +65,8 @@ export interface RecommendationsResponse {
 
 export interface GapItem {
   skill: string;
-  // Backend currently uses camelCase (mocked), full impl uses snake_case
-  gapSeverity?: "none" | "low" | "medium" | "high";
   gap_severity?: "none" | "low" | "medium" | "high";
-  // Fields from full implementation
+  gapSeverity?: "none" | "low" | "medium" | "high";
   user_level?: number;
   required_level?: string | number;
   user_level_label?: string;
@@ -77,9 +74,8 @@ export interface GapItem {
 }
 
 export interface RoleGap {
-  // Backend currently uses targetRole (mocked), full impl uses role_title
-  targetRole?: string;
   role_title?: string;
+  targetRole?: string;
   role_id?: number;
   match_score?: number;
   gaps: GapItem[];
@@ -134,10 +130,20 @@ export interface ChatResponse {
   engine: string;
 }
 
+export interface JDMatchGap {
+  skill: string;
+  user_level: number;
+  gap_severity: string;
+  required_level: string;
+  user_level_label: string;
+  priority: string;
+}
+
 export interface JDMatchResult {
+  job_title: string;
   match_score: number;
   extracted_skills: string[];
-  gaps: GapItem[];
+  gaps: JDMatchGap[];
 }
 
 
@@ -515,6 +521,151 @@ export const ssgApi = {
         targetRole: string | null;
         courses: SsgCourse[];
       }>("/api/ssg/recommendations", payload)
+      .then((r) => r.data),
+};
+
+// ─────────────────────────────────────────────
+// Market Insights
+// ─────────────────────────────────────────────
+
+export interface MarketInsight {
+  role_category: string;
+  demand_level: string;
+  avg_salary_sgd: number;
+  yoy_growth_pct: number;
+  hiring_volume: number;
+  trending_skills: string[];
+  forecast_2026?: string;
+  outlook?: string;
+}
+
+export interface MarketInsightsResponse {
+  top_skills_overall: string[];
+  highest_demand_sectors: string[];
+  insights: MarketInsight[];
+  last_updated?: string;
+}
+
+export const marketApi = {
+  /** Get Singapore labour market insights aggregated by sector. */
+  get: () =>
+    api.get<MarketInsightsResponse>("/api/market-insights").then((r) => r.data),
+};
+
+// ─────────────────────────────────────────────
+// Compare Roles
+// ─────────────────────────────────────────────
+
+export const compareApi = {
+  /** Compare a profile against multiple job roles simultaneously. */
+  compare: (payload: { profile_id: number; role_ids: number[] }) =>
+    api
+      .post<{ comparisons: Recommendation[] }>("/api/compare-roles", payload)
+      .then((r) => r.data),
+};
+
+// ─────────────────────────────────────────────
+// Skill Progress
+// ─────────────────────────────────────────────
+
+export interface ProgressEntry {
+  skill: string;
+  level: number;
+  recorded_at?: string;
+}
+
+export interface ProgressResponse {
+  skills_acquired: number;
+  skills_in_progress: number;
+  skills_total: number;
+  entries: ProgressEntry[];
+}
+
+export const progressApi = {
+  /** Record a skill progress update. */
+  record: (payload: { profile_id: number; skill: string; level: number }) =>
+    api.post<ProgressEntry>("/api/progress", payload).then((r) => r.data),
+
+  /** Get the progress dashboard for a profile. */
+  get: (profileId: number) =>
+    api
+      .get<ProgressResponse>(`/api/progress/${profileId}`)
+      .then((r) => r.data),
+
+  /** Get skill progress timeline for a profile. */
+  timeline: (profileId: number) =>
+    api
+      .get<{ timeline: ProgressEntry[] }>(`/api/progress/${profileId}/timeline`)
+      .then((r) => r.data),
+};
+
+// ─────────────────────────────────────────────
+// Resume Rewriter
+// ─────────────────────────────────────────────
+
+export const resumeRewriterApi = {
+  /** Rewrite a resume bullet point for a target role using the LLM chain. */
+  rewrite: (bullet: string, targetRole: string, profileId?: number) =>
+    api
+      .post<{ rewritten_bullet: string; engine: string }>("/api/resume-rewriter", {
+        bullet,
+        target_role: targetRole,
+        profile_id: profileId,
+      })
+      .then((r) => r.data),
+};
+
+// ─────────────────────────────────────────────
+// Interview
+// ─────────────────────────────────────────────
+
+export const interviewApi = {
+  /** Send a message to the AI mock interviewer. */
+  chat: (jobTitle: string, messages: ChatMessage[], profileId?: number) =>
+    api
+      .post<{ reply: string; engine: string }>("/api/interview", {
+        job_title: jobTitle,
+        messages,
+        profile_id: profileId,
+      })
+      .then((r) => r.data),
+};
+
+// ─────────────────────────────────────────────
+// RAG
+// ─────────────────────────────────────────────
+
+export interface RagChunk {
+  id: number;
+  content: string;
+  source_type: string;
+  score?: number;
+}
+
+export const ragApi = {
+  /** Hybrid pgvector + tsvector RAG retrieval. */
+  query: (query: string, topK = 5) =>
+    api
+      .post<{ chunks: RagChunk[]; total: number }>("/api/rag/query", {
+        query,
+        top_k: topK,
+      })
+      .then((r) => r.data),
+
+  /** Record a thumbs-up/down feedback signal for re-ranking. */
+  feedback: (
+    chunkId: number,
+    queryText: string,
+    isPositive: boolean,
+    profileId?: number,
+  ) =>
+    api
+      .post<{ recorded: boolean }>("/api/rag/feedback", {
+        chunk_id: chunkId,
+        query_text: queryText,
+        is_positive: isPositive,
+        profile_id: profileId,
+      })
       .then((r) => r.data),
 };
 

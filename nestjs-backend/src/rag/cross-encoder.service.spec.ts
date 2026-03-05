@@ -105,9 +105,15 @@ describe('CrossEncoderService', () => {
           return Promise.resolve([{ score: scoreMap[id] ?? 0 }]);
         });
 
-      jest.spyOn(enabledService, 'getPipeline').mockResolvedValue(
-        mockPipeline as unknown as ReturnType<typeof enabledService.getPipeline> extends Promise<infer T> ? T : never,
-      );
+      jest
+        .spyOn(enabledService, 'getPipeline')
+        .mockResolvedValue(
+          mockPipeline as unknown as ReturnType<
+            typeof enabledService.getPipeline
+          > extends Promise<infer T>
+            ? T
+            : never,
+        );
 
       const chunks = [makeChunk(1), makeChunk(2), makeChunk(3)];
       const result = await enabledService.rerank('test query', chunks);
@@ -125,7 +131,9 @@ describe('CrossEncoderService', () => {
       jest
         .spyOn(svc, 'getPipeline')
         .mockResolvedValue(
-          jest.fn().mockResolvedValue([{ score: 0.5 }]) as unknown as ReturnType<
+          jest
+            .fn()
+            .mockResolvedValue([{ score: 0.5 }]) as unknown as ReturnType<
             typeof svc.getPipeline
           > extends Promise<infer T>
             ? T
@@ -140,13 +148,19 @@ describe('CrossEncoderService', () => {
     });
 
     it('returns original order when the pipeline throws', async () => {
-      jest.spyOn(enabledService, 'getPipeline').mockResolvedValue(
-        jest.fn().mockRejectedValue(new Error('inference error')) as unknown as ReturnType<
-          typeof enabledService.getPipeline
-        > extends Promise<infer T>
-          ? T
-          : never,
-      );
+      jest
+        .spyOn(enabledService, 'getPipeline')
+        .mockResolvedValue(
+          jest
+            .fn()
+            .mockRejectedValue(
+              new Error('inference error'),
+            ) as unknown as ReturnType<
+            typeof enabledService.getPipeline
+          > extends Promise<infer T>
+            ? T
+            : never,
+        );
 
       const chunks = [makeChunk(1), makeChunk(2)];
       const result = await enabledService.rerank('test', chunks);

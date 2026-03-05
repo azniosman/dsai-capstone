@@ -70,9 +70,9 @@ export class CrossEncoderService {
       const scores = await Promise.all(
         toScore.map(async (chunk): Promise<number> => {
           const result = await pipe(query, { text_pair: chunk.content });
-          const entry = (
-            Array.isArray(result) ? result[0] : result
-          ) as { score?: number } | undefined;
+          const entry = (Array.isArray(result) ? result[0] : result) as
+            | { score?: number }
+            | undefined;
           return typeof entry?.score === 'number' ? entry.score : 0;
         }),
       );
@@ -117,15 +117,11 @@ export class CrossEncoderService {
         this.logger.log(`Loading cross-encoder model ${this.modelId}…`);
         const start = Date.now();
 
-        this.pipeline = (await pipeline(
-          'text-classification',
-          this.modelId,
-          { quantized: true },
-        )) as (...args: unknown[]) => Promise<unknown>;
+        this.pipeline = (await pipeline('text-classification', this.modelId, {
+          quantized: true,
+        })) as (...args: unknown[]) => Promise<unknown>;
 
-        this.logger.log(
-          `Cross-encoder model ready (${Date.now() - start} ms)`,
-        );
+        this.logger.log(`Cross-encoder model ready (${Date.now() - start} ms)`);
         return this.pipeline;
       } catch (err) {
         this.pipelineInit = null; // allow retry on next call

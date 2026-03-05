@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import { SsgService } from '../ssg/ssg.service';
 import { SsgCacheService } from '../ssg/ssg-cache.service';
 import { DomainService } from '../domain/domain.service';
 import { RagService } from '../rag/rag.service';
+import { IntelligenceService } from '../intelligence/intelligence.service';
 
 class BackfillDto {
   @IsOptional()
@@ -52,11 +54,14 @@ interface CleanupResult {
  */
 @Controller('internal')
 export class InternalController {
+  private readonly logger = new Logger(InternalController.name);
+
   constructor(
     private readonly ssgService: SsgService,
     private readonly ssgCacheService: SsgCacheService,
     private readonly domainService: DomainService,
     private readonly ragService: RagService,
+    private readonly intelligenceService: IntelligenceService,
   ) {}
 
   // ─── Health ────────────────────────────────────────────────────────────────
@@ -200,6 +205,43 @@ export class InternalController {
     const start = Date.now();
     const result = await this.ragService.backfill(dto.limit ?? 100);
     return { ...result, duration_ms: Date.now() - start };
+  }
+
+  // ─── Recommendation Pre-computation ────────────────────────────────────────
+
+  /**
+   * Pre-computes recommendation scores for all profiles.
+   * Triggered nightly by EventBridge (cron 02:00 UTC).
+   *
+   * POST /internal/recommendations/precompute
+   */
+  @Post('recommendations/precompute')
+  @UseGuards(InternalTokenGuard)
+  @HttpCode(HttpStatus.OK)
+  precomputeRecommendations(): { processed: number; duration_ms: number } {
+    const start = Date.now();
+    // TODO Phase 2: enumerate all UserProfile IDs and call
+    // intelligenceService.getRecommendations() for each, caching results.
+    this.logger.log('recommendations/precompute triggered — Phase 2 stub');
+    return { processed: 0, duration_ms: Date.now() - start };
+  }
+
+  /**
+   * Pre-generates LLM rationale strings for top recommendations.
+   * Triggered nightly by EventBridge (cron 02:30 UTC).
+   *
+   * POST /internal/recommendations/rationale-pregen
+   */
+  @Post('recommendations/rationale-pregen')
+  @UseGuards(InternalTokenGuard)
+  @HttpCode(HttpStatus.OK)
+  prergenRationale(): { scheduled: boolean } {
+    // TODO Phase 2: call intelligenceService.getRecommendations() for cached
+    // profiles and persist LLM rationale strings to avoid cold-path LLM calls.
+    this.logger.log(
+      'recommendations/rationale-pregen triggered — Phase 2 stub',
+    );
+    return { scheduled: true };
   }
 
   // ─── Analytics ─────────────────────────────────────────────────────────────

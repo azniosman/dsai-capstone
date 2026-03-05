@@ -64,7 +64,11 @@ export class DocumentChunk {
   embedding?: number[];
 
   /** The profile this chunk belongs to (nullable for anonymous uploads). */
-  @ManyToOne(() => UserProfile, { nullable: true, index: true, deleteRule: 'cascade' })
+  @ManyToOne(() => UserProfile, {
+    nullable: true,
+    index: true,
+    deleteRule: 'cascade',
+  })
   profile?: Rel<UserProfile>;
 
   /** Tenant isolation. */

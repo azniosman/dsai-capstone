@@ -41,7 +41,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof Error ? exception.stack : '',
     );
 
-    // This format matches what the frontend extractApiError expects (matching FastAPI structure)
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),

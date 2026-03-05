@@ -53,7 +53,7 @@ export default function OperationsPage() {
       <div className="absolute top-32 left-8 z-10 pointer-events-none">
         <div className="space-y-4">
           <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-[0.85] text-white">
-            DEEP_SPACE
+            SKLBR_CLOUD
             <br />
             <span className="text-[#00f2f2]">ARCHITECTURE</span>
           </h1>
