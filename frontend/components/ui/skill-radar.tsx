@@ -368,6 +368,7 @@ export function SkillRadar({ data, roleName, metrics }: SkillRadarProps) {
                 fill="url(#requiredLevelGradient)"
                 strokeWidth={2}
                 strokeDasharray="4 4"
+                dot={false}
               />
               <Radar
                 name="You"
@@ -376,6 +377,7 @@ export function SkillRadar({ data, roleName, metrics }: SkillRadarProps) {
                 fill="url(#userLevelGradient)"
                 strokeWidth={3}
                 className="drop-shadow-[0_0_8px_rgba(var(--primary),0.5)] transition-all duration-500"
+                dot={false}
               />
             </RadarChart>
           </ChartCard>
