@@ -18,26 +18,34 @@ async function bootstrap() {
   // findOne(), making it idempotent as well.
   const orm = app.get(MikroORM);
   const pgEm = orm.em as EntityManager;
+
+  // Each step is independent — a failure in one should not prevent later steps.
   try {
-    // Enable pgvector extension before updateSchema() attempts to create
-    // any `vector(N)` columns.  The extension is a no-op if already present.
     await pgEm.getConnection().execute('CREATE EXTENSION IF NOT EXISTS vector');
     logger.log('pgvector extension ready');
+  } catch (err) {
+    logger.warn('pgvector extension setup failed (may already exist or lack privileges)', (err as Error).message);
+  }
 
+  try {
+    // Additive-only (never drops tables/columns) — safe on every cold start.
     await orm.getSchemaGenerator().updateSchema();
     logger.log('Schema up to date');
+  } catch (err) {
+    logger.error('updateSchema failed', (err as Error).message);
+  }
 
-    // Create HNSW index for cosine similarity search on document_chunk.
-    // IF NOT EXISTS makes this idempotent across cold starts.
+  try {
     await pgEm.getConnection().execute(`
       CREATE INDEX IF NOT EXISTS document_chunk_embedding_hnsw
       ON document_chunk USING hnsw (embedding vector_cosine_ops)
     `);
     logger.log('HNSW index ready');
+  } catch (err) {
+    logger.warn('HNSW index skipped', (err as Error).message);
+  }
 
-    // tsvector generated column + GIN index for hybrid keyword search (Phase 4).
-    // The generated column is maintained automatically by PostgreSQL on every
-    // INSERT/UPDATE — no application code needed to keep it up to date.
+  try {
     await pgEm.getConnection().execute(`
       ALTER TABLE document_chunk
       ADD COLUMN IF NOT EXISTS search_vector tsvector
@@ -48,12 +56,16 @@ async function bootstrap() {
       ON document_chunk USING gin(search_vector)
     `);
     logger.log('tsvector column + GIN index ready');
+  } catch (err) {
+    logger.warn('tsvector/GIN index skipped', (err as Error).message);
+  }
 
+  try {
     const seeder = orm.getSeeder();
     await seeder.seed(DatabaseSeeder);
     logger.log('Seed complete');
   } catch (err) {
-    logger.error('Schema/seed failed — continuing anyway', err);
+    logger.error('Seed failed — continuing anyway', (err as Error).message);
   }
 
   app.setGlobalPrefix('api');

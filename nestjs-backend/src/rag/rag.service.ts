@@ -527,17 +527,26 @@ export class RagService {
     isPositive: boolean,
     profileId: number | null,
   ): Promise<void> {
-    const feedback = this.em.create(RagFeedback, {
-      chunk: this.em.getReference(DocumentChunk, chunkId),
-      profile: profileId
-        ? this.em.getReference(UserProfile, profileId)
-        : undefined,
-      queryText,
-      isPositive,
-      createdAt: new Date(),
-    });
-    this.em.persist(feedback);
-    await this.em.flush();
+    try {
+      const feedback = this.em.create(RagFeedback, {
+        chunk: this.em.getReference(DocumentChunk, chunkId),
+        profile: profileId
+          ? this.em.getReference(UserProfile, profileId)
+          : undefined,
+        queryText,
+        isPositive,
+        createdAt: new Date(),
+      });
+      this.em.persist(feedback);
+      await this.em.flush();
+    } catch (err) {
+      // Non-fatal — table may not exist yet on a fresh DB (updateSchema runs
+      // on cold start; feedback degrades gracefully until next restart).
+      this.logger.warn(
+        'recordFeedback skipped',
+        (err as Error).message,
+      );
+    }
   }
 
   // ─── Private helpers ───────────────────────────────────────────────────────
