@@ -16,6 +16,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { Subject } from 'rxjs';
+import { ClsService } from 'nestjs-cls';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,8 @@ export interface LogEntry {
   readonly component: string;
   /** Human-readable message. */
   readonly message: string;
+  /** Unique request trace ID pulled from AsyncLocalStorage. */
+  readonly traceId?: string;
   /** Optional key/value metadata (latency, chunk counts, provider name, etc.) */
   readonly meta?: Record<string, string | number | boolean>;
 }
@@ -48,6 +51,8 @@ export class LogBusService {
   /** Internal ring buffer — oldest entries are evicted when full. */
   private readonly buffer: LogEntry[] = [];
 
+  constructor(private readonly cls: ClsService) {}
+
   /**
    * RxJS Subject used to push new entries to Server-Sent Event subscribers.
    * Controllers subscribe to this stream and forward each emission as an SSE
@@ -61,11 +66,14 @@ export class LogBusService {
    * @param entry - Partial entry; `timestamp` is auto-populated if omitted.
    */
   emit(entry: Omit<LogEntry, 'timestamp'> & { timestamp?: string }): void {
+    const traceId = entry.traceId ?? this.cls.getId();
+    
     const full: LogEntry = {
       timestamp: entry.timestamp ?? new Date().toISOString(),
       type: entry.type,
       component: entry.component,
       message: entry.message,
+      traceId,
       meta: entry.meta,
     };
 

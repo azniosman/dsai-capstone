@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { ClsModule } from 'nestjs-cls';
+import { nanoid } from 'nanoid';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommonModule } from '@app/common/common.module';
@@ -19,6 +21,10 @@ import mikroOrmConfig from './mikro-orm.config';
 
 @Module({
   imports: [
+    ClsModule.forRoot({
+      global: true,
+      middleware: { mount: true, generateId: true, idGenerator: () => nanoid(10) },
+    }),
     CommonModule,
     MikroOrmModule.forRoot(mikroOrmConfig),
     AuthModule,

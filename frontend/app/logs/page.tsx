@@ -34,20 +34,31 @@ import {
   ChevronDown,
   Filter,
   Timer,
+  Pause,
+  Play,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+} from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type LogType = "RAG" | "LLM" | "AWS" | "SYSTEM" | "ERROR" | "INFO" | "WARN";
 
-interface LogEntry {
-  readonly timestamp: string;
-  readonly type: LogType;
-  readonly component: string;
-  readonly message: string;
-  readonly meta?: Record<string, string | number | boolean>;
-  /** Client-side generated stable key. */
-  readonly _id: string;
+export interface LogEntry {
+  _id: string; // client-side random key
+  timestamp: string;
+  type: LogType;
+  component: string;
+  message: string;
+  traceId?: string;
+  meta?: Record<string, any>;
 }
 
 type ConnectionStatus = "connecting" | "connected" | "polling" | "error";
@@ -195,6 +206,13 @@ export default function LogsPage() {
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(3_000);
+  const [activeComponents, setActiveComponents] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Pause state freezes the UI on a snapshot of entries, while the background
+  // buffer continues receiving new events up to MAX_ENTRIES.
+  const [pausedSnapshot, setPausedSnapshot] = useState<LogEntry[] | null>(null);
 
   const topRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -304,7 +322,15 @@ export default function LogsPage() {
     if (!atTop && autoScroll) setAutoScroll(false);
   }, [autoScroll]);
 
-  // ── Filters ───────────────────────────────────────────────────────────────
+  const togglePause = useCallback(() => {
+    if (pausedSnapshot) {
+      setPausedSnapshot(null); // Resume (catches up to latest)
+      setAutoScroll(true);
+    } else {
+      setPausedSnapshot([...entries]); // Freeze current state
+      setAutoScroll(false);
+    }
+  }, [pausedSnapshot, entries]);
 
   const toggleType = useCallback((t: LogType) => {
     setActiveTypes((prev) => {
@@ -318,22 +344,139 @@ export default function LogsPage() {
     });
   }, []);
 
+  const toggleComponent = useCallback((c: string) => {
+    setActiveComponents((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
+  }, []);
+
+  const availableComponents = useMemo(() => {
+    return Array.from(new Set(entries.map((e) => e.component))).sort();
+  }, [entries]);
+
   const filtered = useMemo(() => {
-    let list = entries.filter((e) => activeTypes.has(e.type));
+    const source = pausedSnapshot ?? entries;
+    let list = source.filter((e) => activeTypes.has(e.type));
+
+    if (activeComponents.size > 0) {
+      list = list.filter((e) => activeComponents.has(e.component));
+    }
+
     if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (e) =>
-          e.message.toLowerCase().includes(q) ||
-          e.component.toLowerCase().includes(q) ||
-          e.type.toLowerCase().includes(q),
-      );
+      let regex: RegExp | null = null;
+      let q = search.trim();
+
+      // Attempt to parse /pattern/ or /pattern/i
+      if (q.startsWith("/") && (q.endsWith("/") || q.endsWith("/i"))) {
+        try {
+          const isCaseInsensitive = q.endsWith("/i");
+          const pattern = isCaseInsensitive ? q.slice(1, -2) : q.slice(1, -1);
+          regex = new RegExp(pattern, isCaseInsensitive ? "i" : "");
+        } catch {
+          // ignore invalid regex, fallback to string matching
+        }
+      }
+
+      if (regex) {
+        list = list.filter(
+          (e) =>
+            regex!.test(e.message) ||
+            regex!.test(e.component) ||
+            regex!.test(e.type),
+        );
+      } else {
+        q = q.toLowerCase();
+        list = list.filter(
+          (e) =>
+            e.message.toLowerCase().includes(q) ||
+            e.component.toLowerCase().includes(q) ||
+            e.type.toLowerCase().includes(q),
+        );
+      }
     }
     // Newest first
     return [...list].reverse();
-  }, [entries, activeTypes, search]);
+  }, [entries, pausedSnapshot, activeTypes, activeComponents, search]);
+
+  // ─── Metrics Calculation ────────────────────────────────────────────────────
+
+  const metrics = useMemo(() => {
+    // 1. LLM Latency Trend (last 20)
+    const llmLogs = entries.filter(
+      (e) => e.type === "LLM" && e.meta?.latencyMs !== undefined,
+    );
+    const latencyData = llmLogs.slice(-20).map((e, i) => ({
+      i,
+      latency: e.meta!.latencyMs as number,
+      provider: e.meta!.provider as string,
+    }));
+
+    // 2. Provider Split (current buffer)
+    const providerCounts: Record<string, number> = {};
+    for (const e of llmLogs) {
+      const p = (e.meta?.provider as string) || "unknown";
+      providerCounts[p] = (providerCounts[p] || 0) + 1;
+    }
+    const providerSplit = Object.entries(providerCounts).map(
+      ([name, value]) => ({
+        name,
+        value,
+      }),
+    );
+    const PIE_COLORS = ["#00f2f2", "#259df4", "#8b5cf6", "#f59e0b"];
+
+    // 3. Error Rate
+    const errorCount = entries.filter(
+      (e) => e.type === "ERROR" || e.type === "WARN",
+    ).length;
+    const errorRate =
+      entries.length > 0 ? (errorCount / entries.length) * 100 : 0;
+
+    return { latencyData, providerSplit, PIE_COLORS, errorRate, errorCount };
+  }, [entries]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
+
+  const JsonViewer = ({ data }: { data: any }) => {
+    if (!data) return null;
+    let str = JSON.stringify(data, null, 2);
+    // Simple fast regex syntax highlighting for JSON
+    str = str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const highlighted = str.replace(
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+      (match) => {
+        let cls = "text-[#f59e0b]"; // number
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = "text-[#259df4]"; // key
+            match =
+              match.slice(0, -1) +
+              '<span class="text-muted-foreground">:</span>';
+          } else {
+            cls = "text-[#00f2f2]"; // string
+          }
+        } else if (/true|false/.test(match)) {
+          cls = "text-[#8b5cf6]"; // boolean
+        } else if (/null/.test(match)) {
+          cls = "text-muted-foreground"; // null
+        }
+        return `<span class="${cls}">${match}</span>`;
+      },
+    );
+
+    return (
+      <pre
+        className="text-[10px] bg-background-dark/50 p-2 rounded border border-white/5 overflow-x-auto whitespace-pre-wrap break-all"
+        dangerouslySetInnerHTML={{ __html: highlighted }}
+      />
+    );
+  };
 
   const StatusBadge = () => {
     const cfg = {
@@ -410,8 +553,36 @@ export default function LogsPage() {
                 ))}
               </div>
 
+              {/* Pause/Resume Toggle */}
               <button
-                onClick={() => setAutoScroll((v) => !v)}
+                onClick={togglePause}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-bold uppercase tracking-widest transition-all ${
+                  pausedSnapshot
+                    ? "border-yellow-500/40 text-yellow-400 bg-yellow-500/10 shadow-[0_0_10px_rgba(234,179,8,0.2)] animate-pulse"
+                    : "border-border text-muted-foreground hover:border-border/80"
+                }`}
+              >
+                {pausedSnapshot ? (
+                  <>
+                    <Play className="w-3 h-3 fill-current" />
+                    Paused{" "}
+                    <span className="opacity-50 border-l border-yellow-500/50 pl-1.5 ml-0.5">
+                      {entries.length - pausedSnapshot.length} new
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Pause className="w-3 h-3 fill-current" />
+                    Pause
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (pausedSnapshot) setPausedSnapshot(null);
+                  setAutoScroll((v) => !v);
+                }}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-bold uppercase tracking-widest transition-all ${
                   autoScroll
                     ? "border-[#00f2f2]/40 text-[#00f2f2] bg-[#00f2f2]/10"
@@ -449,10 +620,35 @@ export default function LogsPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search message, component…"
+                placeholder="Search (use /pattern/i for regex)..."
                 className="w-full bg-card border border-border rounded pl-8 pr-3 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00f2f2]/40 focus:border-[#00f2f2]/50"
               />
             </div>
+
+            {/* Component filter (Multi-select pills) */}
+            {availableComponents.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap border-r border-border/50 pr-2">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">
+                  SVC
+                </span>
+                {availableComponents.map((c) => {
+                  const active = activeComponents.has(c);
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => toggleComponent(c)}
+                      className={`px-1.5 py-0.5 rounded border text-[10px] font-mono tracking-tight transition-all ${
+                        active
+                          ? "border-[#00f2f2]/40 text-[#00f2f2] bg-[#00f2f2]/10"
+                          : "border-border text-muted-foreground/50 hover:text-muted-foreground hover:border-border/80"
+                      }`}
+                    >
+                      {c.replace("Service", "")}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Type pills */}
             <div className="flex items-center gap-1 flex-wrap">
@@ -481,6 +677,153 @@ export default function LogsPage() {
               {filtered.length} / {entries.length} entries
             </span>
           </div>
+          {/* Dashboard Row */}
+          {entries.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1 mt-1 border-t border-border/50">
+              {/* Metric 1: System Health */}
+              <div className="flex flex-col p-2 bg-card/50 rounded border border-border/50">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                  System Health (Buffer)
+                </span>
+                <div className="flex items-end gap-2">
+                  <span
+                    className={`text-2xl font-black tabular-nums leading-none ${
+                      metrics.errorRate > 10
+                        ? "text-red-400"
+                        : metrics.errorRate > 0
+                          ? "text-yellow-400"
+                          : "text-[#00f2f2]"
+                    }`}
+                  >
+                    {(100 - metrics.errorRate).toFixed(1)}%
+                  </span>
+                  <span className="text-[10px] text-muted-foreground mb-1">
+                    healthy ({metrics.errorCount} warnings/errors)
+                  </span>
+                </div>
+              </div>
+
+              {/* Metric 2: LLM Latency Trend */}
+              <div className="flex flex-col p-2 bg-card/50 rounded border border-border/50 relative">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                  LLM Latency (Last 20)
+                </span>
+                {metrics.latencyData.length > 0 ? (
+                  <div className="h-8 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={metrics.latencyData}>
+                        <Line
+                          type="monotone"
+                          dataKey="latency"
+                          stroke="#259df4"
+                          strokeWidth={1.5}
+                          dot={false}
+                          isAnimationActive={false}
+                        />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-background border border-border p-1.5 text-[10px] shadow-xl">
+                                  <span className="text-[#259df4] font-bold">
+                                    {data.latency}ms
+                                  </span>{" "}
+                                  <span className="text-muted-foreground">
+                                    {data.provider}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-8 w-full flex items-center text-[10px] text-muted-foreground/50">
+                    No LLM activity yet
+                  </div>
+                )}
+              </div>
+
+              {/* Metric 3: Provider Split */}
+              <div className="flex flex-col p-2 bg-card/50 rounded border border-border/50 relative overflow-hidden">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                  Model Usage
+                </span>
+                {metrics.providerSplit.length > 0 ? (
+                  <div className="absolute right-2 top-2 bottom-2 w-12 opacity-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={metrics.providerSplit}
+                          innerRadius="60%"
+                          outerRadius="100%"
+                          paddingAngle={2}
+                          dataKey="value"
+                          stroke="none"
+                          isAnimationActive={false}
+                        >
+                          {metrics.providerSplit.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={
+                                metrics.PIE_COLORS[
+                                  index % metrics.PIE_COLORS.length
+                                ]
+                              }
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-background border border-border p-1 rounded text-[10px] shadow-xl text-foreground">
+                                  {data.name}: {data.value} reqs
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : null}
+                {metrics.providerSplit.length > 0 ? (
+                  <div className="flex flex-col justify-center h-8 pr-14 text-[10px]">
+                    {metrics.providerSplit.map((p, i) => (
+                      <div
+                        key={p.name}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="text-muted-foreground truncate">
+                          {p.name}
+                        </span>
+                        <span
+                          className="font-bold tabular-nums"
+                          style={{
+                            color:
+                              metrics.PIE_COLORS[i % metrics.PIE_COLORS.length],
+                          }}
+                        >
+                          {p.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center h-8 text-[10px] text-muted-foreground/50">
+                    Awaiting requests
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -594,16 +937,34 @@ export default function LogsPage() {
                             {entry.message}
                           </div>
                           {entry.meta && (
-                            <>
+                            <div className="mt-2">
                               <div className="text-white/40 text-[10px] mb-1 uppercase tracking-widest">
                                 Metadata
                               </div>
-                              <pre className="text-[10px] text-[#00f2f2]/70 overflow-x-auto whitespace-pre-wrap break-all">
-                                {JSON.stringify(entry.meta, null, 2)}
-                              </pre>
-                            </>
+                              <JsonViewer data={entry.meta} />
+                            </div>
                           )}
-                          <div className="text-white/30 text-[10px]">
+                          {entry.traceId && (
+                            <div className="mt-3">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSearch(entry.traceId!);
+                                  setActiveComponents(new Set());
+                                  setActiveTypes(new Set(ALL_TYPES));
+                                  setAutoScroll(true);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2 py-1 bg-white/5 hover:bg-[#00f2f2]/20 border border-white/10 hover:border-[#00f2f2]/50 hover:text-[#00f2f2] rounded text-[10px] text-white/70 transition-all font-mono tracking-tight"
+                              >
+                                <Filter className="w-3 h-3" />
+                                Filter Trace:{" "}
+                                <span className="font-bold text-[#00f2f2]">
+                                  {entry.traceId}
+                                </span>
+                              </button>
+                            </div>
+                          )}
+                          <div className="text-white/30 text-[10px] mt-2">
                             {entry.timestamp}
                           </div>
                         </motion.div>
