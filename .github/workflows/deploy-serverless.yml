@@ -693,6 +693,51 @@ jobs:
 
           echo "EventBridge schedule import complete"
 
+      # ── Step 4c.5: Import CloudWatch Query Definitions ────────────────────────
+      # CW Query Definitions persist across clean-slate deploys (not deleted by
+      # the cleanup step). Import them so Terraform updates in place rather than
+      # failing with InvalidParameterException: A query with this name already exists.
+      - name: Import CloudWatch Query Definitions into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region:                  ${{ env.AWS_REGION }}
+          TF_VAR_environment:                 ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password:                 ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key:                  ${{ secrets.SECRET_KEY }}
+          TF_VAR_enable_cloudfront:           ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain:        ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain:               ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token:   ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+
+          import_cw_query() {
+            local addr="$1" name="$2"
+            local qid
+            qid=$(aws logs describe-query-definitions \
+              --query-definition-name-prefix "${name}" \
+              --query "queryDefinitions[?name=='${name}'].queryDefinitionId | [0]" \
+              --output text 2>/dev/null)
+            if [ -n "$qid" ] && [ "$qid" != "None" ] && [ "$qid" != "null" ]; then
+              echo "Importing CW query definition ${name}: ${qid}"
+              terraform state rm "$addr" 2>/dev/null || true
+              terraform import -input=false "$addr" "$qid" 2>&1 | grep -v "^$" || true
+            else
+              echo "No existing CW query definition ${name} — Terraform will create it"
+            fi
+          }
+
+          import_cw_query \
+            "module.eventbridge.aws_cloudwatch_query_definition.rag_latency_and_miss_rate" \
+            "${P}/${E}/RAG/LatencyAndMissRate"
+          import_cw_query \
+            "module.eventbridge.aws_cloudwatch_query_definition.rag_similarity_distribution" \
+            "${P}/${E}/RAG/SimilarityDistribution"
+
+          echo "CloudWatch query definition import complete"
+
       # ── Step 4d: Import DNS resources into Terraform state ────────────────────
       # When enable_custom_domain=true the Route 53 zone and ACM certificate
       # survive the cleanup step (AWS doesn't delete them). Re-import them so
