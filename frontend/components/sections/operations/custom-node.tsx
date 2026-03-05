@@ -3,13 +3,73 @@
 import React, { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { AWSIcon, AWSIconType } from "./aws-icon";
+import {
+  Users,
+  Workflow,
+  Code2,
+  Database,
+  Shield,
+  BookOpen,
+  BrainCircuit,
+  Activity,
+  LineChart,
+  Package,
+  Search,
+  Cpu,
+  FileText,
+} from "lucide-react";
+
+export type IconType =
+  | AWSIconType
+  | "Users"
+  | "Workflow"
+  | "Framework"
+  | "Database"
+  | "Security"
+  | "Library"
+  | "AI"
+  | "Document"
+  | "CloudWatch"
+  | "Activity";
 
 interface CustomNodeData {
   name: string;
-  type: AWSIconType;
+  type: IconType;
   layer: string;
   isActive?: boolean;
 }
+
+const renderIcon = (type: IconType, isActive: boolean, size: number) => {
+  const className = isActive ? "text-[#00f2f2]" : "text-white/60";
+  const lucideProps = { size, className, strokeWidth: 1.5 };
+
+  switch (type) {
+    case "Users":
+      return <Users {...lucideProps} />;
+    case "Workflow":
+      return <Workflow {...lucideProps} />;
+    case "Framework":
+      return <Code2 {...lucideProps} />;
+    case "Database":
+      return <Database {...lucideProps} />;
+    case "Security":
+      return <Shield {...lucideProps} />;
+    case "Library":
+      return <Package {...lucideProps} />;
+    case "AI":
+      return <BrainCircuit {...lucideProps} />;
+    case "Document":
+      return <FileText {...lucideProps} />;
+    case "CloudWatch":
+      return <Search {...lucideProps} />;
+    case "Activity":
+      return <Activity {...lucideProps} />;
+    default:
+      return (
+        <AWSIcon type={type as AWSIconType} size={size} className={className} />
+      );
+  }
+};
 
 export const CustomNode = memo(
   ({ data, selected }: { data: CustomNodeData; selected?: boolean }) => {
@@ -48,11 +108,7 @@ export const CustomNode = memo(
             className={`absolute -bottom-1 -right-1 w-2 h-2 border-b border-r ${isActive ? "border-[#00f2f2]" : "border-white/20"}`}
           />
 
-          <AWSIcon
-            type={data.type}
-            size={32}
-            className={isActive ? "text-[#00f2f2]" : "text-white/60"}
-          />
+          {renderIcon(data.type, isActive ?? false, 32)}
         </div>
 
         <div className="mt-3 text-center w-full">

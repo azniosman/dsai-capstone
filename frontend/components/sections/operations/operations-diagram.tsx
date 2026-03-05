@@ -4,6 +4,7 @@ import React, { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ARCHITECTURE_DATA, ArchitectureNode } from "./architecture-data";
 import { Terminal, Cpu, Shield, Info, X } from "lucide-react";
+import { GroupNode } from "./group-node";
 import {
   ReactFlow,
   Controls,
@@ -22,6 +23,7 @@ import { CustomEdge } from "./custom-edge";
 
 const nodeTypes = {
   custom: CustomNode,
+  customGroup: GroupNode,
 };
 
 const edgeTypes = {
@@ -38,10 +40,21 @@ export function OperationsDiagram() {
     () =>
       ARCHITECTURE_DATA.nodes.map((node) => ({
         id: node.id,
-        type: "custom",
+        type: node.layer === "Group" ? "customGroup" : "custom",
         position: { x: node.position.x, y: node.position.y },
+        parentId: node.parentId,
+        extent: node.parentId ? "parent" : undefined,
+        style:
+          node.layer === "Group"
+            ? {
+                width: node.width,
+                height: node.height,
+                zIndex: node.position.z,
+              }
+            : { zIndex: 10 },
         data: {
           name: node.name,
+          label: node.name,
           type: node.type,
           layer: node.layer,
         },
@@ -58,6 +71,8 @@ export function OperationsDiagram() {
         target: edge.target,
         type: "custom",
         animated: edge.animated,
+        style: edge.dashed ? { strokeDasharray: "4, 4" } : undefined,
+        data: { label: edge.label, dashed: edge.dashed },
       })),
     [],
   );
@@ -200,7 +215,7 @@ export function OperationsDiagram() {
                     </span>
                   </div>
                   <div className="bg-white/5 border border-white/5 p-4 rounded-sm space-y-2">
-                    {selectedNode.metadata.specs && (
+                    {selectedNode.metadata?.specs && (
                       <div className="flex justify-between text-[11px] font-mono">
                         <span className="text-neutral-500 uppercase">
                           Config:
@@ -213,7 +228,7 @@ export function OperationsDiagram() {
                         </span>
                       </div>
                     )}
-                    {selectedNode.metadata.runtime && (
+                    {selectedNode.metadata?.runtime && (
                       <div className="flex justify-between text-[11px] font-mono">
                         <span className="text-neutral-500 uppercase">
                           Runtime:
@@ -245,7 +260,7 @@ export function OperationsDiagram() {
                     </span>
                   </div>
                   <p className="text-[13px] font-sans text-neutral-300 leading-relaxed uppercase tracking-wider font-medium">
-                    {selectedNode.metadata.description}
+                    {selectedNode.metadata?.description || "NO DATA AVAILABLE"}
                   </p>
                 </div>
               </div>
@@ -254,7 +269,7 @@ export function OperationsDiagram() {
                 <div className="flex items-center gap-2 text-neutral-600">
                   <Terminal className="w-4 h-4" />
                   <span className="tactical-label text-[9px]">
-                    AWS_REGION: US-EAST-1
+                    NODE_ID: {selectedNode.id.toUpperCase()}
                   </span>
                 </div>
               </div>
