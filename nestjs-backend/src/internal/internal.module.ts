@@ -4,6 +4,8 @@ import { SsgModule } from '../ssg/ssg.module';
 import { DomainModule } from '../domain/domain.module';
 import { RagModule } from '../rag/rag.module';
 import { IntelligenceModule } from '../intelligence/intelligence.module';
+import { DataIntelligenceModule } from '../data-intelligence/data-intelligence.module';
+import { DatasetSyncController } from './dataset-sync.controller';
 
 /**
  * Module that registers the internal automation endpoints.
@@ -13,7 +15,7 @@ import { IntelligenceModule } from '../intelligence/intelligence.module';
  * public API Gateway route.
  */
 @Module({
-  imports: [SsgModule, DomainModule, RagModule, IntelligenceModule],
-  controllers: [InternalController],
+  imports: [SsgModule, DomainModule, RagModule, IntelligenceModule, DataIntelligenceModule],
+  controllers: [InternalController, DatasetSyncController],
 })
 export class InternalModule {}

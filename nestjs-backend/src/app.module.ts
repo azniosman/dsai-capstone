@@ -19,6 +19,7 @@ import { DomainModule } from './domain/domain.module';
 import { SsgModule } from './ssg/ssg.module';
 import { InternalModule } from './internal/internal.module';
 import { RagModule } from './rag/rag.module';
+import { DataIntelligenceModule } from './data-intelligence/data-intelligence.module';
 import mikroOrmConfig from './mikro-orm.config';
 
 @Module({
@@ -46,6 +47,7 @@ import mikroOrmConfig from './mikro-orm.config';
     SsgModule,
     InternalModule,
     RagModule,
+    DataIntelligenceModule,
   ],
   controllers: [AppController],
   providers: [

@@ -40,7 +40,7 @@ export default function DossierHeader() {
           <span className="text-slate-500">Environment:</span>
           <span>PRODUCTION</span>
           <span className="text-slate-500">Region:</span>
-          <span>ap-southeast-1</span>
+          <span>us-east-1</span>
           <span className="text-slate-500">Timestamp:</span>
           <span>{new Date().toISOString()}</span>
         </div>
