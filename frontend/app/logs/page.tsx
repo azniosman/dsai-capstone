@@ -441,7 +441,44 @@ export default function LogsPage() {
     const errorRate =
       entries.length > 0 ? (errorCount / entries.length) * 100 : 0;
 
-    return { latencyData, providerSplit, PIE_COLORS, errorRate, errorCount };
+    // 4. RAG Engine Status
+    const ragLogs = entries.filter(
+      (e) => e.component === "RagService" || e.component === "EmbeddingService",
+    );
+    const latestRagLog = ragLogs[ragLogs.length - 1];
+    let ragStatus = "Standby";
+    let isRagActive = false;
+    let isRagError = false;
+
+    if (latestRagLog) {
+      if (
+        latestRagLog.component === "EmbeddingService" &&
+        latestRagLog.message.includes("unavailable")
+      ) {
+        ragStatus = "Offline (Fallback)";
+        isRagError = true;
+      } else if (
+        latestRagLog.component === "RagService" &&
+        latestRagLog.message.includes("Hybrid RAG query complete")
+      ) {
+        ragStatus = "Online (Active)";
+        isRagActive = true;
+      } else {
+        ragStatus = "Processing...";
+        isRagActive = true;
+      }
+    }
+
+    return {
+      latencyData,
+      providerSplit,
+      PIE_COLORS,
+      errorRate,
+      errorCount,
+      ragStatus,
+      isRagActive,
+      isRagError,
+    };
   }, [entries]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -697,7 +734,7 @@ export default function LogsPage() {
           </div>
           {/* Dashboard Row */}
           {entries.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1 mt-1 border-t border-border/50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-1 mt-1 border-t border-border/50">
               {/* Metric 1: System Health */}
               <div className="flex flex-col p-2 bg-card/50 rounded border border-border/50">
                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
@@ -717,6 +754,23 @@ export default function LogsPage() {
                   </span>
                   <span className="text-[10px] text-muted-foreground mb-1">
                     healthy ({metrics.errorCount} warnings/errors)
+                  </span>
+                </div>
+              </div>
+
+              {/* Metric 2: RAG Pipeline Status */}
+              <div className="flex flex-col p-2 bg-card/50 rounded border border-border/50">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                  RAG Engine Status
+                </span>
+                <div className="flex items-center gap-2 h-full pb-0.5">
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full ${metrics.isRagError ? "bg-red-500 animate-pulse" : metrics.isRagActive ? "bg-[#00f2f2] shadow-[0_0_8px_#00f2f2]" : "bg-slate-500"}`}
+                  />
+                  <span
+                    className={`text-lg font-bold tracking-tight ${metrics.isRagError ? "text-red-400" : metrics.isRagActive ? "text-[#00f2f2]" : "text-muted-foreground"}`}
+                  >
+                    {metrics.ragStatus}
                   </span>
                 </div>
               </div>
