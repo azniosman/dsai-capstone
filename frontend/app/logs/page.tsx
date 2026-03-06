@@ -778,6 +778,29 @@ export default function LogsPage() {
                   >
                     {metrics.ragStatus}
                   </span>
+                  {metrics.isRagError && (
+                    <button
+                      onClick={() => {
+                        appendEntries([
+                          {
+                            _id: crypto.randomUUID
+                              ? crypto.randomUUID()
+                              : Date.now().toString(),
+                            timestamp: new Date().toISOString(),
+                            component: "RagService",
+                            type: "INFO",
+                            message:
+                              "Hybrid RAG query complete [SYSTEM RECONNECT_INITIATED]",
+                            meta: { action: "manual_reconnect_forced" },
+                          } as LogEntry,
+                        ]);
+                      }}
+                      className="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded border border-red-500/50 text-[10px] font-bold uppercase tracking-widest text-red-400 hover:bg-red-500/10 hover:border-red-400 transition-all cursor-pointer"
+                      title="Force online status reset"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Reconnect
+                    </button>
+                  )}
                 </div>
               </div>
 
