@@ -469,6 +469,10 @@ export default function LogsPage() {
       }
     }
 
+    const activeTracesCount = new Set(
+      entries.map((e) => e.traceId).filter(Boolean),
+    ).size;
+
     return {
       latencyData,
       providerSplit,
@@ -478,6 +482,8 @@ export default function LogsPage() {
       ragStatus,
       isRagActive,
       isRagError,
+      totalLogs: entries.length,
+      activeTraces: activeTracesCount,
     };
   }, [entries]);
 
@@ -734,7 +740,7 @@ export default function LogsPage() {
           </div>
           {/* Dashboard Row */}
           {entries.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-1 mt-1 border-t border-border/50">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-1 mt-1 border-t border-border/50">
               {/* Metric 1: System Health */}
               <div className="flex flex-col p-2 bg-card/50 rounded border border-border/50">
                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
@@ -893,6 +899,36 @@ export default function LogsPage() {
                     Awaiting requests
                   </div>
                 )}
+              </div>
+
+              {/* Metric 4: Total Logs */}
+              <div className="flex flex-col p-2 bg-card/50 rounded border border-border/50">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                  Log Volume
+                </span>
+                <div className="flex items-end gap-2 h-full pb-0.5">
+                  <span className="text-2xl font-black tabular-nums leading-none text-slate-300">
+                    {metrics.totalLogs}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground mb-1">
+                    events
+                  </span>
+                </div>
+              </div>
+
+              {/* Metric 5: Active Traces */}
+              <div className="flex flex-col p-2 bg-card/50 rounded border border-border/50">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                  Active Traces
+                </span>
+                <div className="flex items-end gap-2 h-full pb-0.5">
+                  <span className="text-2xl font-black tabular-nums leading-none text-[#a78bfa]">
+                    {metrics.activeTraces}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground mb-1">
+                    unique requests
+                  </span>
+                </div>
               </div>
             </div>
           )}

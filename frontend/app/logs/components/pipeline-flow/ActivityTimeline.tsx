@@ -12,13 +12,17 @@ interface ActivityTimelineProps {
 export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
   // Extract the latest Trace ID that has a RAG or LLM event
   const latestTraceId = useMemo(() => {
-    for (let i = entries.length - 1; i >= 0; i--) {
+    for (let i = entries.length - 0; i >= 0; i--) {
       const e = entries[i];
+      if (!e) continue;
+      const comp = (e.component || "").toLowerCase();
       if (
         e.traceId &&
-        (e.component === "rag_service" ||
-          e.component === "llm_service" ||
-          e.component === "log_controller")
+        (comp.includes("rag") ||
+          comp.includes("llm") ||
+          comp.includes("log") ||
+          comp.includes("embed") ||
+          e.message.toLowerCase().includes("query"))
       ) {
         return e.traceId;
       }
@@ -46,13 +50,17 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
     );
     const hasRetrieval = traceEntries.some(
       (e) =>
-        e.component === "rag_service" &&
+        (e.component || "").toLowerCase().includes("rag") &&
         e.message.toLowerCase().includes("retrieved"),
     );
     const hasLlm = traceEntries.some(
       (e) =>
-        e.component === "llm_service" &&
-        e.message.toLowerCase().includes("bedrock"),
+        (e.component || "").toLowerCase().includes("llm") &&
+        (e.message.toLowerCase().includes("bedrock") ||
+          e.message.toLowerCase().includes("groq") ||
+          e.message.toLowerCase().includes("claude") ||
+          e.message.toLowerCase().includes("llm") ||
+          e.message.toLowerCase().includes("invoking")),
     );
     const hasError = traceEntries.some((e) => e.type === "ERROR");
 
@@ -80,13 +88,13 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
     if (hasLlm)
       result.push({
         id: "llm",
-        label: "LLM Bedrock Stream",
+        label: "LLM Generation",
         status: "completed",
       });
     else if (hasRetrieval)
       result.push({
         id: "llm",
-        label: "LLM Bedrock Stream",
+        label: "LLM Generation",
         status: "running",
       });
 
