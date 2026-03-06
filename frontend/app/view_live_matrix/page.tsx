@@ -9,7 +9,7 @@
  *   2. A dual-axis line chart (Employed vs Vacancies over time)
  *
  * Data source: IMDA Number of Infocomm Jobs (data.gov.sg)
- * Dataset ID:  d_b0a1c0e664bb6749fbcb161eb09e372a
+ * Dataset ID:  d_f3bbdfbf92b811fff364aeed23b5e0bb
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -38,7 +38,11 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import type { InfocommRecord, InfocommJobsMeta } from "@/lib/fetchInfocommJobs";
+import {
+  fetchInfocommJobs,
+  type InfocommRecord,
+  type InfocommJobsMeta,
+} from "@/lib/fetchInfocommJobs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,18 +99,8 @@ export default function ViewLiveMatrixPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/infocomm-jobs");
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(
-          (body as { error?: string }).error ??
-            `HTTP ${res.status}: ${res.statusText}`,
-        );
-      }
-      const data = (await res.json()) as {
-        records: InfocommRecord[];
-        meta: InfocommJobsMeta;
-      };
+      // Direct client-side fetch since S3 static exports don't support Next.js API routes
+      const data = await fetchInfocommJobs();
       setRecords(data.records);
       setMeta(data.meta);
       setLastFetchedAt(new Date().toLocaleTimeString("en-SG"));
@@ -646,7 +640,7 @@ export default function ViewLiveMatrixPage() {
               <span>
                 IMDA · data.gov.sg ·{" "}
                 <span className="text-primary">
-                  d_b0a1c0e664bb6749fbcb161eb09e372a
+                  d_f3bbdfbf92b811fff364aeed23b5e0bb
                 </span>
               </span>
               <span>

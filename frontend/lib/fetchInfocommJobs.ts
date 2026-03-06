@@ -4,7 +4,7 @@
  *
  * Dataset: IMDA Number of Infocomm Jobs
  * Source:  https://data.gov.sg
- * Resource ID: d_b0a1c0e664bb6749fbcb161eb09e372a
+ * Resource ID: d_f3bbdfbf92b811fff364aeed23b5e0bb
  *
  * Usage:
  *   import { fetchInfocommJobs } from "@/lib/fetchInfocommJobs";
@@ -35,7 +35,7 @@ export interface InfocommJobsResult {
 
 /** Base URL for the data.gov.sg datastore API. */
 const DATASET_API_URL =
-  "https://data.gov.sg/api/action/datastore_search?resource_id=d_b0a1c0e664bb6749fbcb161eb09e372a";
+  "https://data.gov.sg/api/action/datastore_search?resource_id=d_f3bbdfbf92b811fff364aeed23b5e0bb";
 
 /** Maximum records to fetch per page (datastore_search max is 100). */
 const PAGE_LIMIT = 100;
