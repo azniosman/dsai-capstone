@@ -341,6 +341,7 @@ export class IntelligenceService {
       const llmResult = await this.llmService.parseResume(text);
       return {
         ...llmResult,
+        resume_text: text,
         raw_text_preview: text.substring(0, 500),
       };
     } catch {
@@ -360,6 +361,7 @@ export class IntelligenceService {
         phone: phoneMatch ? phoneMatch[0] : '',
         skills,
         experience_years: text.includes('years') ? 5 : 0,
+        resume_text: text,
         raw_text_preview: text.substring(0, 500),
       };
     }

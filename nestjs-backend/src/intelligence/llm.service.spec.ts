@@ -152,7 +152,10 @@ describe('LlmService', () => {
       providers: [
         LlmService,
         { provide: ConfigService, useValue: buildConfig() },
-        { provide: LogBusService, useValue: { emit: jest.fn(), getRecent: jest.fn() } },
+        {
+          provide: LogBusService,
+          useValue: { emit: jest.fn(), getRecent: jest.fn() },
+        },
       ],
     }).compile();
 

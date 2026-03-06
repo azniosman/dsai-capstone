@@ -24,7 +24,10 @@ async function bootstrap() {
     await pgEm.getConnection().execute('CREATE EXTENSION IF NOT EXISTS vector');
     logger.log('pgvector extension ready');
   } catch (err) {
-    logger.warn('pgvector extension setup failed (may already exist or lack privileges)', (err as Error).message);
+    logger.warn(
+      'pgvector extension setup failed (may already exist or lack privileges)',
+      (err as Error).message,
+    );
   }
 
   try {

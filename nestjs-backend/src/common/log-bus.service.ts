@@ -14,7 +14,12 @@
  * this version — the env flag is reserved for future use).
  */
 
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import { Subject } from 'rxjs';
 import { ClsService } from 'nestjs-cls';
 import { EntityManager } from '@mikro-orm/postgresql';
@@ -24,7 +29,14 @@ import { SystemLog } from './system-log.entity';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /** Category of the log entry. */
-export type LogEntryType = 'RAG' | 'LLM' | 'AWS' | 'SYSTEM' | 'ERROR' | 'INFO' | 'WARN';
+export type LogEntryType =
+  | 'RAG'
+  | 'LLM'
+  | 'AWS'
+  | 'SYSTEM'
+  | 'ERROR'
+  | 'INFO'
+  | 'WARN';
 
 /** A single structured log entry emitted by any backend service. */
 export interface LogEntry {
@@ -76,13 +88,15 @@ export class LogBusService implements OnModuleInit, OnModuleDestroy {
 
   private async flush() {
     if (this.dbQueue.length === 0) return;
-    
+
     // Atomically drain queue
     const batch = this.dbQueue.splice(0, this.dbQueue.length);
     try {
       await this.em.fork().insertMany(SystemLog, batch);
     } catch (err) {
-      this.logger.error(`Failed to flush ${batch.length} logs to PostgreSQL: ${(err as Error).message}`);
+      this.logger.error(
+        `Failed to flush ${batch.length} logs to PostgreSQL: ${(err as Error).message}`,
+      );
     }
   }
 
@@ -100,7 +114,7 @@ export class LogBusService implements OnModuleInit, OnModuleDestroy {
    */
   emit(entry: Omit<LogEntry, 'timestamp'> & { timestamp?: string }): void {
     const traceId = entry.traceId ?? this.cls.getId();
-    
+
     const full: LogEntry = {
       timestamp: entry.timestamp ?? new Date().toISOString(),
       type: entry.type,
@@ -139,14 +153,12 @@ export class LogBusService implements OnModuleInit, OnModuleDestroy {
    */
   async getRecent(n = 200): Promise<LogEntry[]> {
     const count = Math.min(n, LOG_BUS_MAX_ENTRIES);
-    
+
     // Always query DB to ensure we survive lambda cold starts
-    const logs = await this.em.fork().find(
-      SystemLog,
-      {},
-      { orderBy: { timestamp: 'DESC' }, limit: count }
-    );
-    
+    const logs = await this.em
+      .fork()
+      .find(SystemLog, {}, { orderBy: { timestamp: 'DESC' }, limit: count });
+
     return logs.reverse().map((l) => ({
       _id: l.id,
       timestamp: l.timestamp.toISOString(),

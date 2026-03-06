@@ -35,11 +35,13 @@ export class ProfileService {
       yearsExperience: payload.years_experience ?? payload.yearsExperience ?? 0,
       isCareerSwitcher:
         payload.is_career_switcher ?? payload.isCareerSwitcher ?? false,
+      resumeText: payload.resume_text ?? payload.resumeText ?? undefined,
     };
 
     // Remove the snake_case keys after mapping
     delete (normalizedPayload as any).years_experience;
     delete (normalizedPayload as any).is_career_switcher;
+    delete (normalizedPayload as any).resume_text;
 
     // If authenticated user already has a profile, update it instead of creating a duplicate
     if (userId) {

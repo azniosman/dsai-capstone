@@ -74,7 +74,10 @@ describe('RagService', () => {
         { provide: CrossEncoderService, useValue: crossEncoderService },
         { provide: getRepositoryToken(DocumentChunk), useValue: mockRepo },
         { provide: EntityManager, useValue: mockEm },
-        { provide: LogBusService, useValue: { emit: jest.fn(), getRecent: jest.fn() } },
+        {
+          provide: LogBusService,
+          useValue: { emit: jest.fn(), getRecent: jest.fn() },
+        },
       ],
     }).compile();
 

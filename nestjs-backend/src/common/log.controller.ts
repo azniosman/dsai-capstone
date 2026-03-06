@@ -15,7 +15,13 @@
  *   production, the polling fallback (`/recent`) is the reliable path.
  */
 
-import { Controller, Get, Query, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  ParseIntPipe,
+  DefaultValuePipe,
+} from '@nestjs/common';
 import { LogBusService, LogEntry } from '@app/common/log-bus.service';
 
 @Controller('logs')
@@ -36,5 +42,4 @@ export class LogController {
   ): Promise<LogEntry[]> {
     return this.logBus.getRecent(Math.min(n, 500));
   }
-
 }

@@ -21,4 +21,3 @@ import { SystemLog } from './system-log.entity';
   exports: [ConfigModule, LogBusService],
 })
 export class CommonModule {}
-

@@ -89,9 +89,7 @@ export class GroqProvider implements LlmProvider {
     }[] = [
       { role: 'system', content: systemPrompt },
       ...messages.map((m) => ({
-        role: (m.role === 'assistant' ? 'assistant' : 'user') as
-          | 'user'
-          | 'assistant',
+        role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
         content: m.content,
       })),
     ];

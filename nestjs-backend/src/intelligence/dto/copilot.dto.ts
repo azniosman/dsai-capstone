@@ -3,7 +3,13 @@
  * @description Data Transfer Objects and shared types for the AI Career Copilot.
  */
 
-import { IsArray, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 // ─── Core Intelligence Types ──────────────────────────────────────────────────
 

@@ -32,6 +32,10 @@ export default function StepReview() {
         years_experience: (store.parsedResume?.experience_years as number) || 0,
         is_career_switcher: false,
         skills: store.skills,
+        resume_text:
+          (store.parsedResume?.resume_text as string) ||
+          (store.parsedResume?.resumeText as string) ||
+          undefined,
       };
 
       const token = localStorage.getItem("token");

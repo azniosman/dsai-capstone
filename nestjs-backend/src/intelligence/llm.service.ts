@@ -187,7 +187,12 @@ export class LlmService {
             type: 'WARN',
             component: 'LlmService',
             message: `[${label}] ${provider.name} failed (${latencyMs}ms) — falling back to ${nextProvider.name}`,
-            meta: { label, provider: provider.name, fallback: nextProvider.name, latencyMs },
+            meta: {
+              label,
+              provider: provider.name,
+              fallback: nextProvider.name,
+              latencyMs,
+            },
           });
         } else {
           this.logger.error(
@@ -549,4 +554,3 @@ export class LlmService {
     return JSON.parse(jsonMatch[1].trim());
   }
 }
-

@@ -17,10 +17,7 @@ import { EntityRepository } from '@mikro-orm/postgresql';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { LlmService } from './llm.service';
 import { RagService } from '../rag/rag.service';
-import type {
-  CareerIntelligence,
-  CareerPlan,
-} from './dto/copilot.dto';
+import type { CareerIntelligence, CareerPlan } from './dto/copilot.dto';
 
 /**
  * Builds the provider label displayed in the UI.
@@ -64,7 +61,11 @@ export class CopilotService {
     profileId: number,
     tenantId: number,
     force = false,
-  ): Promise<{ intelligence: CareerIntelligence; fresh: boolean; engine: string }> {
+  ): Promise<{
+    intelligence: CareerIntelligence;
+    fresh: boolean;
+    engine: string;
+  }> {
     const profile = await this.profileRepository.findOne({
       id: profileId,
       tenant: tenantId,
@@ -90,7 +91,8 @@ export class CopilotService {
 
     this.logger.log(`Extracting career intelligence for profile ${profileId}`);
 
-    const intelligence = await this.llmService.extractCareerIntelligence(resumeText);
+    const intelligence =
+      await this.llmService.extractCareerIntelligence(resumeText);
 
     // Persist the extracted intelligence back to the profile
     profile.careerIntelligence = intelligence as CareerIntelligence;
@@ -204,7 +206,11 @@ export class CopilotService {
   async analyzeCareer(
     profileId: number,
     tenantId: number,
-  ): Promise<{ analysis: string; intelligence: CareerIntelligence | null; engine: string }> {
+  ): Promise<{
+    analysis: string;
+    intelligence: CareerIntelligence | null;
+    engine: string;
+  }> {
     const profile = await this.profileRepository.findOne({
       id: profileId,
       tenant: tenantId,
@@ -336,7 +342,10 @@ export class CopilotService {
     const resolvedRole =
       targetRole ?? profile.careerIntelligence?.career_paths?.[0];
 
-    const tips = await this.llmService.generateResumeTips(resumeText, resolvedRole);
+    const tips = await this.llmService.generateResumeTips(
+      resumeText,
+      resolvedRole,
+    );
 
     return {
       tips,

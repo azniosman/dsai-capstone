@@ -23,7 +23,11 @@ import mikroOrmConfig from './mikro-orm.config';
   imports: [
     ClsModule.forRoot({
       global: true,
-      middleware: { mount: true, generateId: true, idGenerator: () => randomUUID() },
+      middleware: {
+        mount: true,
+        generateId: true,
+        idGenerator: () => randomUUID(),
+      },
     }),
     CommonModule,
     MikroOrmModule.forRoot(mikroOrmConfig),

@@ -120,7 +120,11 @@ export class RagService {
       type: 'RAG',
       component: 'RagService',
       message: `Ingestion started: ${chunks.length} chunks from source=${sourceType}`,
-      meta: { profileId: profileId ?? 'anon', sourceType, chunkCount: chunks.length },
+      meta: {
+        profileId: profileId ?? 'anon',
+        sourceType,
+        chunkCount: chunks.length,
+      },
     });
 
     const hashes = chunks.map((c) => RagService.sha256(c));
@@ -594,10 +598,7 @@ export class RagService {
     } catch (err) {
       // Non-fatal — table may not exist yet on a fresh DB (updateSchema runs
       // on cold start; feedback degrades gracefully until next restart).
-      this.logger.warn(
-        'recordFeedback skipped',
-        (err as Error).message,
-      );
+      this.logger.warn('recordFeedback skipped', (err as Error).message);
     }
   }
 
