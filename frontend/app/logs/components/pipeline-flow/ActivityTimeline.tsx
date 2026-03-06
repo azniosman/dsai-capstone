@@ -2,7 +2,13 @@
 
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Loader2, PlayCircle, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  PlayCircle,
+  XCircle,
+  Circle,
+} from "lucide-react";
 import type { LogEntry } from "../../page";
 
 interface ActivityTimelineProps {
@@ -39,6 +45,55 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
   const steps = useMemo(() => {
     if (traceEntries.length === 0) return [];
 
+    const pipelineLogs = traceEntries.filter(
+      (e) => e.component === "rag_pipeline",
+    );
+
+    // New precise 7-step pipeline trace parsing
+    if (pipelineLogs.length > 0) {
+      const result = [];
+      const orderedSteps = [
+        "User Query",
+        "Embedding",
+        "Vector DB Search",
+        "Document Retrieval",
+        "Context Builder",
+        "LLM Engine",
+        "Response",
+      ];
+
+      for (const stepName of orderedSteps) {
+        const stepLogs = pipelineLogs.filter((e) => e.meta?.step === stepName);
+        if (stepLogs.length === 0) {
+          result.push({
+            id: stepName.toLowerCase(),
+            label: stepName,
+            status: "pending",
+            meta: {} as any,
+          });
+          continue;
+        }
+
+        const latestMeta = stepLogs[stepLogs.length - 1].meta || {};
+        const latestStatus = latestMeta.status;
+
+        let status = "pending";
+        if (latestStatus === "RUNNING") status = "running";
+        if (latestStatus === "COMPLETED") status = "completed";
+        if (latestStatus === "FAILED") status = "failed";
+        if (latestStatus === "SKIPPED") status = "skipped";
+
+        result.push({
+          id: stepName.toLowerCase(),
+          label: stepName,
+          status,
+          meta: latestMeta,
+        });
+      }
+      return result;
+    }
+
+    // Fallback parsing for legacy un-tracked traces
     const result = [];
     const hasQuery = traceEntries.some((e) =>
       e.message.toLowerCase().includes("query"),
@@ -65,37 +120,56 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
     const hasError = traceEntries.some((e) => e.type === "ERROR");
 
     // Always include a "Request Received" step if we have a trace
-    result.push({ id: "req", label: "Request Received", status: "completed" });
+    result.push({
+      id: "req",
+      label: "Request Received",
+      status: "completed",
+      meta: {} as any,
+    });
 
     if (hasEmbed)
       result.push({
         id: "emb",
         label: "Generating Embeddings",
         status: "completed",
+        meta: {} as any,
       });
     else if (hasQuery)
       result.push({
         id: "emb",
         label: "Generating Embeddings",
         status: "running",
+        meta: {} as any,
       });
 
     if (hasRetrieval)
-      result.push({ id: "ret", label: "Vector Search", status: "completed" });
+      result.push({
+        id: "ret",
+        label: "Vector Search",
+        status: "completed",
+        meta: {} as any,
+      });
     else if (hasEmbed)
-      result.push({ id: "ret", label: "Vector Search", status: "running" });
+      result.push({
+        id: "ret",
+        label: "Vector Search",
+        status: "running",
+        meta: {} as any,
+      });
 
     if (hasLlm)
       result.push({
         id: "llm",
         label: "LLM Generation",
         status: "completed",
+        meta: {} as any,
       });
     else if (hasRetrieval)
       result.push({
         id: "llm",
         label: "LLM Generation",
         status: "running",
+        meta: {} as any,
       });
 
     if (hasError) {
@@ -143,7 +217,9 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
                     ? "bg-emerald-500/20 text-emerald-500"
                     : step.status === "running"
                       ? "bg-blue-500/20 text-blue-400"
-                      : "bg-red-500/20 text-red-500"
+                      : step.status === "failed"
+                        ? "bg-red-500/20 text-red-500"
+                        : "bg-slate-500/20 text-slate-500"
                 }`}
               >
                 {step.status === "completed" && (
@@ -153,6 +229,9 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
                   <Loader2 className="w-4 h-4 animate-spin" />
                 )}
                 {step.status === "failed" && <XCircle className="w-4 h-4" />}
+                {(step.status === "pending" || step.status === "skipped") && (
+                  <Circle className="w-4 h-4" />
+                )}
               </div>
               <div className="flex-1">
                 <p
@@ -166,8 +245,23 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
                 >
                   {step.label}
                 </p>
-                <p className="text-xs text-slate-500 capitalize">
-                  {step.status}
+                <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                  <span className="capitalize">{step.status}</span>
+                  {step.meta?.durationMs !== undefined && (
+                    <span className="text-[10px] bg-slate-800/50 px-1.5 rounded text-slate-400">
+                      {step.meta.durationMs}ms
+                    </span>
+                  )}
+                  {step.meta?.attempts > 1 && (
+                    <span className="text-[10px] bg-[#fb923c]/20 border border-[#fb923c]/30 px-1.5 rounded text-[#fb923c]">
+                      {step.meta.attempts} retries
+                    </span>
+                  )}
+                  {step.status === "skipped" && (
+                    <span className="text-[10px] bg-red-500/10 border border-red-500/30 px-1.5 rounded text-red-400">
+                      halted via upstream dependency
+                    </span>
+                  )}
                 </p>
               </div>
             </motion.div>

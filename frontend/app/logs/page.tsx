@@ -236,7 +236,7 @@ export default function LogsPage() {
     if (!isDemoMode) return;
 
     let step = 0;
-    const currentTraceId = `demo-${Math.random().toString(36).substring(2, 9)}`;
+    const currentTraceId = `sklbr-${Math.random().toString(36).substring(2, 9)}`;
     const steps = [
       { t: "INFO", c: "chat_controller", m: "Received user query" },
       { t: "INFO", c: "embedding_service", m: "Generating query embeddings" },

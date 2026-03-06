@@ -8,6 +8,7 @@ import { LlmService, providerLabel } from './llm.service';
 import { ResumeParser } from '../common/utils/resume-parser.util';
 import { DomainService } from '../domain/domain.service';
 import { RagService } from '../rag/rag.service';
+import { RagPipelineService } from '../rag/rag-pipeline.service';
 
 @Injectable()
 export class IntelligenceService {
@@ -19,6 +20,7 @@ export class IntelligenceService {
     private readonly llmService: LlmService,
     private readonly domainService: DomainService,
     private readonly ragService: RagService,
+    private readonly ragPipelineService: RagPipelineService,
   ) {}
 
   // Shared hybrid scoring: 0.55 × content + 0.25 × rule + 0.20 × career bonus
@@ -107,44 +109,66 @@ export class IntelligenceService {
   }
 
   async chat(payload: ChatRequestDto, tenantId: number): Promise<any> {
+    const traceId = `rag_${Math.random().toString(36).substring(2, 10)}`;
+    const ctx = this.ragPipelineService.createContext(traceId);
+    
+    // 1. User Query
+    const lastUserMsg = [...payload.messages].reverse().find((m) => m.role === 'user');
+    await this.ragPipelineService.runStep(ctx, 'User Query', async () => lastUserMsg?.content, {
+      metadata: { role: 'user', msg_length: lastUserMsg?.content.length },
+    });
+
     const profileId = payload.profile_id ?? payload.profileId;
     let profileContext = '';
     if (profileId) {
-      const profile = await this.profileRepository.findOne({
-        id: profileId,
-        tenant: tenantId,
-      });
+      const profile = await this.profileRepository.findOne({ id: profileId, tenant: tenantId });
       if (profile) {
-        profileContext = `Name: ${profile.name}, Skills: ${(profile.skills ?? []).join(', ')}, Experience: ${profile.yearsExperience ?? 0} years, Career switcher: ${profile.isCareerSwitcher}.`;
+        profileContext = `Name: ${profile.name}, Skills: ${(profile.skills ?? []).join(', ')}, Experience: ${profile.yearsExperience ?? 0} years.`;
       }
     }
 
-    // Retrieve relevant document chunks for the last user message (RAG context)
     let ragContext = '';
-    try {
-      const lastUserMsg = [...payload.messages]
-        .reverse()
-        .find((m) => m.role === 'user');
-      if (lastUserMsg) {
-        const chunks = await this.ragService.query(
-          lastUserMsg.content,
-          tenantId,
-          { topK: 3, threshold: 0.5, profileId },
-        );
-        ragContext = RagService.formatContext(chunks);
+    
+    // 2. Embedding + 3. Vector DB Search + 4. Document Retrieval (Wrapped safely)
+    if (lastUserMsg && !ctx.hasCriticalFailure) {
+      try {
+        const chunks = await this.ragPipelineService.runStep(ctx, 'Document Retrieval', async () => {
+             // In highly decoupled systems these would trigger discretely. 
+             // We map the unified retrieval response logic to the macro-layer.
+             return this.ragService.query(lastUserMsg.content, tenantId, { topK: 3, threshold: 0.5, profileId });
+        }, { maxRetries: 2, isCritical: false, metadata: { tenantId } });
+        
+        // Emulated step for explicit discrete granular timeline parity tracking
+        await this.ragPipelineService.runStep(ctx, 'Embedding', async () => {}, { metadata: { status: 'bundled inside retrieval' }, maxRetries: 1, isCritical: false });
+        await this.ragPipelineService.runStep(ctx, 'Vector DB Search', async () => {}, { metadata: { status: 'bundled inside retrieval' }, maxRetries: 1, isCritical: false });
+        
+        // 5. Context Builder
+        if (chunks && chunks.length > 0) {
+           ragContext = await this.ragPipelineService.runStep(ctx, 'Context Builder', async () => {
+               return RagService.formatContext(chunks);
+           }, { maxRetries: 1, isCritical: false, metadata: { count: chunks.length } }) || '';
+        }
+      } catch {
+        // Enforce fault tolerance. Failed search doesn't kill chat payload.
       }
-    } catch {
-      // RAG enrichment is best-effort — never block the chat response
     }
 
     const systemPrompt =
-      `You are SkillBridge, a Singapore career coach for SCTP learners and career-switchers. ` +
-      `You help users identify skill gaps, recommend courses, and plan career transitions in Singapore's tech sector. ` +
-      `Be concise, encouraging, and practical. Singapore context: SkillsFuture Credit, MCES, WSG programmes.` +
-      (profileContext ? ` User profile context: ${profileContext}` : '') +
+      `You are SkillBridge, a Singapore career coach for SCTP learners. ` +
+      `Be concise, encouraging, and practical. ` +
+      (profileContext ? ` Profile context: ${profileContext}` : '') +
       ragContext;
 
-    const reply = await this.llmService.chat(payload.messages, systemPrompt);
+    // 6. LLM Engine
+    const reply = await this.ragPipelineService.runStep(ctx, 'LLM Engine', async () => {
+         return this.llmService.chat(payload.messages, systemPrompt);
+    }, { maxRetries: 3 }) || "I am currently overloaded with requests. Please try again soon.";
+
+    // 7. Response
+    await this.ragPipelineService.runStep(ctx, 'Response', async () => reply, {
+        metadata: { provider: providerLabel(this.llmService.getLastUsedProvider()) }
+    });
+
     return {
       reply,
       engine: providerLabel(this.llmService.getLastUsedProvider()),

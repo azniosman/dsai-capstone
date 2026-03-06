@@ -313,7 +313,7 @@ export default function SkillGapPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden h-[calc(100vh-theme(spacing.16))] -m-12 bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+    <div className="flex flex-1 flex-col overflow-hidden h-[calc(100vh-var(--spacing-16))] -m-12 bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
       <header className="h-16 border-b border-slate-custom-200 dark:border-slate-custom-800 bg-white dark:bg-slate-custom-900 px-6 flex items-center justify-between z-10 shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
@@ -326,24 +326,24 @@ export default function SkillGapPage() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex gap-2 mr-4">
+          <div className="flex bg-background-dark/50 border border-primary/30 p-0.5 relative z-10 mr-4">
             {gaps.map((g, i) => (
               <button
                 key={i}
                 onClick={() => setSelectedRole(i)}
                 className={cn(
-                  "text-[10px] font-bold px-3 py-1.5 rounded uppercase tracking-wider transition-colors",
+                  "px-4 py-1.5 text-[10px] font-mono font-bold uppercase tracking-widest transition-colors",
                   selectedRole === i
-                    ? "bg-primary text-white"
-                    : "bg-slate-custom-100 text-slate-custom-600 hover:bg-slate-custom-200 dark:bg-slate-custom-800 dark:text-slate-custom-300 dark:hover:bg-slate-custom-700",
+                    ? "bg-primary/20 text-primary border border-primary/50 shadow-[0_0_10px_rgba(37,157,244,0.2)]"
+                    : "text-slate-500 hover:text-primary border border-transparent",
                 )}
               >
                 {g.role_title}
               </button>
             ))}
           </div>
-          <button className="bg-primary text-white text-xs font-bold px-4 py-2 rounded flex items-center gap-2">
-            <Download className="text-sm w-4 h-4" /> Export Dataset
+          <button className="clay-btn">
+            <Download className="w-3.5 h-3.5" /> Export Dataset
           </button>
         </div>
       </header>

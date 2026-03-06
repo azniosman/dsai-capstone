@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Activity } from "lucide-react";
 import {
   ReactFlow,
   Background,
@@ -8,6 +9,7 @@ import {
   Edge,
   Node,
   MarkerType,
+  Position,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import CustomNode from "./CustomNode";
@@ -71,6 +73,8 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
           label: "User Query",
           isActive: activeStages.has("query"),
           icon: "👤",
+          targetPosition: Position.Left,
+          sourcePosition: Position.Right,
         },
       },
       {
@@ -81,6 +85,8 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
           label: "Embedding",
           isActive: activeStages.has("embed"),
           icon: "🧠",
+          targetPosition: Position.Left,
+          sourcePosition: Position.Right,
         },
       },
       {
@@ -88,9 +94,11 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
         type: "custom",
         position: { x: 450, y: 100 },
         data: {
-          label: "Vector DB",
+          label: "Vector DB Search",
           isActive: activeStages.has("vector"),
           icon: "🗄️",
+          targetPosition: Position.Left,
+          sourcePosition: Position.Right,
         },
       },
       {
@@ -98,9 +106,11 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
         type: "custom",
         position: { x: 650, y: 100 },
         data: {
-          label: "Doc Retrieval",
+          label: "Document Retrieval",
           isActive: activeStages.has("retrieve"),
           icon: "📄",
+          targetPosition: Position.Left,
+          sourcePosition: Position.Bottom,
         },
       },
       {
@@ -111,6 +121,8 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
           label: "Context Builder",
           isActive: activeStages.has("context"),
           icon: "🏗️",
+          targetPosition: Position.Top,
+          sourcePosition: Position.Left,
         },
       },
       {
@@ -121,6 +133,8 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
           label: "LLM Engine",
           isActive: activeStages.has("llm"),
           icon: "🤖",
+          targetPosition: Position.Right,
+          sourcePosition: Position.Left,
         },
       },
       {
@@ -131,6 +145,8 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
           label: "Response",
           isActive: activeStages.has("response"),
           icon: "✨",
+          targetPosition: Position.Right,
+          sourcePosition: Position.Left,
         },
       },
     ],
@@ -148,8 +164,8 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
     const activeEdge = {
       type: "smoothstep",
       animated: true,
-      style: { stroke: "#60a5fa", strokeWidth: 3 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#60a5fa" },
+      style: { stroke: "#fb923c", strokeWidth: 3 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: "#fb923c" },
     };
 
     return [
@@ -193,31 +209,38 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
   }, [activeStages]);
 
   return (
-    <div className="w-full h-[400px] bg-slate-950/50 backdrop-blur-xl border border-white/5 rounded-2xl overflow-hidden relative shadow-2xl">
-      <div className="absolute top-4 left-4 z-10">
-        <h3 className="text-xl font-bold tracking-tight text-white/90">
-          Execution Flow
+    <div className="w-full flex-1 min-h-[400px] flex flex-col bg-slate-950/50 backdrop-blur-xl border border-white/5 rounded-2xl overflow-hidden relative shadow-2xl">
+      <div className="px-4 py-3 border-b border-border/50 bg-slate-900/50 flex items-center justify-between shrink-0 drop-shadow-md z-10">
+        <h3 className="text-sm font-bold tracking-tight text-white/90 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-primary" /> Execution Flow Live AI
+          Pipeline Routing
         </h3>
-        <p className="text-xs text-slate-400">Live AI Pipeline Routing</p>
       </div>
 
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        proOptions={{ hideAttribution: true }}
-        className="bg-transparent"
-        minZoom={0.5}
-        maxZoom={1.5}
-      >
-        <Background color="#334155" size={2} gap={20} />
-        <Controls
-          className="bg-slate-900 border-slate-700 fill-slate-300"
-          showInteractive={false}
-        />
-      </ReactFlow>
+      <div className="flex-1 relative">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          proOptions={{ hideAttribution: true }}
+          className="bg-transparent"
+          minZoom={0.5}
+          maxZoom={1.5}
+        >
+          <Background
+            color="#334155"
+            size={2}
+            gap={20}
+            className="opacity-50"
+          />
+          <Controls
+            className="bg-background-dark! border-border! fill-orange-400! [&>button]:bg-background-dark! [&>button]:border-border! [&>button]:border-b! [&>button:hover]:bg-orange-500/10! shadow-xl"
+            showInteractive={false}
+          />
+        </ReactFlow>
+      </div>
     </div>
   );
 }
