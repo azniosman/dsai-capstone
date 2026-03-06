@@ -245,11 +245,80 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
                 >
                   {step.label}
                 </p>
-                <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                <p className="text-[11px] text-slate-400/80 mt-0.5 leading-snug">
+                  {(() => {
+                    const s = step.status;
+                    const id = step.id;
+                    const meta = step.meta || {};
+                    if (s === "pending") return "Awaiting execution...";
+                    if (s === "failed")
+                      return `Execution failed: ${meta.error || "Unknown error"}`;
+                    if (s === "skipped")
+                      return "Halted due to upstream dependency bypass";
+
+                    switch (id) {
+                      case "user query":
+                        return s === "running"
+                          ? "Parsing and validating query payload"
+                          : "Query sanitized and execution context established";
+                      case "embedding":
+                        return s === "running"
+                          ? `Generating vector mapping via ${meta.model || "BGE-Small ONNX"}`
+                          : `Vector representation generated (${meta.dimensions || 384}-d)`;
+                      case "vector db search":
+                        return s === "running"
+                          ? "Executing hybrid search (HNSW ANN + BM25 GIN) with Reciprocal Rank Fusion"
+                          : `Search complete, mapped top ${meta.top_k || meta.limit || "K"} candidates`;
+                      case "document retrieval":
+                        return s === "running"
+                          ? "Hydrating vector rows into full chunk data"
+                          : `Retrieved ${meta.docs_found || meta.documentsFound || meta.retrieved || "relevant"} contextual documents`;
+                      case "context builder":
+                        return s === "running"
+                          ? "Assembling dynamic prompt template"
+                          : `Context successfully prepared (${meta.tokens || meta.contextTokens || meta.token_count || "synthesized"} tokens)`;
+                      case "llm engine":
+                        return s === "running"
+                          ? `Streaming response inference via ${meta.provider || "configured AI Model"}`
+                          : `Generation completed safely`;
+                      case "response":
+                        return s === "running"
+                          ? "Streaming SSE packets to client"
+                          : "Transmission finalized";
+                      default:
+                        return s === "running"
+                          ? "Processing..."
+                          : "Completed successfully";
+                    }
+                  })()}
+                </p>
+                <p className="text-xs text-slate-500 flex items-center gap-2 mt-1">
                   <span className="capitalize">{step.status}</span>
                   {step.meta?.durationMs !== undefined && (
-                    <span className="text-[10px] bg-slate-800/50 px-1.5 rounded text-slate-400">
+                    <span className="text-[10px] bg-slate-800/50 border border-slate-700/50 px-1.5 rounded text-slate-400">
                       {step.meta.durationMs}ms
+                    </span>
+                  )}
+                  {step.meta?.model && (
+                    <span className="text-[10px] bg-purple-500/10 border border-purple-500/30 px-1.5 rounded text-purple-400">
+                      {step.meta.model}
+                    </span>
+                  )}
+                  {step.meta?.provider && (
+                    <span className="text-[10px] bg-blue-500/10 border border-blue-500/30 px-1.5 rounded text-blue-400">
+                      {step.meta.provider}
+                    </span>
+                  )}
+                  {(step.meta?.tokens || step.meta?.contextTokens) && (
+                    <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 px-1.5 rounded text-emerald-400">
+                      {step.meta.tokens || step.meta.contextTokens} tokens
+                    </span>
+                  )}
+                  {(step.meta?.docs_found !== undefined ||
+                    step.meta?.documentsFound !== undefined) && (
+                    <span className="text-[10px] bg-cyan-500/10 border border-cyan-500/30 px-1.5 rounded text-cyan-400">
+                      Top {step.meta.docs_found ?? step.meta.documentsFound}{" "}
+                      docs
                     </span>
                   )}
                   {step.meta?.attempts > 1 && (
