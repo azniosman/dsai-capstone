@@ -298,16 +298,17 @@
   }
 
   .clay-btn {
-    @apply bg-primary text-primary-foreground backdrop-blur-md hover:-translate-y-0.5 transition-all duration-200 border border-primary/20 rounded-lg font-semibold;
-    box-shadow:
-      0 4px 14px rgba(99, 102, 241, 0.3),
-      0 1px 3px rgba(99, 102, 241, 0.2);
+    @apply px-4 py-2 text-[10px] font-mono font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/50 transition-all duration-200 rounded-none cursor-pointer;
+    box-shadow: 0 0 10px rgba(37, 157, 244, 0.2);
   }
 
   .clay-btn:hover {
-    box-shadow:
-      0 6px 20px rgba(99, 102, 241, 0.4),
-      0 2px 6px rgba(99, 102, 241, 0.25);
+    @apply bg-primary/20;
+    box-shadow: 0 0 15px rgba(37, 157, 244, 0.4);
+  }
+
+  .clay-btn:disabled {
+    @apply opacity-50 cursor-not-allowed border-muted-foreground/30 text-muted-foreground shadow-none bg-transparent hover:bg-transparent hover:shadow-none;
   }
 
   .glass-panel {
