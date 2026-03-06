@@ -1,4 +1,5 @@
 import { Options, PostgreSqlDriver } from '@mikro-orm/postgresql';
+import { Migrator } from '@mikro-orm/migrations';
 import { Logger } from '@nestjs/common';
 import * as dotenv from 'dotenv';
 
@@ -22,6 +23,7 @@ const config: Options = {
     path: './dist/migrations',
     pathTs: './src/migrations',
   },
+  extensions: [Migrator],
   seeder: {
     path: './dist/seeders',
     pathTs: './src/seeders',

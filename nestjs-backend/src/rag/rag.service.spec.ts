@@ -9,6 +9,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@mikro-orm/nestjs';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { RagService } from './rag.service';
+import { LogBusService } from '@app/common/log-bus.service';
 import { EmbeddingService, EMBEDDING_DIM } from './embedding.service';
 import { CrossEncoderService } from './cross-encoder.service';
 import { DocumentChunk } from '@app/entities/document-chunk.entity';
@@ -73,6 +74,7 @@ describe('RagService', () => {
         { provide: CrossEncoderService, useValue: crossEncoderService },
         { provide: getRepositoryToken(DocumentChunk), useValue: mockRepo },
         { provide: EntityManager, useValue: mockEm },
+        { provide: LogBusService, useValue: { emit: jest.fn(), getRecent: jest.fn() } },
       ],
     }).compile();
 

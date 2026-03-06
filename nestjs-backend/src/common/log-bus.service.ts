@@ -14,9 +14,11 @@
  * this version — the env flag is reserved for future use).
  */
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { Subject } from 'rxjs';
 import { ClsService } from 'nestjs-cls';
+import { EntityManager } from '@mikro-orm/postgresql';
+import { SystemLog } from './system-log.entity';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,11 +49,41 @@ const LOG_BUS_MAX_ENTRIES = 500;
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 @Injectable()
-export class LogBusService {
+export class LogBusService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(LogBusService.name);
+
   /** Internal ring buffer — oldest entries are evicted when full. */
   private readonly buffer: LogEntry[] = [];
 
-  constructor(private readonly cls: ClsService) {}
+  /** Queue of logs waiting to be flushed to PostgreSQL. */
+  private readonly dbQueue: Omit<SystemLog, 'id'>[] = [];
+  private flushTimer: NodeJS.Timeout | null = null;
+
+  constructor(
+    private readonly cls: ClsService,
+    private readonly em: EntityManager,
+  ) {}
+
+  onModuleInit() {
+    this.flushTimer = setInterval(() => this.flush(), 5000);
+  }
+
+  async onModuleDestroy() {
+    if (this.flushTimer) clearInterval(this.flushTimer);
+    await this.flush();
+  }
+
+  private async flush() {
+    if (this.dbQueue.length === 0) return;
+    
+    // Atomically drain queue
+    const batch = this.dbQueue.splice(0, this.dbQueue.length);
+    try {
+      await this.em.fork().insertMany(SystemLog, batch);
+    } catch (err) {
+      this.logger.error(`Failed to flush ${batch.length} logs to PostgreSQL: ${(err as Error).message}`);
+    }
+  }
 
   /**
    * RxJS Subject used to push new entries to Server-Sent Event subscribers.
@@ -83,6 +115,16 @@ export class LogBusService {
     }
     this.buffer.push(full);
 
+    // Queue for PostgreSQL background flush
+    this.dbQueue.push({
+      timestamp: new Date(full.timestamp),
+      type: full.type,
+      component: full.component,
+      message: full.message,
+      traceId: full.traceId,
+      meta: full.meta,
+    });
+
     // Push to SSE stream (non-blocking — subscribers receive asynchronously).
     this.stream$.next(full);
   }
@@ -93,9 +135,25 @@ export class LogBusService {
    *
    * @param n - Number of entries to return (capped at {@link LOG_BUS_MAX_ENTRIES}).
    */
-  getRecent(n = 200): LogEntry[] {
+  async getRecent(n = 200): Promise<LogEntry[]> {
     const count = Math.min(n, LOG_BUS_MAX_ENTRIES);
-    return this.buffer.slice(-count);
+    
+    // Always query DB to ensure we survive lambda cold starts
+    const logs = await this.em.fork().find(
+      SystemLog,
+      {},
+      { orderBy: { timestamp: 'DESC' }, limit: count }
+    );
+    
+    return logs.reverse().map((l) => ({
+      _id: l.id,
+      timestamp: l.timestamp.toISOString(),
+      type: l.type,
+      component: l.component,
+      message: l.message,
+      traceId: l.traceId,
+      meta: l.meta,
+    }));
   }
 
   /**

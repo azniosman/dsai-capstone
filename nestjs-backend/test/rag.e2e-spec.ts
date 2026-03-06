@@ -11,7 +11,7 @@
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
+import request = require('supertest');
 
 // Skip the entire suite if no E2E database is configured
 const E2E_DATABASE_URL = process.env.E2E_DATABASE_URL;
@@ -71,7 +71,7 @@ describeE2E('RAG pipeline (e2e)', () => {
           query_text: 'data analyst',
           is_positive: true,
         })
-        .expect((res) => {
+        .expect((res: any) => {
           // 200 OK or 404 if chunk doesn't exist — both are acceptable in E2E
           expect([200, 404]).toContain(res.status);
         });

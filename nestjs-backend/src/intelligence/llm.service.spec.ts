@@ -8,6 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { LlmService } from './llm.service';
+import { LogBusService } from '@app/common/log-bus.service';
 
 // ── Provider mocks ────────────────────────────────────────────────────────────
 
@@ -151,6 +152,7 @@ describe('LlmService', () => {
       providers: [
         LlmService,
         { provide: ConfigService, useValue: buildConfig() },
+        { provide: LogBusService, useValue: { emit: jest.fn(), getRecent: jest.fn() } },
       ],
     }).compile();
 

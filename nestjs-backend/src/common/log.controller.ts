@@ -39,9 +39,9 @@ export class LogController {
    * GET /api/logs/recent?n=200
    */
   @Get('recent')
-  getRecent(
+  async getRecent(
     @Query('n', new DefaultValuePipe(200), ParseIntPipe) n: number,
-  ): LogEntry[] {
+  ): Promise<LogEntry[]> {
     return this.logBus.getRecent(Math.min(n, 500));
   }
 
