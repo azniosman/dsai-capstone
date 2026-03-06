@@ -46,6 +46,8 @@ import {
   Cell,
   Tooltip,
 } from "recharts";
+import PipelineCanvas from "./components/pipeline-flow/PipelineCanvas";
+import ActivityTimeline from "./components/pipeline-flow/ActivityTimeline";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -208,6 +210,7 @@ export default function LogsPage() {
   const [activeComponents, setActiveComponents] = useState<Set<string>>(
     new Set(),
   );
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   // Pause state freezes the UI on a snapshot of entries, while the background
   // buffer continues receiving new events up to MAX_ENTRIES.
@@ -226,6 +229,46 @@ export default function LogsPage() {
         : combined;
     });
   }, []);
+
+  // ── Demo Mode Simulator ────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!isDemoMode) return;
+
+    let step = 0;
+    const currentTraceId = `demo-${Math.random().toString(36).substring(2, 9)}`;
+    const steps = [
+      { t: "INFO", c: "chat_controller", m: "Received user query" },
+      { t: "INFO", c: "embedding_service", m: "Generating query embeddings" },
+      { t: "INFO", c: "vector_store", m: "Executing hybrid search" },
+      { t: "INFO", c: "rag_service", m: "5 documents retrieved" },
+      { t: "INFO", c: "rag_service", m: "Context builder assembled prompt" },
+      { t: "INFO", c: "llm_service", m: "Invoking Bedrock model" },
+      { t: "INFO", c: "llm_service", m: "Response stream generated" },
+    ];
+
+    const interval = setInterval(() => {
+      if (step >= steps.length) {
+        step = 0; // Loop the demo
+        return;
+      }
+
+      const s = steps[step];
+      const entry: LogEntry = {
+        _id: makeId(),
+        timestamp: new Date().toISOString(),
+        type: s.t as LogType,
+        component: s.c,
+        message: s.m,
+        traceId: currentTraceId,
+      };
+
+      appendEntries([entry]);
+      step++;
+    }, 1200);
+
+    return () => clearInterval(interval);
+  }, [isDemoMode, appendEntries]);
 
   // ── Polling connection ─────────────────────────────────────────────────────
 
@@ -571,6 +614,18 @@ export default function LogsPage() {
                 <X className="w-3 h-3" />
                 Clear
               </button>
+
+              <button
+                onClick={() => setIsDemoMode((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-bold uppercase tracking-widest transition-all ${
+                  isDemoMode
+                    ? "border-purple-500/50 text-purple-400 bg-purple-500/10 shadow-[0_0_10px_rgba(168,85,247,0.3)] animate-pulse"
+                    : "border-border text-muted-foreground hover:border-purple-500/30 hover:text-purple-400"
+                }`}
+              >
+                <Activity className="w-3 h-3" />
+                Demo
+              </button>
             </div>
           </div>
 
@@ -790,155 +845,179 @@ export default function LogsPage() {
         </div>
       </header>
 
-      {/* ── Log Table ───────────────────────────────────────────────────── */}
+      {/* ── Dashboard Layout ────────────────────────────────────────────── */}
       <main className="flex-1 flex flex-col overflow-hidden max-w-[1600px] w-full mx-auto px-4 py-4">
-        {filtered.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
-            <Activity className="w-10 h-10 opacity-20" />
-            <p className="text-sm">
-              {entries.length === 0
-                ? "Waiting for log events…"
-                : "No entries match your filters."}
-            </p>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+          {/* Left Panel: Visualization & Timeline */}
+          <div className="lg:col-span-7 flex flex-col gap-6 h-full overflow-y-auto pr-2 custom-scrollbar pb-20">
+            <PipelineCanvas entries={entries} />
+            <ActivityTimeline entries={entries} />
           </div>
-        )}
 
-        {filtered.length > 0 && (
-          <>
-            {/* Column headers */}
-            <div className="flex text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1.5 mb-1 px-2 shrink-0">
-              <span className="w-[120px] shrink-0">Timestamp</span>
-              <span className="w-[72px] shrink-0">Type</span>
-              <span className="w-[130px] shrink-0">Component</span>
-              <span className="flex-1">Message</span>
-              <span className="w-[160px] shrink-0 hidden lg:block">Meta</span>
+          {/* Right Panel: Live Interceptor Stream */}
+          <div className="lg:col-span-5 h-full flex flex-col bg-slate-950/50 backdrop-blur-xl rounded-2xl border border-white/5 shadow-2xl relative overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/50 bg-slate-900/50 flex items-center justify-between shrink-0 drop-shadow-md">
+              <h3 className="text-sm font-bold tracking-tight text-white/90">
+                Interceptor Stream
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground mr-2">
+                  {filtered.length} / {entries.length} raw
+                </span>
+              </div>
             </div>
 
-            {/* Scrollable rows container — newest at top */}
-            <div
-              ref={tableRef}
-              onScroll={handleScroll}
-              className="flex-1 overflow-y-auto custom-scrollbar"
-              style={{ contain: "strict" } as React.CSSProperties}
-            >
-              <div ref={topRef} />
-              <AnimatePresence initial={false}>
-                {filtered.map((entry) => {
-                  const s = TYPE_STYLES[entry.type];
-                  const isExpanded = expandedId === entry._id;
+            {filtered.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground p-8 text-center min-h-[300px]">
+                <Activity className="w-10 h-10 opacity-20" />
+                <p className="text-sm">
+                  {entries.length === 0
+                    ? "Waiting for log events…"
+                    : "No entries match your filters."}
+                </p>
+              </div>
+            )}
 
-                  return (
-                    <motion.div
-                      key={entry._id}
-                      initial={{ opacity: 0, x: -4 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.15 }}
-                      onClick={() =>
-                        setExpandedId(isExpanded ? null : entry._id)
-                      }
-                      title={entry.message}
-                      className={`flex flex-col cursor-pointer border-b border-border/30 transition-colors ${s.row} ${
-                        isExpanded ? "bg-white/3" : ""
-                      }`}
-                    >
-                      {/* Main row */}
-                      <div className="flex items-center px-2 py-1.5 gap-2">
-                        {/* Timestamp */}
-                        <span className="w-[120px] shrink-0 text-[11px] text-muted-foreground tabular-nums">
-                          {formatTs(entry.timestamp)}
-                        </span>
+            {filtered.length > 0 && (
+              <>
+                {/* Column headers */}
+                <div className="flex text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1.5 mb-1 px-2 shrink-0">
+                  <span className="w-[120px] shrink-0">Timestamp</span>
+                  <span className="w-[72px] shrink-0">Type</span>
+                  <span className="w-[130px] shrink-0">Component</span>
+                  <span className="flex-1">Message</span>
+                  <span className="w-[160px] shrink-0 hidden lg:block">
+                    Meta
+                  </span>
+                </div>
 
-                        {/* Type pill */}
-                        <span
-                          className={`w-[72px] shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold tracking-widest ${s.pill}`}
-                        >
-                          {s.icon}
-                          {s.label}
-                        </span>
+                {/* Scrollable rows container — newest at top */}
+                <div
+                  ref={tableRef}
+                  onScroll={handleScroll}
+                  className="flex-1 overflow-y-auto custom-scrollbar"
+                  style={{ contain: "strict" } as React.CSSProperties}
+                >
+                  <div ref={topRef} />
+                  <AnimatePresence initial={false}>
+                    {filtered.map((entry) => {
+                      const s = TYPE_STYLES[entry.type];
+                      const isExpanded = expandedId === entry._id;
 
-                        {/* Component */}
-                        <span className="w-[130px] shrink-0 text-[11px] text-[#259df4] truncate font-semibold">
-                          {entry.component}
-                        </span>
-
-                        {/* Message */}
-                        <span
-                          className={`flex-1 text-[11px] truncate ${
-                            entry.type === "ERROR"
-                              ? "text-red-400"
-                              : entry.type === "WARN"
-                                ? "text-yellow-400"
-                                : "text-slate-300"
+                      return (
+                        <motion.div
+                          key={entry._id}
+                          initial={{ opacity: 0, x: -4 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.15 }}
+                          onClick={() =>
+                            setExpandedId(isExpanded ? null : entry._id)
+                          }
+                          title={entry.message}
+                          className={`flex flex-col cursor-pointer border-b border-border/30 transition-colors ${s.row} ${
+                            isExpanded ? "bg-white/3" : ""
                           }`}
                         >
-                          {entry.message}
-                        </span>
+                          {/* Main row */}
+                          <div className="flex items-center px-2 py-1.5 gap-2">
+                            {/* Timestamp */}
+                            <span className="w-[120px] shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                              {formatTs(entry.timestamp)}
+                            </span>
 
-                        {/* Meta (desktop) */}
-                        {entry.meta && (
-                          <span className="w-[160px] shrink-0 hidden lg:block text-[10px] text-muted-foreground truncate">
-                            {Object.entries(entry.meta)
-                              .slice(0, 2)
-                              .map(([k, v]) => `${k}=${v}`)
-                              .join(" ")}
-                          </span>
-                        )}
-                      </div>
+                            {/* Type pill */}
+                            <span
+                              className={`w-[72px] shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold tracking-widest ${s.pill}`}
+                            >
+                              {s.icon}
+                              {s.label}
+                            </span>
 
-                      {/* Expanded meta detail */}
-                      {isExpanded && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="px-2 pb-2 pl-[328px] text-[11px] text-muted-foreground space-y-0.5"
-                        >
-                          <div className="text-white/40 text-[10px] mb-1 uppercase tracking-widest">
-                            Full message
+                            {/* Component */}
+                            <span className="w-[130px] shrink-0 text-[11px] text-[#259df4] truncate font-semibold">
+                              {entry.component}
+                            </span>
+
+                            {/* Message */}
+                            <span
+                              className={`flex-1 text-[11px] truncate ${
+                                entry.type === "ERROR"
+                                  ? "text-red-400"
+                                  : entry.type === "WARN"
+                                    ? "text-yellow-400"
+                                    : "text-slate-300"
+                              }`}
+                            >
+                              {entry.message}
+                            </span>
+
+                            {/* Meta (desktop) */}
+                            {entry.meta && (
+                              <span className="w-[160px] shrink-0 hidden lg:block text-[10px] text-muted-foreground truncate">
+                                {Object.entries(entry.meta)
+                                  .slice(0, 2)
+                                  .map(([k, v]) => `${k}=${v}`)
+                                  .join(" ")}
+                              </span>
+                            )}
                           </div>
-                          <div className="text-slate-300 mb-2">
-                            {entry.message}
-                          </div>
-                          {entry.meta && (
-                            <div className="mt-2">
+
+                          {/* Expanded meta detail */}
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="px-2 pb-2 pl-[328px] text-[11px] text-muted-foreground space-y-0.5"
+                            >
                               <div className="text-white/40 text-[10px] mb-1 uppercase tracking-widest">
-                                Metadata
+                                Full message
                               </div>
-                              <JsonViewer data={entry.meta} />
-                            </div>
+                              <div className="text-slate-300 mb-2">
+                                {entry.message}
+                              </div>
+                              {entry.meta && (
+                                <div className="mt-2">
+                                  <div className="text-white/40 text-[10px] mb-1 uppercase tracking-widest">
+                                    Metadata
+                                  </div>
+                                  <JsonViewer data={entry.meta} />
+                                </div>
+                              )}
+                              {entry.traceId && (
+                                <div className="mt-3">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSearch(entry.traceId!);
+                                      setActiveComponents(new Set());
+                                      setActiveTypes(new Set(ALL_TYPES));
+                                      setAutoScroll(true);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-2 py-1 bg-white/5 hover:bg-[#00f2f2]/20 border border-white/10 hover:border-[#00f2f2]/50 hover:text-[#00f2f2] rounded text-[10px] text-white/70 transition-all font-mono tracking-tight"
+                                  >
+                                    <Filter className="w-3 h-3" />
+                                    Filter Trace:{" "}
+                                    <span className="font-bold text-[#00f2f2]">
+                                      {entry.traceId}
+                                    </span>
+                                  </button>
+                                </div>
+                              )}
+                              <div className="text-white/30 text-[10px] mt-2">
+                                {entry.timestamp}
+                              </div>
+                            </motion.div>
                           )}
-                          {entry.traceId && (
-                            <div className="mt-3">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSearch(entry.traceId!);
-                                  setActiveComponents(new Set());
-                                  setActiveTypes(new Set(ALL_TYPES));
-                                  setAutoScroll(true);
-                                }}
-                                className="inline-flex items-center gap-1.5 px-2 py-1 bg-white/5 hover:bg-[#00f2f2]/20 border border-white/10 hover:border-[#00f2f2]/50 hover:text-[#00f2f2] rounded text-[10px] text-white/70 transition-all font-mono tracking-tight"
-                              >
-                                <Filter className="w-3 h-3" />
-                                Filter Trace:{" "}
-                                <span className="font-bold text-[#00f2f2]">
-                                  {entry.traceId}
-                                </span>
-                              </button>
-                            </div>
-                          )}
-                          <div className="text-white/30 text-[10px] mt-2">
-                            {entry.timestamp}
-                          </div>
                         </motion.div>
-                      )}
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
-          </>
-        )}
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </main>
     </div>
   );
