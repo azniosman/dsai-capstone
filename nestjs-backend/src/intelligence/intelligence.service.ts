@@ -128,26 +128,22 @@ export class IntelligenceService {
     }
 
     let ragContext = '';
-    
-    // 2. Embedding + 3. Vector DB Search + 4. Document Retrieval (Wrapped safely)
+
+    // 2–5. Embedding → Vector DB Search → Document Retrieval → Context Builder
     if (lastUserMsg && !ctx.hasCriticalFailure) {
       try {
-        const chunks = await this.ragPipelineService.runStep(ctx, 'Document Retrieval', async () => {
-             // In highly decoupled systems these would trigger discretely. 
-             // We map the unified retrieval response logic to the macro-layer.
-             return this.ragService.query(lastUserMsg.content, tenantId, { topK: 3, threshold: 0.5, profileId });
-        }, { maxRetries: 2, isCritical: false, metadata: { tenantId } });
-        
-        // Emulated step for explicit discrete granular timeline parity tracking
+        // Emit discrete steps first so the timeline reflects the correct logical order
         await this.ragPipelineService.runStep(ctx, 'Embedding', async () => {}, { metadata: { status: 'bundled inside retrieval' }, maxRetries: 1, isCritical: false });
         await this.ragPipelineService.runStep(ctx, 'Vector DB Search', async () => {}, { metadata: { status: 'bundled inside retrieval' }, maxRetries: 1, isCritical: false });
-        
-        // 5. Context Builder
-        if (chunks && chunks.length > 0) {
-           ragContext = await this.ragPipelineService.runStep(ctx, 'Context Builder', async () => {
-               return RagService.formatContext(chunks);
-           }, { maxRetries: 1, isCritical: false, metadata: { count: chunks.length } }) || '';
-        }
+
+        const chunks = await this.ragPipelineService.runStep(ctx, 'Document Retrieval', async () => {
+             return this.ragService.query(lastUserMsg.content, tenantId, { topK: 3, threshold: 0.5, profileId });
+        }, { maxRetries: 2, isCritical: false, metadata: { tenantId } });
+
+        // Always emit Context Builder so the canvas node activates regardless of chunk count
+        ragContext = await this.ragPipelineService.runStep(ctx, 'Context Builder', async () => {
+            return chunks && chunks.length > 0 ? RagService.formatContext(chunks) : '';
+        }, { maxRetries: 1, isCritical: false, metadata: { count: chunks?.length ?? 0 } }) || '';
       } catch {
         // Enforce fault tolerance. Failed search doesn't kill chat payload.
       }

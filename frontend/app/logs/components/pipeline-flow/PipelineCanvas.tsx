@@ -33,30 +33,24 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
     const newActive = new Set<string>();
 
     recentLogs.forEach((log) => {
+      // Prefer the structured meta.step field emitted by RagPipelineService
+      const step = ((log.meta?.step as string) || "").toLowerCase();
       const msg = log.message.toLowerCase();
       const comp = (log.component || "").toLowerCase();
 
-      if (msg.includes("query") || msg.includes("prompt"))
+      if (step === "user query" || msg.includes("query") || msg.includes("prompt"))
         newActive.add("query");
-      if (comp.includes("embed") || msg.includes("embedding"))
+      if (step === "embedding" || comp.includes("embed") || msg.includes("embedding"))
         newActive.add("embed");
-      if (
-        comp.includes("vector") ||
-        comp.includes("pgvector") ||
-        msg.includes("hybrid search")
-      )
+      if (step === "vector db search" || comp.includes("vector") || comp.includes("pgvector") || msg.includes("hybrid search"))
         newActive.add("vector");
-      if (comp.includes("rag") || msg.includes("retrieved"))
+      if (step === "document retrieval" || msg.includes("retrieved"))
         newActive.add("retrieve");
-      if (comp.includes("context") || msg.includes("context builder"))
+      if (step === "context builder" || comp.includes("context") || msg.includes("context builder"))
         newActive.add("context");
-      if (
-        comp.includes("llm") ||
-        comp.includes("bedrock") ||
-        comp.includes("groq")
-      )
+      if (step === "llm engine" || comp.includes("llm") || comp.includes("bedrock") || comp.includes("groq"))
         newActive.add("llm");
-      if (msg.includes("response") || msg.includes("generated"))
+      if (step === "response" || msg.includes("generated"))
         newActive.add("response");
     });
 

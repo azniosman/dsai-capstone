@@ -16,6 +16,7 @@ import { SsgCacheService } from '../ssg/ssg-cache.service';
 import { DomainService } from '../domain/domain.service';
 import { RagService } from '../rag/rag.service';
 import { IntelligenceService } from '../intelligence/intelligence.service';
+import { SystemTerminalService, IngestChunkDto } from '../intelligence/system-terminal.service';
 
 class BackfillDto {
   @IsOptional()
@@ -62,6 +63,7 @@ export class InternalController {
     private readonly domainService: DomainService,
     private readonly ragService: RagService,
     private readonly intelligenceService: IntelligenceService,
+    private readonly systemTerminalService: SystemTerminalService,
   ) {}
 
   // ─── Health ────────────────────────────────────────────────────────────────
@@ -276,6 +278,25 @@ export class InternalController {
     return {
       tenants_processed: processed,
       duration_ms: Date.now() - start,
+    };
+  }
+
+  // ─── System Terminal Ingestion ────────────────────────────────────────────
+
+  /**
+   * Internal hook to ingest codebase chunks for the Dossier System AI.
+   * Expects an array of `{ filePath, content, chunkHash }` mapped directly.
+   */
+  @Post('system/ingest')
+  async ingestSystemChunks(@Body('chunks') chunks: IngestChunkDto[]) {
+    if (!chunks || !Array.isArray(chunks)) {
+      return { ingested: 0, errors: 0, msg: 'Invalid payload' };
+    }
+    const result = await this.systemTerminalService.ingestChunks(chunks);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'System ingestion cycle complete',
+      ...result,
     };
   }
 }

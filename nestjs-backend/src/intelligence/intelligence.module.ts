@@ -10,16 +10,18 @@ import { UserProfile } from '@app/entities/user-profile.entity';
 import { JobRole } from '@app/entities/job-role.entity';
 import { DomainModule } from '../domain/domain.module';
 import { RagModule } from '../rag/rag.module';
+import { SystemTerminalService } from './system-terminal.service';
+import { SystemDocument } from '../entities/system-document.entity';
 
 @Module({
   imports: [
     ConfigModule,
-    MikroOrmModule.forFeature([UserProfile, JobRole]),
+    MikroOrmModule.forFeature([UserProfile, JobRole, SystemDocument]),
     DomainModule,
     RagModule,
   ],
   controllers: [IntelligenceController, UploadController],
-  providers: [IntelligenceService, LlmService, CopilotService],
-  exports: [IntelligenceService, LlmService, CopilotService],
+  providers: [IntelligenceService, LlmService, CopilotService, SystemTerminalService],
+  exports: [IntelligenceService, LlmService, CopilotService, SystemTerminalService],
 })
 export class IntelligenceModule {}

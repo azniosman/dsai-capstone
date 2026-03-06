@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 
-// Import upcoming components
-import DossierHeader from "./components/DossierHeader";
+// Import existing components
 import ApplicationIdentity from "./components/ApplicationIdentity";
 import MissionBriefing from "./components/MissionBriefing";
 import AIEngineDiagram from "./components/AIEngineDiagram";
@@ -13,6 +13,7 @@ import IntelligenceSources from "./components/IntelligenceSources";
 import CapabilityCards from "./components/CapabilityCards";
 import SystemStatusPanel from "./components/SystemStatusPanel";
 import SecurityProfile from "./components/SecurityProfile";
+import SkillBridgeTerminal from "./components/SkillBridgeTerminal";
 import BuildTimeline from "./components/BuildTimeline";
 
 const initPhrases = [
@@ -41,94 +42,260 @@ export default function DossierPage() {
   }, [initStep]);
 
   return (
-    <div className="min-h-screen relative w-full overflow-hidden bg-background-dark font-mono text-slate-300">
-      {/* Universal scanline background effects */}
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <motion.div
-          className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-size-[100%_4px] opacity-20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.2 }}
-          transition={{ duration: 2 }}
-        />
-        <motion.div
-          className="absolute left-0 right-0 h-[2px] bg-cyan-500/30 shadow-[0_0_15px_3px_rgba(6,182,212,0.4)]"
-          initial={{ top: "-10%" }}
-          animate={{ top: "110%" }}
-          transition={{
-            duration: 8,
-            ease: "linear",
-            repeat: Infinity,
-          }}
-        />
-        <div className="absolute right-0 bottom-0 w-[800px] h-[800px] rounded-full border border-white/5 opacity-10 bg-[radial-gradient(circle,transparent_40%,rgba(6,182,212,0.1)_100%)] blur-3xl pointer-events-none" />
-      </div>
+    <div className="relative flex h-screen w-full flex-col font-sans bg-[#05080b] text-text-main overflow-hidden bg-[linear-gradient(rgba(56,189,248,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.03)_1px,transparent_1px)] bg-size-[32px_32px]">
+      {/* 1. Terminal Header */}
+      <header className="flex items-center justify-between border-b border-brand-border px-6 py-3 glass-panel z-20">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 text-brand-accent">
+            <span className="material-symbols-outlined text-2xl font-light">
+              insights
+            </span>
+            <h1 className="text-sm font-semibold tracking-[0.2em] uppercase">
+              Intelligence Terminal
+            </h1>
+          </div>
+          <div className="h-4 w-px bg-brand-border"></div>
+          <div className="text-[10px] text-text-dim tracking-widest uppercase font-medium">
+            Core v8.4.2 // Node_012
+          </div>
+        </div>
+        <div className="flex items-center gap-8">
+          <nav className="hidden lg:flex items-center gap-8">
+            <Link
+              href="/dashboard"
+              className="text-text-dim hover:text-brand-accent text-[11px] font-medium tracking-widest transition-colors"
+            >
+              ANALYTICS
+            </Link>
+            <Link
+              href="/logs"
+              className="text-text-dim hover:text-brand-accent text-[11px] font-medium tracking-widest transition-colors"
+            >
+              SURVEILLANCE
+            </Link>
+            <Link
+              href="/operations"
+              className="text-text-dim hover:text-brand-accent text-[11px] font-medium tracking-widest transition-colors"
+            >
+              OPERATIONS
+            </Link>
+            <button
+              type="button"
+              className="text-text-dim hover:text-brand-accent text-[11px] font-medium tracking-widest transition-colors"
+            >
+              ENCRYPTION
+            </button>
+          </nav>
+          <div className="flex gap-6 items-center border-l border-brand-border pl-8">
+            <div className="flex gap-4 text-text-dim">
+              <button
+                type="button"
+                className="material-symbols-outlined text-xl font-light hover:text-brand-accent transition-colors"
+              >
+                language
+              </button>
+              <button
+                type="button"
+                className="material-symbols-outlined text-xl font-light hover:text-brand-accent transition-colors"
+              >
+                notifications_none
+              </button>
+              <button
+                type="button"
+                className="material-symbols-outlined text-xl font-light hover:text-brand-accent transition-colors"
+              >
+                settings
+              </button>
+            </div>
+            <div className="text-xs font-mono tracking-tighter tabular-nums bg-brand-slate px-3 py-1 rounded border border-brand-border">
+              {new Date().toLocaleTimeString("en-US", {
+                timeZone: "UTC",
+                hour12: false,
+              })}{" "}
+              UTC
+            </div>
+            <div className="w-8 h-8 rounded-full border border-brand-accent/30 bg-brand-accent/10 flex items-center justify-center overflow-hidden">
+              <span className="material-symbols-outlined text-brand-accent text-lg">
+                account_circle
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
 
-      <AnimatePresence mode="wait">
-        {isInitializing ? (
-          <motion.div
-            key="initializer"
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background-dark"
-            exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
-            transition={{ duration: 0.8, ease: "easeInOut" }}
-          >
-            <div className="flex flex-col items-center justify-center gap-4">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-                className="w-16 h-16 border-t-2 border-r-2 border-cyan-500 rounded-full mb-8 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
-              />
-              {initPhrases.slice(0, initStep).map((phrase, idx) => (
+      {/* 2. Main Body */}
+      <main className="flex flex-1 overflow-hidden p-6 gap-6">
+        {/* Left Pane: Terminal Console */}
+        <section className="flex-3 flex flex-col bg-terminal-bg border border-brand-border active-window-shadow rounded-sm relative transition-all">
+          <div className="flex items-center justify-between px-4 py-2 bg-brand-slate/40 border-b border-brand-border">
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-brand-border/60"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-brand-border/60"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-brand-border/60"></div>
+              </div>
+              <span className="text-[10px] text-text-dim uppercase tracking-[0.15em] font-medium ml-2">
+                Terminal Console — root@intelligence: /opt/skillbridge/core
+              </span>
+            </div>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                className="material-symbols-outlined text-sm text-text-dim hover:text-text-main transition-colors"
+              >
+                remove
+              </button>
+              <button
+                type="button"
+                className="material-symbols-outlined text-sm text-text-dim hover:text-text-main transition-colors"
+              >
+                fullscreen
+              </button>
+              <Link
+                href="/dashboard"
+                className="material-symbols-outlined text-sm text-text-dim hover:text-brand-accent transition-colors"
+              >
+                close
+              </Link>
+            </div>
+          </div>
+
+          <div className="flex-1 p-6 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed relative">
+            <AnimatePresence mode="wait">
+              {isInitializing ? (
                 <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-cyan-400 font-mono tracking-widest text-sm uppercase shadow-cyan-500/50 drop-shadow-md"
+                  key="initializer"
+                  className="flex flex-col gap-2"
+                  exit={{ opacity: 0, filter: "blur(10px)" }}
+                  transition={{ duration: 0.8 }}
                 >
-                  &gt; {phrase}
+                  <div className="text-text-dim/60 mb-4">
+                    Establishing secure tunnel via proxy-v4.intel.internal...
+                    [CONNECTED]
+                  </div>
+                  <div className="text-text-dim">
+                    root@intelligence:~${" "}
+                    <span className="text-text-main">./init_platform.sh</span>
+                  </div>
+                  <div className="text-brand-accent mt-2 flex flex-col gap-1">
+                    {initPhrases.slice(0, initStep).map((phrase, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="text-cyan-400 font-mono tracking-widest text-sm uppercase"
+                      >
+                        [ <span className="font-bold">OK</span> ] {phrase}
+                      </motion.div>
+                    ))}
+                  </div>
+                  <div className="mt-2 text-text-main">
+                    Loading core logic pathways...{" "}
+                    <span className="cursor-blink"></span>
+                  </div>
                 </motion.div>
+              ) : (
+                <motion.div
+                  key="main-intel-stream"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 1 }}
+                  className="w-full h-full flex"
+                >
+                  <SkillBridgeTerminal />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </section>
+
+        {/* Right Pane: Surveillance Sidebar */}
+        <aside className="flex-1 flex flex-col gap-6 overflow-y-auto custom-scrollbar max-w-sm">
+          {/* Tactical UI Load Block */}
+          <div className="bg-terminal-bg border border-brand-border p-5 rounded-sm">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-text-dim">
+                SYSTEM_LOAD
+              </h3>
+              <span className="text-xs font-mono text-brand-accent">
+                STATUS: NOMINAL
+              </span>
+            </div>
+            <div className="flex h-12 items-end gap-1.5 px-1">
+              {[40, 60, 35, 80, 20, 42, 55, 30, 70, 45].map((h, i) => (
+                <div
+                  key={i}
+                  className={`w-full transition-colors ${i === 3 ? "bg-brand-accent/40" : i === 5 ? "bg-brand-accent/60" : "bg-brand-accent/20"}`}
+                  style={{ height: `${h}%` }}
+                ></div>
               ))}
-              <div className="h-4 w-2 bg-cyan-400 animate-pulse mt-2" />
             </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="dossier-content"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.2 }}
-            className="relative z-10 max-w-6xl mx-auto px-6 py-12 flex flex-col gap-12"
-          >
-            <DossierHeader />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <ApplicationIdentity />
-              <MissionBriefing />
+            <div className="flex justify-between text-[9px] text-text-dim/50 mt-3 font-mono">
+              <span>-15 MIN</span>
+              <span>LIVE</span>
             </div>
+          </div>
 
-            <AIEngineDiagram />
+          <SystemStatusPanel />
+          <SecurityProfile />
 
-            <ArchitectureMap />
-
-            <div className="grid grid-cols-1 gap-8">
-              <IntelligenceSources />
-            </div>
-
-            <CapabilityCards />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <SystemStatusPanel />
-              <SecurityProfile />
-            </div>
-
+          <div className="bg-terminal-bg border border-brand-border p-5 rounded-sm">
+            <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-text-dim mb-4">
+              MIGRATION_TIMELINE
+            </h3>
             <BuildTimeline />
+          </div>
+        </aside>
+      </main>
 
-            <footer className="text-center text-xs text-slate-600 mt-12 mb-8 border-t border-white/5 pt-8">
-              SKILLBRIDGE AI // CLASSIFIED INTEL DASHBOARD // ALL RIGHTS
-              RESERVED
-            </footer>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 3. Terminal Footer */}
+      <footer className="h-10 border-t border-brand-border bg-brand-navy flex items-center px-6 text-[10px] text-text-dim gap-8 justify-between relative z-10">
+        <div className="flex items-center gap-10">
+          <button
+            type="button"
+            className="flex items-center gap-2 hover:text-brand-accent transition-colors text-left group"
+          >
+            <span className="material-symbols-outlined text-base font-light group-hover:scale-110 transition-transform">
+              database
+            </span>
+            <span className="font-medium tracking-tight">
+              STORAGE_ENCRYPTED: 100%
+            </span>
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-2 hover:text-brand-accent transition-colors text-left group"
+          >
+            <span className="material-symbols-outlined text-base font-light group-hover:scale-110 transition-transform">
+              vpn_lock
+            </span>
+            <span className="font-medium tracking-tight">
+              QUANTUM_SECURE_V7
+            </span>
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-2 hover:text-brand-accent transition-colors text-left group"
+          >
+            <span className="material-symbols-outlined text-base font-light group-hover:scale-110 transition-transform">
+              memory
+            </span>
+            <span className="font-medium tracking-tight">LATENCY: 4ms AVG</span>
+          </button>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 bg-brand-accent/5 px-3 py-1 rounded-full border border-brand-accent/20">
+            <div className="size-1.5 bg-brand-accent rounded-full shadow-[0_0_8px_#38bdf8] animate-pulse"></div>
+            <span className="uppercase tracking-[0.2em] font-bold text-brand-accent text-[9px]">
+              Uplink Active
+            </span>
+          </div>
+          <div className="h-4 w-px bg-brand-border"></div>
+          <span className="italic text-text-dim/60 font-medium">
+            CLASSIFIED_ACCESS_ONLY
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -22,7 +22,7 @@ export class DataIntelligenceController {
     const l = Math.min(100, Math.max(1, parseInt(limit)));
     
     // Default to the latest COMPLETED dataset
-    const latestDataset = await this.em.findOne(Dataset, { status: DatasetStatus.COMPLETED }, { orderBy: { downloadedAt: 'DESC' } });
+    const latestDataset = await this.em.findOne(Dataset, { status: DatasetStatus.COMPLETED as DatasetStatus }, { orderBy: { downloadedAt: 'DESC' } });
     
     if (!latestDataset) {
       return { data: [], total: 0, page: p, limit: l, dataset: null };
@@ -51,7 +51,7 @@ export class DataIntelligenceController {
   async getDatasetDiff(@Query('newDatasetId') newDatasetId: string) {
     if (!newDatasetId) {
       // Find latest diffs based on newest completed dataset
-      const latestDataset = await this.em.findOne(Dataset, { status: DatasetStatus.COMPLETED }, { orderBy: { downloadedAt: 'DESC' } });
+      const latestDataset = await this.em.findOne(Dataset, { status: DatasetStatus.COMPLETED as DatasetStatus }, { orderBy: { downloadedAt: 'DESC' } });
       if (!latestDataset) return [];
       return await this.em.find(DatasetDiff, { datasetNew: latestDataset }, { orderBy: { detectedAt: 'DESC' } });
     }
@@ -62,7 +62,7 @@ export class DataIntelligenceController {
   @Get('trends')
   async getTrends(@Query('sector') sector?: string) {
     // Only return trends from the latest dataset
-    const latestDataset = await this.em.findOne(Dataset, { status: DatasetStatus.COMPLETED }, { orderBy: { downloadedAt: 'DESC' } });
+    const latestDataset = await this.em.findOne(Dataset, { status: DatasetStatus.COMPLETED as DatasetStatus }, { orderBy: { downloadedAt: 'DESC' } });
     if (!latestDataset) return [];
 
     const where: any = { dataset: latestDataset };

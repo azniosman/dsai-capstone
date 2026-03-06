@@ -24,6 +24,7 @@ import {
   CareerPlanDto,
   ResumeTipsDto,
 } from './dto/copilot.dto';
+import { SystemTerminalService, SystemChatDto } from './system-terminal.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
 
@@ -33,6 +34,7 @@ export class IntelligenceController {
   constructor(
     private readonly intelligenceService: IntelligenceService,
     private readonly copilotService: CopilotService,
+    private readonly systemTerminalService: SystemTerminalService,
   ) {}
 
   // ─── Original Intelligence Endpoints ──────────────────────────────────────
