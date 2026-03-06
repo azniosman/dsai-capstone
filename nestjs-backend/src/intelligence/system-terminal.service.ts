@@ -75,7 +75,7 @@ Answer the user's question using ONLY the provided context sources below.`;
           createdAt: new Date(),
           updatedAt: new Date(),
         });
-        
+        this.em.persist(doc);
         ingested++;
       } catch (err) {
         this.logger.error(`Failed to ingest chunk for ${chunk.filePath}`, err);
@@ -110,7 +110,12 @@ Answer the user's question using ONLY the provided context sources below.`;
       ORDER BY embedding <=> $1::vector
       LIMIT 5
     `;
-    const results: any[] = await conn.execute(queryStr, [JSON.stringify(queryVector)]);
+    let results: any[] = [];
+    try {
+      results = await conn.execute(queryStr, [JSON.stringify(queryVector)]);
+    } catch (err) {
+      this.logger.warn('system_documents query failed — table may not be seeded yet', (err as Error).message);
+    }
     const searchTimeMs = Date.now() - searchStart;
 
     // 3. Construct context
