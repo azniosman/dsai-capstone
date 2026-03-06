@@ -4,7 +4,7 @@ const isExport = process.env.NEXT_OUTPUT === "export";
 
 const nextConfig: NextConfig = {
   output: isExport ? "export" : "standalone",
-  trailingSlash: isExport ? true : false,
+  trailingSlash: false, // must be false for static export — trailingSlash:true nests pages as login/index.html, breaking S3 routing
   images: isExport ? { unoptimized: true } : undefined,
   ...(isExport
     ? {}
