@@ -114,14 +114,14 @@ module "lambda_backend" {
   lambda_image_uri = var.lambda_image_uri != "" ? var.lambda_image_uri : "${module.ecr.backend_repo_url}:latest"
 
   # Application configuration
-  db_secret_arn           = module.rds.db_secret_arn
-  db_host                 = module.rds.db_address
-  db_name                 = "skillbridge"
-  db_username             = var.db_username
-  groq_api_key            = var.groq_api_key
-  groq_model              = var.groq_model
-  anthropic_api_key       = var.anthropic_api_key
-  gemini_api_key          = var.gemini_api_key
+  db_secret_arn             = module.rds.db_secret_arn
+  db_host                   = module.rds.db_address
+  db_name                   = "skillbridge"
+  db_username               = var.db_username
+  groq_api_key              = var.groq_api_key
+  groq_model                = var.groq_model
+  anthropic_api_key         = var.anthropic_api_key
+  gemini_api_key            = var.gemini_api_key
   secret_key                = var.secret_key
   refresh_token_secret      = var.refresh_token_secret
   internal_automation_token = var.internal_automation_token

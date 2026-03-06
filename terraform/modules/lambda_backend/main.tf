@@ -11,13 +11,13 @@ resource "aws_cloudwatch_log_group" "lambda" {
 # ── Lambda Function (container image) ────────────────────────────────────────
 
 resource "aws_lambda_function" "api" {
-  function_name                  = "${var.project_name}-${var.environment}-api"
-  role                           = var.lambda_role_arn
-  package_type                   = "Image"
-  image_uri                      = var.lambda_image_uri
-  timeout                        = var.timeout
-  memory_size                    = var.memory_size
-  architectures                  = ["x86_64"]
+  function_name = "${var.project_name}-${var.environment}-api"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = var.timeout
+  memory_size   = var.memory_size
+  architectures = ["x86_64"]
   # No positive reservation — account concurrency limit (10) equals the minimum
   # unreserved pool size, so reserved_concurrent_executions > 0 is disallowed.
   # Unused specialist Lambdas are disabled (= 0) to reduce competition.
@@ -120,13 +120,13 @@ resource "aws_cloudwatch_log_group" "voice" {
 }
 
 resource "aws_lambda_function" "voice" {
-  function_name                  = "${var.project_name}-${var.environment}-voice"
-  role                           = var.lambda_role_arn
-  package_type                   = "Image"
-  image_uri                      = var.lambda_image_uri
-  timeout                        = 120
-  memory_size                    = 512
-  architectures                  = ["x86_64"]
+  function_name = "${var.project_name}-${var.environment}-voice"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 120
+  memory_size   = 512
+  architectures = ["x86_64"]
   # Voice coaching is not yet implemented — disable to free concurrency slots.
   reserved_concurrent_executions = 0
 
@@ -156,13 +156,13 @@ resource "aws_cloudwatch_log_group" "rag_query" {
 }
 
 resource "aws_lambda_function" "rag_query" {
-  function_name                  = "${var.project_name}-${var.environment}-rag-query"
-  role                           = var.lambda_role_arn
-  package_type                   = "Image"
-  image_uri                      = var.lambda_image_uri
-  timeout                        = 30
-  memory_size                    = 512
-  architectures                  = ["x86_64"]
+  function_name = "${var.project_name}-${var.environment}-rag-query"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 30
+  memory_size   = 512
+  architectures = ["x86_64"]
   # RAG is handled by the main API Lambda — disable specialist stub.
   reserved_concurrent_executions = 0
 
@@ -188,13 +188,13 @@ resource "aws_cloudwatch_log_group" "embed_gen" {
 }
 
 resource "aws_lambda_function" "embed_gen" {
-  function_name                  = "${var.project_name}-${var.environment}-embed-gen"
-  role                           = var.lambda_role_arn
-  package_type                   = "Image"
-  image_uri                      = var.lambda_image_uri
-  timeout                        = 30
-  memory_size                    = 512
-  architectures                  = ["x86_64"]
+  function_name = "${var.project_name}-${var.environment}-embed-gen"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 30
+  memory_size   = 512
+  architectures = ["x86_64"]
   # Embedding is handled by the main API Lambda — disable specialist stub.
   reserved_concurrent_executions = 0
 
@@ -220,13 +220,13 @@ resource "aws_cloudwatch_log_group" "gap_analysis" {
 }
 
 resource "aws_lambda_function" "gap_analysis" {
-  function_name                  = "${var.project_name}-${var.environment}-gap-analysis"
-  role                           = var.lambda_role_arn
-  package_type                   = "Image"
-  image_uri                      = var.lambda_image_uri
-  timeout                        = 60
-  memory_size                    = 512
-  architectures                  = ["x86_64"]
+  function_name = "${var.project_name}-${var.environment}-gap-analysis"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 60
+  memory_size   = 512
+  architectures = ["x86_64"]
   # Gap analysis is handled by the main API Lambda — disable specialist stub.
   reserved_concurrent_executions = 0
 
@@ -252,13 +252,13 @@ resource "aws_cloudwatch_log_group" "resume_upload" {
 }
 
 resource "aws_lambda_function" "resume_upload" {
-  function_name                  = "${var.project_name}-${var.environment}-resume-upload"
-  role                           = var.lambda_role_arn
-  package_type                   = "Image"
-  image_uri                      = var.lambda_image_uri
-  timeout                        = 30
-  memory_size                    = 1024
-  architectures                  = ["x86_64"]
+  function_name = "${var.project_name}-${var.environment}-resume-upload"
+  role          = var.lambda_role_arn
+  package_type  = "Image"
+  image_uri     = var.lambda_image_uri
+  timeout       = 30
+  memory_size   = 1024
+  architectures = ["x86_64"]
   # Resume upload is handled by the main API Lambda — disable specialist stub.
   reserved_concurrent_executions = 0
 
