@@ -49,6 +49,9 @@ npm run build         # production build (must pass before PR)
 cd nestjs-backend
 npx mikro-orm seeder:run
 
+# Local full-stack deploy (builds images, starts all services, runs smoke test)
+bash scripts/deploy.sh
+
 # AWS deployment scripts
 bash scripts/build_and_push.sh      # builds Docker images and pushes to ECR
 ```
@@ -88,14 +91,14 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 
 **App config/validation**: `src/common/config/env.validation.ts` — class-validator schema for env vars.
 
-**Entities** (`src/entities/`): `user.entity.ts`, `user-profile.entity.ts`, `skill.entity.ts`, `job-role.entity.ts`, `sctp-course.entity.ts`, `skill-progress.entity.ts`, `market-insight.entity.ts`, `profile-snapshot.entity.ts`, `tenant.entity.ts`, `ssg-cache.entity.ts`, `document-chunk.entity.ts` (RAG vector chunks + tsvector generated column), `rag-feedback.entity.ts` (thumbs-up/down signals for re-ranking)
+**Entities** (`src/entities/`): `user.entity.ts`, `user-profile.entity.ts`, `skill.entity.ts`, `job-role.entity.ts`, `sctp-course.entity.ts`, `skill-progress.entity.ts`, `market-insight.entity.ts`, `profile-snapshot.entity.ts`, `tenant.entity.ts`, `ssg-cache.entity.ts`, `document-chunk.entity.ts` (RAG vector chunks + tsvector generated column), `rag-feedback.entity.ts` (thumbs-up/down signals for re-ranking). `SystemLog` entity lives in `src/common/system-log.entity.ts` (not `src/entities/`) and is registered in `CommonModule`.
 
 **Modules** (`src/`):
 - `auth/` — Passport.js JWT + Local strategies; `AuthController`, `AuthService`
 - `users/` — user CRUD
 - `profile/` — user profile management
 - `skills/` — skill taxonomy + user skills
-- `intelligence/` — AI features: `chat()`, `getRecommendations()`, `getSkillGap()`, `interview()`, `rewriteResume()`; wired via `LlmService`
+- `intelligence/` — AI features: `chat()`, `getRecommendations()`, `getSkillGap()`, `interview()`, `rewriteResume()`; wired via `LlmService`. Also hosts `CopilotService` (`copilot.service.ts`) with multi-turn AI assistant endpoints (`/api/copilot/*`): `extractCareerProfile`, `copilotChat`, `analyzeCareer`, `generateCareerPlan`, `getResumeTips`.
 - `intelligence/upload.controller.ts` — resume upload + parsing
 - `upskilling/` — roadmap and course pathways
 - `roles/` — job role listing
@@ -104,7 +107,7 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `rag/` — RAG pipeline: `EmbeddingService` (ONNX sentence embeddings via `@xenova/transformers`), `RagService` (hybrid CTE search: pgvector HNSW + tsvector GIN → RRF → feedback boost → optional cross-encoder), `CrossEncoderService` (`ms-marco-MiniLM-L-6-v2`, off by default), `RagController` (`POST /api/rag/query`, `POST /api/rag/feedback`). Bootstrap in `main.ts` adds the `search_vector` tsvector generated column + GIN index at cold start.
 - `ssg/` — SkillsFuture/WSG API integration with three-tier fallback: PostgreSQL cache → live SSG API → seeded SCTPCourse rows
 - `internal/` — `InternalController` + `InternalModule`; automation endpoints invoked exclusively via Lambda Invoke API, never via public API Gateway. Guarded by `InternalTokenGuard` (`common/guards/`) which validates `X-Internal-Token` header against `INTERNAL_AUTOMATION_TOKEN`. `GET /internal/health` has no auth guard (used by warmup ping).
-- `common/` — shared config, filters, interceptors, utils (`resume-parser.util.ts`)
+- `common/` — shared config, filters, interceptors, utils (`resume-parser.util.ts`). Also owns `LogBusService` (in-memory RxJS Subject that buffers the last 500 log entries and exposes an Observable stream), `LogController` (`GET /api/logs/recent?n=200` JSON polling, `GET /api/logs/stream` SSE), and `SystemLog` entity for DB-persisted log entries. All backend services emit structured `LogEntry` objects via `this.logBus.emit(...)`.
 - `seeders/` — MikroORM seed data
 
 **Auth flow**: `POST /auth/login` accepts `{ username, password }` via Local strategy → returns JWT. Subsequent requests attach `Authorization: Bearer <token>`. Two guards exist:
@@ -115,7 +118,7 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 
 ### Frontend (`frontend/`)
 
-- `app/` — Next.js App Router pages by feature (recommendations, skill-gap, roadmap, jd-match, chat, interview, market, compare, courses, progress, projects, peers, dashboard, account)
+- `app/` — Next.js App Router pages by feature (recommendations, skill-gap, roadmap, jd-match, chat, interview, market, compare, courses, progress, projects, peers, dashboard, account, `logs/` live log viewer with pipeline flow canvas, `view_live_matrix/` infocomm job matrix)
 - `components/` — organized by domain:
   - `ui/` — shadcn primitives + extended SkillBridge components (`skill-radar.tsx`, `match-score-bar.tsx`, `skill-chip.tsx`, `skeleton-card.tsx`, `empty-state.tsx`, `AppModal.tsx`, `chart-card.tsx`)
   - `layout/` — `app-shell.tsx`, `sidebar-nav.tsx`, `page-header.tsx`, `error-boundary.tsx`, `page-transition.tsx`
@@ -208,6 +211,10 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 
 - **Aurora master password restrictions**: The password must not contain `/ @ " ` or spaces. The CI workflow strips these characters automatically, but local `.env` files must comply too.
 
+- **Docker multi-stage native addon mismatch**: The Dockerfile has four stages: `deps` (Alpine/musl, for TypeScript compilation only), `deps-glibc` (Debian/glibc, for runtime), `model-download` (glibc, runs ONNX model download), `runner` (glibc). Always copy `node_modules` from `deps-glibc` into `model-download` and `runner` — never from `deps`. Native addons (`onnxruntime-node`, `sharp`) compiled for musl crash immediately on glibc with "Cannot find module" or segfault.
+
+- **Embedding model is baked into the Docker image**: `scripts/download-model.cjs` runs in the `model-download` build stage and caches `Xenova/bge-small-en-v1.5` at `/app/.cache/huggingface`. The `EmbeddingService` sets `allowRemoteModels=false` in production — if the model is missing from the image the service logs an error at startup rather than silently returning empty embeddings per request.
+
 ## Key Design Decisions
 
 - **Hybrid scoring**: `0.55 × content_similarity + 0.25 × rule_match + 0.20 × career_switcher_bonus`
@@ -259,6 +266,14 @@ terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.
 | GET    | /api/ssg/courses/:ref         | Get single SSG course by reference number |
 | GET    | /api/ssg/job-roles            | List WSG SkillsFramework job roles    |
 | POST   | /api/ssg/recommendations      | Personalised SSG courses by skill overlap |
+| POST   | /api/interview                | AI mock interview session                 |
+| POST   | /api/copilot/extract          | Extract career profile from free text     |
+| POST   | /api/copilot/chat             | Multi-turn AI career copilot chat         |
+| GET    | /api/copilot/analyze/:id      | Full career analysis for a profile        |
+| POST   | /api/copilot/career-plan      | Generate personalised career plan         |
+| POST   | /api/copilot/resume-tips      | Get resume improvement tips               |
+| GET    | /api/logs/recent              | Last N structured log entries (JSON)      |
+| GET    | /api/logs/stream              | Live log stream (SSE)                     |
 
 **Internal automation endpoints** (Lambda Invoke only — not on API Gateway; require `X-Internal-Token` header except health):
 
