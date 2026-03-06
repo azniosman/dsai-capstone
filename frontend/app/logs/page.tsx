@@ -94,7 +94,6 @@ const buildApiUrl = (path: string): string => {
 };
 
 const LOGS_RECENT_URL = buildApiUrl("/logs/recent");
-const LOGS_STREAM_URL = buildApiUrl("/logs/stream");
 
 const ALL_TYPES: LogType[] = [
   "RAG",
@@ -228,79 +227,43 @@ export default function LogsPage() {
     });
   }, []);
 
-  // ── SSE connection ─────────────────────────────────────────────────────────
+  // ── Polling connection ─────────────────────────────────────────────────────
 
   useEffect(() => {
-    let es: EventSource | null = null;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
     let lastSeenTs = "";
     let destroyed = false;
 
-    const startPolling = () => {
+    const startPolling = async () => {
       if (destroyed) return;
       setConnectionStatus("polling");
 
-      const poll = async () => {
-        try {
-          const res = await fetch(`${LOGS_RECENT_URL}?n=200`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = (await res.json()) as Array<Omit<LogEntry, "_id">>;
-
-          const newItems = data
-            .filter((e) => e.timestamp > lastSeenTs)
-            .map((e) => ({ ...e, _id: makeId() }));
-
-          if (newItems.length > 0) {
-            lastSeenTs = newItems[newItems.length - 1].timestamp;
-            appendEntries(newItems);
-          }
-          setConnectionStatus("polling");
-        } catch {
-          setConnectionStatus("error");
-        }
-      };
-
-      poll();
-      pollTimer = setInterval(poll, pollIntervalMs);
-    };
-
-    const connect = () => {
-      if (destroyed) return;
-      setConnectionStatus("connecting");
-
       try {
-        es = new EventSource(LOGS_STREAM_URL);
+        const res = await fetch(`${LOGS_RECENT_URL}?n=200`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as Array<Omit<LogEntry, "_id">>;
 
-        es.onopen = () => {
-          if (!destroyed) setConnectionStatus("connected");
-        };
+        const newItems = data
+          .filter((e) => e.timestamp > lastSeenTs)
+          .map((e) => ({ ...e, _id: makeId() }));
 
-        es.onmessage = (event: MessageEvent<string>) => {
-          if (destroyed) return;
-          try {
-            const entry = JSON.parse(event.data) as Omit<LogEntry, "_id">;
-            appendEntries([{ ...entry, _id: makeId() }]);
-          } catch {
-            /* ignore malformed frames */
-          }
-        };
-
-        es.onerror = () => {
-          es?.close();
-          es = null;
-          // Fall back to polling
-          startPolling();
-        };
+        if (newItems.length > 0) {
+          lastSeenTs = newItems[newItems.length - 1].timestamp;
+          appendEntries(newItems);
+        }
+        setConnectionStatus("polling");
       } catch {
-        startPolling();
+        setConnectionStatus("error");
       }
     };
 
-    connect();
+    // Initial poll
+    startPolling();
+    // Set up interval for continuous polling
+    pollTimer = setInterval(startPolling, pollIntervalMs);
 
     return () => {
       destroyed = true;
-      es?.close();
       if (pollTimer) clearInterval(pollTimer);
     };
   }, [appendEntries, pollIntervalMs]);
