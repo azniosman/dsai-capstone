@@ -21,10 +21,8 @@ import {
   Query,
   ParseIntPipe,
   DefaultValuePipe,
-  UseGuards,
 } from '@nestjs/common';
 import { LogBusService, LogEntry } from '@app/common/log-bus.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('logs')
 export class LogController {
@@ -38,7 +36,6 @@ export class LogController {
    *
    * GET /api/logs/recent?n=200
    */
-  @UseGuards(JwtAuthGuard)
   @Get('recent')
   async getRecent(
     @Query('n', new DefaultValuePipe(200), ParseIntPipe) n: number,
