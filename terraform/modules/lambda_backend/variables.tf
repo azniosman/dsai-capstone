@@ -83,6 +83,16 @@ variable "secret_key" {
   sensitive = true
 }
 
+variable "refresh_token_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "internal_automation_token" {
+  type      = string
+  sensitive = true
+}
+
 variable "opensearch_url" {
   type    = string
   default = ""

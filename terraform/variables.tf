@@ -34,6 +34,12 @@ variable "secret_key" {
   sensitive   = true
 }
 
+variable "refresh_token_secret" {
+  description = "Separate secret for signing refresh tokens (generate: openssl rand -hex 32)"
+  type        = string
+  sensitive   = true
+}
+
 variable "groq_api_key" {
   description = "Groq API key (primary LLM provider)"
   type        = string

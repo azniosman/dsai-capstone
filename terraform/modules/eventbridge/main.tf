@@ -82,13 +82,13 @@ locals {
       handler              = "lambdas.automation.recommendation_refresh.handler"
       memory               = 512
       timeout              = 600
-      reserved_concurrency = -1
+      reserved_concurrency = -1 # Unreserved — account minimum unreserved pool = account limit
     }
     embedding-backfill = {
       handler              = "lambdas.automation.embedding_backfill.handler"
       memory               = 512
       timeout              = 600
-      reserved_concurrency = -1
+      reserved_concurrency = -1 # Unreserved — account minimum unreserved pool = account limit
     }
     market-insights = {
       handler              = "lambdas.automation.market_insights.handler"

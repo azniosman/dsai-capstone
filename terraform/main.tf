@@ -122,10 +122,12 @@ module "lambda_backend" {
   groq_model              = var.groq_model
   anthropic_api_key       = var.anthropic_api_key
   gemini_api_key          = var.gemini_api_key
-  secret_key              = var.secret_key
-  opensearch_url          = var.enable_opensearch ? "https://${module.opensearch[0].opensearch_endpoint}" : ""
-  voice_transcribe_bucket = aws_s3_bucket.uploads.id
-  cors_allowed_origins    = var.cors_allowed_origins
+  secret_key                = var.secret_key
+  refresh_token_secret      = var.refresh_token_secret
+  internal_automation_token = var.internal_automation_token
+  opensearch_url            = var.enable_opensearch ? "https://${module.opensearch[0].opensearch_endpoint}" : ""
+  voice_transcribe_bucket   = aws_s3_bucket.uploads.id
+  cors_allowed_origins      = var.cors_allowed_origins
 
   depends_on = [module.rds, module.iam, aws_s3_bucket.uploads]
 }
