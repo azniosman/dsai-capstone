@@ -6,6 +6,7 @@ import {
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { User } from '@app/entities/user.entity';
 import { Tenant } from '@app/entities/tenant.entity';
 
@@ -31,7 +32,6 @@ export class UsersService {
     hashedPassword: string;
     name: string;
     tenantName: string;
-    role?: any;
   }): Promise<User> {
     const existing = await this.findByEmail(payload.email);
     if (existing) {
@@ -51,7 +51,6 @@ export class UsersService {
       hashedPassword: payload.hashedPassword,
       name: payload.name,
       tenant,
-      ...(payload.role ? { role: payload.role } : {}),
     });
 
     await this.userRepository.getEntityManager().persistAndFlush(user);
@@ -102,7 +101,7 @@ export class UsersService {
 
     user.isActive = false;
     user.name = 'Deleted User';
-    user.email = `deleted_${id}@deleted.invalid`;
+    user.email = `deleted_${randomUUID()}@deleted.invalid`;
     await this.userRepository.getEntityManager().flush();
   }
 }

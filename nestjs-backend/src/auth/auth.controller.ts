@@ -9,8 +9,10 @@ import {
   HttpStatus,
   Patch,
   Delete,
+  BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -23,6 +25,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthenticatedRequest } from '../types/auth-request.interface';
 
+@Throttle({ default: { ttl: 60_000, limit: 10 } })
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -33,15 +36,6 @@ export class AuthController {
   ) {}
 
   /**
-   * Health and smoke test for the Auth controller.
-   * @returns Controller operational status.
-   */
-  @Get('admin/test')
-  smokeTest() {
-    return { status: 'Auth Controller OK' };
-  }
-
-  /**
    * Register a new user and assign a tenant and role.
    * Internally hashes the provided password.
    *
@@ -50,6 +44,10 @@ export class AuthController {
    */
   @Post('register')
   async register(@Body() registerDto: RegisterDto): Promise<any> {
+    if (registerDto.password !== registerDto.passwordConfirm) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
     const hashedPassword = await this.authService.hashPassword(
       registerDto.password,
     );
@@ -58,7 +56,6 @@ export class AuthController {
       hashedPassword,
       name: registerDto.name,
       tenantName: registerDto.tenantName,
-      role: registerDto.role,
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -162,7 +159,7 @@ export class AuthController {
 
   /**
    * Takes a refresh JWT token and exchanges it for an entirely new active signed JWT.
-   * Verify it utilizing the original JWT configurations safely.
+   * Verifies with REFRESH_TOKEN_SECRET and asserts token type is 'refresh'.
    *
    * @param body Requires a raw `refresh_token` string body.
    * @returns New functional JWT payload dictionary.
@@ -177,12 +174,16 @@ export class AuthController {
 
     let payload: Record<string, string>;
     try {
-      const secret = this.configService.get<string>('JWT_SECRET');
+      const secret = this.configService.get<string>('REFRESH_TOKEN_SECRET');
       if (!secret)
-        throw new Error('JWT_SECRET environment variable is required');
+        throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
       payload = this.jwtService.verify(token, { secret });
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (payload.typ !== 'refresh') {
+      throw new UnauthorizedException('Invalid token type');
     }
 
     const userId = parseInt(payload.sub, 10);

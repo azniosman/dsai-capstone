@@ -135,17 +135,22 @@ export class RagService {
     });
     const existingHashes = new Set(existing.map((e) => e.contentHash));
 
+    // Identify new chunks (skip already-stored hashes)
+    const newChunkIndices = chunks
+      .map((_, i) => i)
+      .filter((i) => !existingHashes.has(hashes[i]));
+
+    const skipped = chunks.length - newChunkIndices.length;
+
+    // Embed all new chunks in parallel
+    const embeddings = await Promise.all(
+      newChunkIndices.map((i) => this.embeddingService.embed(chunks[i])),
+    );
+
     let stored = 0;
-    let skipped = 0;
-
-    for (let i = 0; i < chunks.length; i++) {
-      const hash = hashes[i];
-      if (existingHashes.has(hash)) {
-        skipped++;
-        continue;
-      }
-
-      const embedding = await this.embeddingService.embed(chunks[i]);
+    for (let j = 0; j < newChunkIndices.length; j++) {
+      const i = newChunkIndices[j];
+      const embedding = embeddings[j];
 
       this.logBus.emit({
         type: 'RAG',
@@ -156,7 +161,7 @@ export class RagService {
 
       const chunk = this.chunkRepository.create({
         content: chunks[i],
-        contentHash: hash,
+        contentHash: hashes[i],
         sourceType,
         chunkIndex: i,
         embedding: embedding.length > 0 ? embedding : undefined,
@@ -340,7 +345,6 @@ export class RagService {
     threshold: number,
     profileId: number | undefined,
   ): Promise<HybridRow[]> {
-    const profileFilter = profileId ? `AND dc.profile_id = ${profileId}` : '';
     const vectorLiteral = `[${queryEmbedding.join(',')}]`;
     const overFetch = topK * 3;
 
@@ -368,7 +372,7 @@ export class RagService {
           WHERE dc.tenant_id = $2
             AND dc.embedding IS NOT NULL
             AND (1 - (dc.embedding <=> $1::vector)) >= $3
-            ${profileFilter}
+            AND ($8::int IS NULL OR dc.profile_id = $8::int)
           LIMIT $4
         ),
         keyword AS (
@@ -383,7 +387,7 @@ export class RagService {
           FROM document_chunk dc
           WHERE dc.tenant_id = $2
             AND dc.search_vector @@ plainto_tsquery('english', $5)
-            ${profileFilter}
+            AND ($8::int IS NULL OR dc.profile_id = $8::int)
           LIMIT $4
         ),
         rrf AS (
@@ -413,6 +417,7 @@ export class RagService {
         queryText,
         RRF_K,
         overFetch,
+        profileId ?? null,
       ],
     );
 
@@ -430,7 +435,6 @@ export class RagService {
     threshold: number,
     profileId: number | undefined,
   ): Promise<HybridRow[]> {
-    const profileFilter = profileId ? `AND dc.profile_id = ${profileId}` : '';
     const vectorLiteral = `[${queryEmbedding.join(',')}]`;
     const overFetch = topK * 3;
 
@@ -454,11 +458,11 @@ export class RagService {
       WHERE dc.tenant_id = $2
         AND dc.embedding IS NOT NULL
         AND (1 - (dc.embedding <=> $1::vector)) >= $3
-        ${profileFilter}
+        AND ($5::int IS NULL OR dc.profile_id = $5::int)
       ORDER BY dc.embedding <=> $1::vector
       LIMIT $4
       `,
-      [vectorLiteral, tenantId, threshold, overFetch],
+      [vectorLiteral, tenantId, threshold, overFetch, profileId ?? null],
     );
 
     return rows.map((r, i) => ({ ...r, rrfScore: 1 / (RRF_K + (i + 1)) }));

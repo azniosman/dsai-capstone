@@ -26,15 +26,6 @@ export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
   /**
-   * Health and smoke test for the Profile controller.
-   * @returns Controller operational status.
-   */
-  @Get('admin/test')
-  smokeTest() {
-    return { status: 'Profile Controller OK' };
-  }
-
-  /**
    * Fetch the complete connected profile of the locally authenticated user.
    * Resolves utilizing the ID tied to the active JWT.
    *

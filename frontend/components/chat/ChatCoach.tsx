@@ -14,6 +14,7 @@
  */
 
 import { useState, useRef, useEffect, FormEvent } from "react";
+import DOMPurify from "isomorphic-dompurify";
 import { Bot, User, Send, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -135,7 +136,7 @@ function MessageBubble({ msg }: { msg: Message }) {
         ) : (
           <span
             dangerouslySetInnerHTML={{
-              __html: msg.content.replace(/\n/g, "<br/>"),
+              __html: DOMPurify.sanitize(msg.content.replace(/\n/g, "<br/>")),
             }}
           />
         )}

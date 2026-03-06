@@ -8,6 +8,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { IntelligenceService } from './intelligence.service';
 import { CopilotService } from './copilot.service';
 import {
@@ -26,21 +27,13 @@ import {
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
 
+@Throttle({ default: { ttl: 60_000, limit: 20 } })
 @Controller()
 export class IntelligenceController {
   constructor(
     private readonly intelligenceService: IntelligenceService,
     private readonly copilotService: CopilotService,
   ) {}
-
-  /**
-   * Health and smoke test for the Intelligence controller.
-   * @returns Controller operational status.
-   */
-  @Get('admin/test')
-  smokeTest() {
-    return { status: 'Intelligence Controller OK' };
-  }
 
   // ─── Original Intelligence Endpoints ──────────────────────────────────────
 

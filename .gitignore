@@ -21,6 +21,9 @@ frontend/build/
 # Environment
 .env
 *.env.local
+nestjs-backend/.env
+frontend/.env.local
+frontend/.env.production.local
 
 # IDE
 .idea/

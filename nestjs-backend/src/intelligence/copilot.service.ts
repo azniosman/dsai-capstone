@@ -15,24 +15,9 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { UserProfile } from '@app/entities/user-profile.entity';
-import { LlmService } from './llm.service';
+import { LlmService, providerLabel } from './llm.service';
 import { RagService } from '../rag/rag.service';
 import type { CareerIntelligence, CareerPlan } from './dto/copilot.dto';
-
-/**
- * Builds the provider label displayed in the UI.
- *
- * @param provider - Raw provider name from LlmService.
- * @returns Human-readable engine label.
- */
-function providerLabel(provider: string | null): string {
-  const map: Record<string, string> = {
-    groq: 'Groq',
-    claude: 'Anthropic Claude',
-    gemini: 'Google Gemini',
-  };
-  return map[provider ?? ''] ?? 'LLM Router';
-}
 
 @Injectable()
 export class CopilotService {

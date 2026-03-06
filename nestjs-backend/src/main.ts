@@ -1,5 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import helmet from 'helmet';
+import * as express from 'express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from '@app/common/filters/all-exceptions.filter';
 import { TransformInterceptor } from '@app/common/interceptors/transform.interceptor';
@@ -70,6 +72,10 @@ async function bootstrap() {
   } catch (err) {
     logger.error('Seed failed — continuing anyway', (err as Error).message);
   }
+
+  app.use(helmet());
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
   app.setGlobalPrefix('api');
 

@@ -40,5 +40,8 @@ COPY --from=builder /app/dist ./dist
 # Baked-in model cache — loaded by EmbeddingService without any network calls
 COPY --from=model-download /app/.cache/huggingface ./.cache/huggingface
 
+RUN groupadd -r nodejs && useradd -r -g nodejs nodejs
+USER nodejs
+
 EXPOSE 8000
 CMD ["node", "dist/main"]

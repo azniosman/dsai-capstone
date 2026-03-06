@@ -31,6 +31,14 @@ export class EnvironmentVariables {
   @MinLength(32)
   readonly JWT_SECRET!: string;
 
+  @IsString()
+  @MinLength(32)
+  readonly REFRESH_TOKEN_SECRET!: string;
+
+  @IsString()
+  @MinLength(32)
+  readonly INTERNAL_AUTOMATION_TOKEN!: string;
+
   // SSG/WSG API — optional; if absent, service falls back to seeded data
   @IsString()
   @IsOptional()
@@ -101,9 +109,7 @@ export class EnvironmentVariables {
   readonly GEMINI_MODEL?: string;
 
   // Internal automation — shared secret for EventBridge Lambda-to-Lambda calls
-  @IsString()
-  @IsOptional()
-  readonly INTERNAL_AUTOMATION_TOKEN?: string;
+  // (promoted to required — declared above with JWT_SECRET)
 
   // Embedding model — optional; both supported models output 384-dim vectors
   // Valid values: 'Xenova/all-MiniLM-L6-v2' (default) | 'Xenova/all-MiniLM-L12-v2'

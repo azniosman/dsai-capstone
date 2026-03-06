@@ -11,12 +11,6 @@ import {
 export class DomainController {
   constructor(private readonly domainService: DomainService) {}
 
-  /** Smoke test for the Domain controller. */
-  @Get('admin/test')
-  smokeTest() {
-    return { status: 'Domain Controller OK' };
-  }
-
   /** Singapore labour market insights aggregated by sector. */
   @UseGuards(OptionalJwtAuthGuard)
   @Get('market-insights')

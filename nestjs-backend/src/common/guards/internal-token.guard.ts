@@ -7,6 +7,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { timingSafeEqual } from 'crypto';
 
 /**
  * Guard that validates the `X-Internal-Token` header on internal automation
@@ -48,7 +49,13 @@ export class InternalTokenGuard implements CanActivate, OnModuleInit {
     const token: string | undefined = request.headers?.['x-internal-token'];
     const expected = this.config.get<string>('INTERNAL_AUTOMATION_TOKEN');
 
-    if (!expected || !token || token !== expected) {
+    const tokenOk =
+      !!expected &&
+      !!token &&
+      token.length === expected.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+
+    if (!tokenOk) {
       throw new ForbiddenException(
         'Invalid or missing internal automation token',
       );

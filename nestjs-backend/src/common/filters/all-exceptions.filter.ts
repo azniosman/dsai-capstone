@@ -33,20 +33,28 @@ export class AllExceptionsFilter implements ExceptionFilter {
         detail = (res as any).error || res;
       }
     } else if (exception instanceof Error) {
-      message = exception.message;
+      // Don't expose internal error messages to clients in production
+      this.logger.error(
+        `Unhandled exception: ${exception.message}`,
+        exception.stack,
+      );
     }
 
-    this.logger.error(
-      `Http Status: ${status} Error Message: ${message}`,
-      exception instanceof Error ? exception.stack : '',
-    );
+    if (!(exception instanceof HttpException)) {
+      this.logger.error(
+        `Http Status: ${status} Error Message: ${message}`,
+        exception instanceof Error ? exception.stack : '',
+      );
+    } else {
+      this.logger.warn(`Http Status: ${status} Error Message: ${message}`);
+    }
 
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       detail: message,
-      errorInfo: detail,
+      ...(exception instanceof HttpException ? { errorInfo: detail } : {}),
     });
   }
 }

@@ -41,9 +41,15 @@ export class UploadController {
     private readonly ragService: RagService,
   ) {}
 
+  private static readonly ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain',
+  ];
+
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
   async uploadResume(
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: UploadResumeDto,
@@ -51,6 +57,10 @@ export class UploadController {
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
+    }
+
+    if (!UploadController.ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException('Only PDF, DOCX, and TXT files are allowed');
     }
 
     let text: string;

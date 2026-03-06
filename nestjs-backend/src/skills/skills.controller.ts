@@ -22,15 +22,6 @@ export class SkillsController {
   constructor(private readonly skillsService: SkillsService) {}
 
   /**
-   * Health and smoke test for the Skills controller.
-   * @returns Controller operational status.
-   */
-  @Get('admin/test')
-  smokeTest() {
-    return { status: 'Skills Controller OK' };
-  }
-
-  /**
    * Logs a new upskilling progress event block tracked to the user profile.
    *
    * @param req The valid verified executing auth identity.

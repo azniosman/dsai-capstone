@@ -4,7 +4,7 @@ import { EntityRepository } from '@mikro-orm/postgresql';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { JobRole } from '@app/entities/job-role.entity';
 import { ChatRequestDto, RecommendRequestDto } from './dto/intelligence.dto';
-import { LlmService } from './llm.service';
+import { LlmService, providerLabel } from './llm.service';
 import { ResumeParser } from '../common/utils/resume-parser.util';
 import { DomainService } from '../domain/domain.service';
 import { RagService } from '../rag/rag.service';
@@ -145,17 +145,9 @@ export class IntelligenceService {
       ragContext;
 
     const reply = await this.llmService.chat(payload.messages, systemPrompt);
-    const providerUsed = this.llmService.getLastUsedProvider();
-    const engineLabel =
-      {
-        groq: 'Groq',
-        claude: 'Anthropic Claude',
-        gemini: 'Google Gemini',
-      }[providerUsed ?? 'groq'] ?? 'LLM Router';
-
     return {
       reply,
-      engine: engineLabel,
+      engine: providerLabel(this.llmService.getLastUsedProvider()),
     };
   }
 
@@ -173,7 +165,10 @@ export class IntelligenceService {
       throw new NotFoundException('Profile not found');
     }
 
-    const roles = await this.roleRepository.find({ tenant: tenantId });
+    const roles = await this.roleRepository.find(
+      { tenant: tenantId },
+      { limit: 200 },
+    );
     const scored = roles
       .map((role) => {
         const {
@@ -243,7 +238,10 @@ export class IntelligenceService {
       throw new NotFoundException('Profile not found');
     }
 
-    const roles = await this.roleRepository.find({ tenant: tenantId });
+    const roles = await this.roleRepository.find(
+      { tenant: tenantId },
+      { limit: 200 },
+    );
     const top3 = roles
       .map((role) => ({ role, ...this.scoreRole(profile, role) }))
       .sort((a, b) => b.score - a.score)
@@ -258,15 +256,15 @@ export class IntelligenceService {
 
       const allGaps = [
         ...role.requiredSkills
-          .map((skill, idx) => {
+          .map((skill) => {
             if (profileSkillsLower.has(skill.toLowerCase())) return null;
             return {
               skill,
-              gap_severity: idx < 3 ? 'high' : 'medium',
+              gap_severity: 'high',
               required_level: 'required',
               user_level: 0,
               user_level_label: 'Missing',
-              priority: idx < 3 ? 'high' : 'medium',
+              priority: 'high',
               ai_advice: '',
             };
           })
@@ -376,14 +374,10 @@ export class IntelligenceService {
       [{ role: 'user', content: prompt }],
       'You are a professional resume writer specialising in tech roles in Singapore.',
     );
-    const providerUsed = this.llmService.getLastUsedProvider();
-    const engineLabel =
-      {
-        groq: 'Groq',
-        claude: 'Anthropic Claude',
-        gemini: 'Google Gemini',
-      }[providerUsed ?? 'groq'] ?? 'LLM Router';
-    return { rewritten_bullet: reply.trim(), engine: engineLabel };
+    return {
+      rewritten_bullet: reply.trim(),
+      engine: providerLabel(this.llmService.getLastUsedProvider()),
+    };
   }
 
   async interview(
@@ -437,14 +431,7 @@ export class IntelligenceService {
       dto.messages as Array<{ role: string; content: string }>,
       systemPrompt,
     );
-    const providerUsed = this.llmService.getLastUsedProvider();
-    const engineLabel =
-      {
-        groq: 'Groq',
-        claude: 'Anthropic Claude',
-        gemini: 'Google Gemini',
-      }[providerUsed ?? 'groq'] ?? 'LLM Router';
-    return { reply, engine: engineLabel };
+    return { reply, engine: providerLabel(this.llmService.getLastUsedProvider()) };
   }
 
   async analyzeJdMatch(
@@ -489,13 +476,13 @@ export class IntelligenceService {
       );
     }
 
-    const gaps = gapSkills.map((skill, idx) => ({
+    const gaps = gapSkills.map((skill) => ({
       skill,
       user_level: 0,
-      gap_severity: idx < 3 ? 'high' : 'medium',
+      gap_severity: 'high',
       required_level: 'required',
       user_level_label: 'Missing',
-      priority: idx < 3 ? 'high' : 'medium',
+      priority: 'high',
     }));
 
     return {

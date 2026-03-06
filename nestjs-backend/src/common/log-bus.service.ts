@@ -160,7 +160,6 @@ export class LogBusService implements OnModuleInit, OnModuleDestroy {
       .find(SystemLog, {}, { orderBy: { timestamp: 'DESC' }, limit: count });
 
     return logs.reverse().map((l) => ({
-      _id: l.id,
       timestamp: l.timestamp.toISOString(),
       type: l.type,
       component: l.component,

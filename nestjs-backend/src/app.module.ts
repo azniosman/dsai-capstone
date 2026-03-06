@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { ClsModule } from 'nestjs-cls';
 import { randomUUID } from 'crypto';
@@ -21,6 +23,7 @@ import mikroOrmConfig from './mikro-orm.config';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
     ClsModule.forRoot({
       global: true,
       middleware: {
@@ -45,6 +48,9 @@ import mikroOrmConfig from './mikro-orm.config';
     RagModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

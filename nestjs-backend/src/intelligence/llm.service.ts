@@ -21,6 +21,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ClsService } from 'nestjs-cls';
 import { LogBusService } from '@app/common/log-bus.service';
 
 import type {
@@ -35,6 +36,22 @@ import { GeminiProvider } from './providers/gemini.provider';
 /** Re-export for consumers that imported `ChatMessage` from this module. */
 export type { ChatMessage };
 
+/**
+ * Maps a raw LlmProviderName to a human-readable label for API responses.
+ * Exported so callers in IntelligenceService/CopilotService don't duplicate the map.
+ */
+export function providerLabel(provider: LlmProviderName | null): string {
+  const map: Record<string, string> = {
+    groq: 'Groq',
+    claude: 'Anthropic Claude',
+    gemini: 'Google Gemini',
+  };
+  return map[provider ?? ''] ?? 'LLM Router';
+}
+
+/** CLS key used to store the per-request active provider name. */
+const CLS_PROVIDER_KEY = 'llm_provider';
+
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
@@ -43,14 +60,15 @@ export class LlmService {
   private readonly providerChain: LlmProvider[];
 
   /**
-   * Name of the provider that handled the most recent request.
-   * Used by `IntelligenceService` to report the active engine to the client.
+   * Fallback for test environments where ClsService has no active store.
+   * Under concurrent production load, CLS takes precedence.
    */
   private lastUsedProvider: LlmProviderName | null = null;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly logBus: LogBusService,
+    private readonly cls: ClsService,
   ) {
     // ── Build individual providers ─────────────────────────────────────────
     const groqApiKey = this.configService.get<string>('GROQ_API_KEY');
@@ -117,18 +135,21 @@ export class LlmService {
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   /**
-   * Returns the name of the LLM provider that served the most recent request.
-   * Used by `IntelligenceService` to populate the `engine` field in responses.
-   *
-   * @returns Provider name string or `null` if no request has been made yet.
+   * Returns the provider that served the most recent request on this async
+   * execution context. Reads from CLS (per-request store) so concurrent
+   * requests each see their own provider without race conditions.
+   * Falls back to `this.lastUsedProvider` in test environments where CLS
+   * has no active store.
    */
   getLastUsedProvider(): LlmProviderName | null {
-    return this.lastUsedProvider;
+    return (this.cls.get<LlmProviderName>(CLS_PROVIDER_KEY)) ?? this.lastUsedProvider;
   }
 
   /**
    * Iterates the provider chain in priority order, attempting each provider
    * in turn. Records latency and logs each attempt and fallback.
+   * Writes the winning provider to the per-request CLS store so that
+   * concurrent requests never overwrite each other's result.
    *
    * @param label - Short label used in log messages (e.g. `"chat"`).
    * @param messages - Conversation history passed to the provider.
@@ -172,6 +193,9 @@ export class LlmService {
           message: `[${label}] Response from ${provider.name} in ${latencyMs}ms`,
           meta: { label, provider: provider.name, latencyMs },
         });
+        // Store per-request in CLS (concurrent-safe); also update the
+        // instance field as a fallback for test environments without CLS.
+        this.cls.set(CLS_PROVIDER_KEY, provider.name);
         this.lastUsedProvider = provider.name;
         return result;
       } catch (err) {
@@ -211,6 +235,21 @@ export class LlmService {
     throw new ServiceUnavailableException(
       `LLM unavailable for "${label}". All configured providers (groq, claude, gemini) failed.`,
     );
+  }
+
+  /**
+   * Safely parses a JSON string returned by an LLM, stripping optional
+   * markdown code fences. Throws a typed error (not a raw SyntaxError) so
+   * callers can catch and re-throw meaningful messages.
+   */
+  private parseJson<T>(raw: string, label: string): T {
+    const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const cleaned = (fenceMatch ? fenceMatch[1] : raw).trim();
+    try {
+      return JSON.parse(cleaned) as T;
+    } catch {
+      throw new Error(`LLM returned invalid JSON for "${label}": ${cleaned.slice(0, 200)}`);
+    }
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -257,11 +296,7 @@ export class LlmService {
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [
-      null,
-      text,
-    ];
-    return JSON.parse(jsonMatch[1].trim());
+    return this.parseJson(text, 'analyzeJD');
   }
 
   /**
@@ -292,8 +327,7 @@ export class LlmService {
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
-    return JSON.parse(jsonMatch[1].trim());
+    return this.parseJson(raw, 'parseResume');
   }
 
   /**
@@ -333,8 +367,7 @@ export class LlmService {
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
-    return JSON.parse(jsonMatch[1].trim());
+    return this.parseJson(raw, 'generateRationale');
   }
 
   /**
@@ -365,8 +398,7 @@ export class LlmService {
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
-    return JSON.parse(jsonMatch[1].trim());
+    return this.parseJson(raw, 'skillGapAdvice');
   }
 
   /**
@@ -405,10 +437,6 @@ export class LlmService {
 
   /**
    * Extracts structured career intelligence from a plain-text resume.
-   * Returns a `CareerIntelligence` object with experience level, skills,
-   * industries, strengths, improvement areas, career paths, and a professional
-   * summary — ready to be persisted in the `careerIntelligence` column on
-   * `UserProfile`.
    *
    * @param resumeText - Raw resume text (truncated to 6 000 chars).
    * @returns Structured `CareerIntelligence` profile.
@@ -449,11 +477,9 @@ export class LlmService {
       systemPrompt,
     );
 
-    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
-    const cleaned = jsonMatch[1].trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = this.parseJson<Record<string, unknown>>(raw, 'extractCareerIntelligence');
     return {
-      ...parsed,
+      ...(parsed as any),
       analyzed_at: new Date().toISOString(),
     };
   }
@@ -513,9 +539,7 @@ export class LlmService {
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-
-    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
-    return JSON.parse(jsonMatch[1].trim());
+    return this.parseJson(raw, 'generateCareerPlan');
   }
 
   /**
@@ -549,8 +573,6 @@ export class LlmService {
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-
-    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, raw];
-    return JSON.parse(jsonMatch[1].trim());
+    return this.parseJson(raw, 'generateResumeTips');
   }
 }

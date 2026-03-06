@@ -33,6 +33,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const profileId = localStorage.getItem("profileId") || undefined;
 
         if (token && name && email) {
+          // Check token expiry before restoring session
+          try {
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            if (payload.exp && Date.now() / 1000 > payload.exp) {
+              localStorage.removeItem("token");
+              localStorage.removeItem("refreshToken");
+              return;
+            }
+          } catch {
+            // Malformed token — clear it
+            localStorage.removeItem("token");
+            return;
+          }
           setUser({ name, email, profileId });
         }
       } catch (error) {

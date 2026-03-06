@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MinLength,
 } from 'class-validator';
 
@@ -12,6 +13,10 @@ export class RegisterDto {
 
   @IsString()
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/, {
+    message:
+      'Password must contain uppercase, lowercase, digit, and special character',
+  })
   password!: string;
 
   @IsString()
@@ -25,10 +30,6 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   tenantName!: string;
-
-  @IsString()
-  @IsOptional()
-  role?: string;
 
   @IsOptional()
   profileId?: number;
