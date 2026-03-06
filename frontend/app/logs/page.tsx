@@ -939,6 +939,7 @@ export default function LogsPage() {
                   <span className="w-[120px] shrink-0">Timestamp</span>
                   <span className="w-[72px] shrink-0">Type</span>
                   <span className="w-[130px] shrink-0">Component</span>
+                  <span className="w-[100px] shrink-0">Model</span>
                   <span className="flex-1">Message</span>
                   <span className="w-[160px] shrink-0 hidden lg:block">
                     Meta
@@ -990,6 +991,11 @@ export default function LogsPage() {
                             {/* Component */}
                             <span className="w-[130px] shrink-0 text-[11px] text-[#259df4] truncate font-semibold">
                               {entry.component}
+                            </span>
+
+                            {/* Model */}
+                            <span className="w-[100px] shrink-0 text-[11px] text-muted-foreground truncate font-mono">
+                              {entry.meta?.model || entry.meta?.provider || "-"}
                             </span>
 
                             {/* Message */}
