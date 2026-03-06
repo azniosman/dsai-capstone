@@ -10,7 +10,7 @@ SkillBridge — Job Recommendation & Skill Gap Analysis System for SCTP learners
 
 - **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + Recharts + Framer Motion + Three.js
 - **Backend**: NestJS 10 + TypeScript + MikroORM + Passport.js
-- **AI/ML**: Sentence Transformers (`all-MiniLM-L6-v2`), FAISS, configurable LLM chain via `LlmService` (default: Groq → Claude API → Gemini → 503)
+- **AI/ML**: Sentence Transformers (`bge-small-en-v1.5`), FAISS, configurable LLM chain via `LlmService` (default: Groq → Claude API → Gemini → 503)
 - **Database**: PostgreSQL 16 + pgvector
 - **Automation**: n8n workflows
 - **Deployment (capstone)**: Docker Compose locally; AWS Lambda + Aurora Serverless v2 + S3/CloudFront via Terraform
@@ -73,7 +73,7 @@ Backend env vars (set in `.env` at project root; see `.env.example`):
 - `SSG_API_BASE_URL`, `SSG_TOKEN_URL` — SSG API endpoints (optional)
 - `SSG_CACHE_TTL_SECONDS` — how long to cache SSG responses in PostgreSQL (optional)
 - `INTERNAL_AUTOMATION_TOKEN` — shared secret validated by `InternalTokenGuard`; injected from Secrets Manager in production; required for automation Lambdas to call `/internal/*` endpoints
-- `EMBEDDING_MODEL` — ONNX model for sentence embeddings (default: `Xenova/all-MiniLM-L6-v2`; upgrade to `Xenova/all-MiniLM-L12-v2` for higher recall; both output 384-dim)
+- `EMBEDDING_MODEL` — ONNX model for sentence embeddings (default: `Xenova/bge-small-en-v1.5`; all options output 384-dim; model is baked into the Docker image at build time via `scripts/download-model.cjs` — no internet access required at Lambda runtime)
 - `RERANKER_ENABLED` — set `true` to activate cross-encoder re-ranking after RRF (default: disabled)
 - `RERANKER_MODEL` — cross-encoder model (default: `Xenova/ms-marco-MiniLM-L-6-v2`)
 - `RERANKER_TOP_N` — how many RRF candidates the cross-encoder scores (default: `20`)
