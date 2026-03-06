@@ -47,7 +47,7 @@ export default function ApplicationIdentity() {
 
       {/* Decorative scanning line on hover */}
       <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-        <div className="absolute top-0 left-0 w-full h-[1px] bg-cyan-500/30 animate-[scan_2s_linear_infinite]" />
+        <div className="absolute top-0 left-0 w-full h-px bg-cyan-500/30 animate-[scan_2s_linear_infinite]" />
       </div>
     </motion.div>
   );

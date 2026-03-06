@@ -9,7 +9,7 @@ export default function DossierHeader() {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="clay-panel border-l-4 border-l-red-500/80 !rounded-none p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-black/40"
+      className="clay-panel border-l-4 border-l-red-500/80 rounded-none! p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-black/40"
     >
       <div className="flex items-center gap-4">
         <ShieldAlert className="w-10 h-10 text-red-500 opacity-80" />

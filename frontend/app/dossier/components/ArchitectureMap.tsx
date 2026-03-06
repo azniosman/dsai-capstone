@@ -79,7 +79,7 @@ export default function ArchitectureMap() {
             <motion.div
               animate={{ opacity: [0.2, 1, 0.2] }}
               transition={{ duration: 3, repeat: Infinity, delay: idx * 0.5 }}
-              className={`absolute -top-[2px] right-[40%] w-1/5 h-[2px] bg-gradient-to-r from-transparent via-white to-transparent`}
+              className={`absolute -top-[2px] right-[40%] w-1/5 h-[2px] bg-linear-to-r from-transparent via-white to-transparent`}
             />
           </motion.div>
         ))}

@@ -45,7 +45,7 @@ export default function DossierPage() {
       {/* Universal scanline background effects */}
       <div className="pointer-events-none fixed inset-0 z-0">
         <motion.div
-          className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px] opacity-20"
+          className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-size-[100%_4px] opacity-20"
           initial={{ opacity: 0 }}
           animate={{ opacity: 0.2 }}
           transition={{ duration: 2 }}
