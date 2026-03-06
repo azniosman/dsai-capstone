@@ -97,8 +97,10 @@ export default function SkillBridgeTerminal() {
     });
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/intelligence/system-chat`, {
+      const rawUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = rawUrl.replace(/\/+$/, "");
+      // Global nestJS prefix is /api, and IntelligenceController has no route prefix
+      const res = await fetch(`${baseUrl}/api/system-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: query.trim() }),

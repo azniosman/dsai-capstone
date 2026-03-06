@@ -48,7 +48,7 @@ export default function DossierPage() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 text-brand-accent">
             <span className="material-symbols-outlined text-2xl font-light">
-              insights
+              SKLBR
             </span>
             <h1 className="text-sm font-semibold tracking-[0.2em] uppercase">
               Intelligence Terminal
