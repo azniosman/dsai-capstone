@@ -18,6 +18,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { Subject } from 'rxjs';
 import { ClsService } from 'nestjs-cls';
 import { EntityManager } from '@mikro-orm/postgresql';
+import { randomUUID } from 'crypto';
 import { SystemLog } from './system-log.entity';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ export class LogBusService implements OnModuleInit, OnModuleDestroy {
   private readonly buffer: LogEntry[] = [];
 
   /** Queue of logs waiting to be flushed to PostgreSQL. */
-  private readonly dbQueue: Omit<SystemLog, 'id'>[] = [];
+  private readonly dbQueue: SystemLog[] = [];
   private flushTimer: NodeJS.Timeout | null = null;
 
   constructor(
@@ -117,6 +118,7 @@ export class LogBusService implements OnModuleInit, OnModuleDestroy {
 
     // Queue for PostgreSQL background flush
     this.dbQueue.push({
+      id: randomUUID(),
       timestamp: new Date(full.timestamp),
       type: full.type,
       component: full.component,
