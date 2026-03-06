@@ -123,6 +123,19 @@ export class IntelligenceController {
     );
   }
 
+  // ─── System Terminal Endpoint ─────────────────────────────────────────────
+
+  /**
+   * RAG-powered Q&A over SkillBridge system documentation.
+   * Scope-limited to architecture, pipeline, datasets, AWS, deployment topics.
+   *
+   * POST /api/system-chat
+   */
+  @Post('system-chat')
+  async systemChat(@Body() payload: SystemChatDto) {
+    return this.systemTerminalService.systemChat(payload);
+  }
+
   // ─── Copilot Endpoints ────────────────────────────────────────────────────
 
   /**
