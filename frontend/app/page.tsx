@@ -45,13 +45,17 @@ export default function LandingPage() {
               >
                 OPERATIONS
               </Link>
-              {["NODES", "DOSSIER", "LOGS"].map((item) => (
+              {[
+                { label: "NODES", href: "#" },
+                { label: "DOSSIER", href: "/dossier" },
+                { label: "LOGS", href: "/logs" },
+              ].map((item) => (
                 <Link
-                  key={item}
-                  href="#"
+                  key={item.label}
+                  href={item.href}
                   className="tactical-label text-neutral-400 hover:text-[#00f2f2] transition-colors tracking-[0.2em] font-black"
                 >
-                  {item}
+                  {item.label}
                 </Link>
               ))}
             </nav>
