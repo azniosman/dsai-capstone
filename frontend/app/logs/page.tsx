@@ -19,6 +19,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import apiClient from "@/lib/api-client";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
@@ -282,9 +283,8 @@ export default function LogsPage() {
       setConnectionStatus("polling");
 
       try {
-        const res = await fetch(`${LOGS_RECENT_URL}?n=200`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as Array<Omit<LogEntry, "_id">>;
+        const res = await apiClient.get<Array<Omit<LogEntry, "_id">>>(`${LOGS_RECENT_URL}?n=200`);
+        const data = res.data;
 
         const newItems = data
           .filter((e) => e.timestamp > lastSeenTs)
