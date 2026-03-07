@@ -356,7 +356,7 @@ export default function Dashboard() {
                         >
                           <motion.circle
                             animate={{
-                              r: [4, 5, 4],
+                              scale: [1, 1.3, 1],
                               opacity: [0.8, 1, 0.8],
                             }}
                             transition={{
@@ -370,6 +370,9 @@ export default function Dashboard() {
                             fill="#259df4"
                             r="4"
                             opacity="0.8"
+                            style={{
+                              transformOrigin: `${coord.cx} ${coord.cy}`,
+                            }}
                           ></motion.circle>
                           <line
                             stroke="#259df4"
