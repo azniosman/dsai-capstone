@@ -557,25 +557,30 @@ jobs:
           # CloudFront distributions with CNAME aliases (e.g. sklbr.co) must have those
           # aliases removed before Terraform can create a new distribution with the same CNAMEs.
           # Updating aliases on an enabled distribution is instant and does not require disabling.
-          for DIST_ID in $(aws cloudfront list-distributions \
-            --query "DistributionList.Items[?Comment=='${P}-${E}'].Id" \
-            --output text 2>/dev/null | tr '\t' '\n'); do
-            [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ] && continue
-            echo "  Clearing CNAME aliases from CloudFront distribution: $DIST_ID"
-            ETAG=$(aws cloudfront get-distribution-config --id "$DIST_ID" \
-              --query 'ETag' --output text 2>/dev/null)
-            CONFIG=$(aws cloudfront get-distribution-config --id "$DIST_ID" \
-              --query 'DistributionConfig' --output json 2>/dev/null)
-            if [ -n "$ETAG" ] && [ "$ETAG" != "None" ]; then
-              UPDATED=$(echo "$CONFIG" | jq '.Aliases = {"Quantity": 0, "Items": []}')
-              aws cloudfront update-distribution \
-                --id "$DIST_ID" \
-                --distribution-config "$UPDATED" \
-                --if-match "$ETAG" \
-                --output text --query 'Distribution.Id' 2>/dev/null || true
-              echo "  Aliases cleared from $DIST_ID"
-            fi
-          done
+          # Search by actual alias value (not by Comment) so we find distributions regardless
+          # of how they were originally created or what comment they were given.
+          CF_DOMAIN="${{ github.event.inputs.custom_domain }}"
+          if [ -n "$CF_DOMAIN" ]; then
+            ALL_DISTS=$(aws cloudfront list-distributions --output json 2>/dev/null || echo '{"DistributionList":{"Items":[]}}')
+            for DIST_ID in $(echo "$ALL_DISTS" | jq -r --arg d "$CF_DOMAIN" \
+              '.DistributionList.Items[]? | select(any(.Aliases.Items[]?; . == $d)) | .Id' 2>/dev/null); do
+              [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ] && continue
+              echo "  Clearing CNAME aliases from CloudFront distribution: $DIST_ID"
+              ETAG=$(aws cloudfront get-distribution-config --id "$DIST_ID" \
+                --query 'ETag' --output text 2>/dev/null)
+              CONFIG=$(aws cloudfront get-distribution-config --id "$DIST_ID" \
+                --query 'DistributionConfig' --output json 2>/dev/null)
+              if [ -n "$ETAG" ] && [ "$ETAG" != "None" ]; then
+                UPDATED=$(echo "$CONFIG" | jq '.Aliases = {"Quantity": 0, "Items": []}')
+                aws cloudfront update-distribution \
+                  --id "$DIST_ID" \
+                  --distribution-config "$UPDATED" \
+                  --if-match "$ETAG" \
+                  --output text --query 'Distribution.Id' 2>/dev/null || true
+                echo "  Aliases cleared from $DIST_ID"
+              fi
+            done
+          fi
 
           echo "Cleanup complete — Terraform will rebuild all resources from scratch"
           exit 0
@@ -860,10 +865,20 @@ jobs:
             echo "No existing CloudFront OAC — Terraform will create it"
           fi
 
-          # Import CloudFront distribution if it already exists
+          # Import CloudFront distribution if it already exists.
+          # Search by OAC name first (reliable after our own deploys), then fall back
+          # to searching by custom_domain alias (catches manually-created distributions).
           DIST_ID=$(aws cloudfront list-distributions \
             --query "DistributionList.Items[?Comment=='${P}-${E}'].Id | [0]" \
             --output text 2>/dev/null)
+          if [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ] || [ "$DIST_ID" = "null" ]; then
+            CF_DOMAIN="${{ github.event.inputs.custom_domain }}"
+            if [ -n "$CF_DOMAIN" ]; then
+              ALL_DISTS=$(aws cloudfront list-distributions --output json 2>/dev/null || echo '{"DistributionList":{"Items":[]}}')
+              DIST_ID=$(echo "$ALL_DISTS" | jq -r --arg d "$CF_DOMAIN" \
+                '.DistributionList.Items[]? | select(any(.Aliases.Items[]?; . == $d)) | .Id' 2>/dev/null | head -1)
+            fi
+          fi
           if [ -n "$DIST_ID" ] && [ "$DIST_ID" != "None" ] && [ "$DIST_ID" != "null" ]; then
             echo "Importing CloudFront distribution: ${DIST_ID}"
             terraform state rm 'module.cloudfront[0].aws_cloudfront_distribution.web' 2>/dev/null || true
