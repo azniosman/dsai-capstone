@@ -553,6 +553,30 @@ jobs:
           aws s3api delete-bucket --bucket "${UPLOADS_BUCKET}" \
             --region "${{ env.AWS_REGION }}" 2>/dev/null || true
 
+          echo "=== Step 11: Clear CNAME aliases from any existing CloudFront distributions ==="
+          # CloudFront distributions with CNAME aliases (e.g. sklbr.co) must have those
+          # aliases removed before Terraform can create a new distribution with the same CNAMEs.
+          # Updating aliases on an enabled distribution is instant and does not require disabling.
+          for DIST_ID in $(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Comment=='${P}-${E}'].Id" \
+            --output text 2>/dev/null | tr '\t' '\n'); do
+            [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ] && continue
+            echo "  Clearing CNAME aliases from CloudFront distribution: $DIST_ID"
+            ETAG=$(aws cloudfront get-distribution-config --id "$DIST_ID" \
+              --query 'ETag' --output text 2>/dev/null)
+            CONFIG=$(aws cloudfront get-distribution-config --id "$DIST_ID" \
+              --query 'DistributionConfig' --output json 2>/dev/null)
+            if [ -n "$ETAG" ] && [ "$ETAG" != "None" ]; then
+              UPDATED=$(echo "$CONFIG" | jq '.Aliases = {"Quantity": 0, "Items": []}')
+              aws cloudfront update-distribution \
+                --id "$DIST_ID" \
+                --distribution-config "$UPDATED" \
+                --if-match "$ETAG" \
+                --output text --query 'Distribution.Id' 2>/dev/null || true
+              echo "  Aliases cleared from $DIST_ID"
+            fi
+          done
+
           echo "Cleanup complete — Terraform will rebuild all resources from scratch"
           exit 0
 
