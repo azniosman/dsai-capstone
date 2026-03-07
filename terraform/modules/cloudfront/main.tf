@@ -1,8 +1,9 @@
 locals {
   s3_origin_id  = "S3-${var.s3_bucket_id}"
   api_origin_id = "APIGW-${var.project_name}-${var.environment}"
-  # Strip "https://" prefix to get the domain name for CloudFront origin
-  api_domain = replace(var.api_gateway_url, "https://", "")
+  # Strip "https://" prefix and any trailing slash/path to get a bare domain name.
+  # API Gateway v2 $default stage invoke_url ends with "/", which CloudFront rejects.
+  api_domain = trimsuffix(replace(var.api_gateway_url, "https://", ""), "/")
 }
 
 # ── Origin Access Control (OAC) — modern replacement for OAI ─────────────────
