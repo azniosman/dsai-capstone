@@ -9,7 +9,7 @@ SkillBridge — Job Recommendation & Skill Gap Analysis System for SCTP learners
 ## Tech Stack
 
 - **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + Recharts + Framer Motion + Three.js
-- **Backend**: NestJS 10 + TypeScript + MikroORM + Passport.js
+- **Backend**: NestJS 11 + TypeScript 5.7 + MikroORM + Passport.js
 - **AI/ML**: Sentence Transformers (`bge-small-en-v1.5`), FAISS, configurable LLM chain via `LlmService` (default: Groq → Claude API → Gemini → 503)
 - **Database**: PostgreSQL 16 + pgvector
 - **Automation**: n8n workflows

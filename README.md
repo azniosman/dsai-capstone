@@ -69,9 +69,9 @@ SkillBridge is deployed on AWS serverless infrastructure. The backend is a **con
 | Database         | PostgreSQL 16 + pgvector extension                                                                                    |
 | Vector index     | HNSW (`vector_cosine_ops`) + tsvector GIN                                                                             |
 | Auth             | Passport.js — JWT + Local strategies                                                                                  |
-| Embedding model  | `Xenova/all-MiniLM-L6-v2` (ONNX, 384-dim, runs in-process)                                                            |
-| Re-ranking model | `Xenova/ms-marco-MiniLM-L-6-v2` (cross-encoder, optional)                                                             |
-| LLM providers    | Groq (`llama-3.3-70b-versatile`), Anthropic Claude (`claude-3-5-sonnet-20241022`), Google Gemini (`gemini-2.0-flash`) |
+| Embedding model  | `Xenova/bge-small-en-v1.5` (ONNX, 384-dim, runs in-process)                                                        |
+| Re-ranking model | `Xenova/ms-marco-MiniLM-L-6-v2` (cross-encoder, optional)                                                          |
+| LLM providers    | Groq (`llama-3.3-70b-versatile`), Anthropic Claude (`claude-sonnet-4-6`), Google Gemini (`gemini-2.0-flash`)        |
 | File parsing     | `pdf-parse` (PDF), `mammoth` (DOCX)                                                                                   |
 | Validation       | `class-validator` + `class-transformer`                                                                               |
 
@@ -119,7 +119,7 @@ User query
     │
     ▼
 EmbeddingService.embed(query)
-  └─ ONNX pipeline: Xenova/all-MiniLM-L6-v2 (384-dim, in-process)
+  └─ ONNX pipeline: Xenova/bge-small-en-v1.5 (384-dim, in-process)
     │
     ▼
 Single SQL CTE (one DB round trip)
@@ -158,6 +158,11 @@ Overlapping chunks (1,500 chars, 200-char overlap, sentence-boundary aware)
 384-dim vectors → stored in document_chunk (pgvector column)
 ```
 
+**Embedding model note**: `Xenova/bge-small-en-v1.5` is baked into the Docker image at build time via `scripts/download-model.cjs`. `EmbeddingService` sets `allowRemoteModels=false` in production — the model must be present in `/app/.cache/huggingface` or the service will log an error at startup.
+
+```
+```
+
 ### Hybrid Scoring (Job Recommendations)
 
 The intelligence layer uses a weighted scoring formula separate from RAG retrieval:
@@ -192,7 +197,7 @@ GROQ_MODEL=llama-3.3-70b-versatile
 
 # Anthropic Claude (secondary fallback)
 ANTHROPIC_API_KEY=sk-ant-...
-CLAUDE_MODEL=claude-3-5-sonnet-20241022
+CLAUDE_MODEL=claude-sonnet-4-6
 
 # Google Gemini (tertiary fallback)
 GEMINI_API_KEY=AIza...
@@ -395,25 +400,25 @@ Create a `.env` file at the project root. See `.env.example` for a complete temp
 
 ### LLM Providers
 
-| Variable            | Default                      | Description                                            |
-| ------------------- | ---------------------------- | ------------------------------------------------------ |
-| `PRIMARY_LLM`       | `groq`                       | First provider to attempt (`groq \| claude \| gemini`) |
-| `SECONDARY_LLM`     | `claude`                     | Second provider                                        |
-| `TERTIARY_LLM`      | `gemini`                     | Third provider                                         |
-| `GROQ_API_KEY`      | —                            | Groq API key                                           |
-| `GROQ_MODEL`        | `llama-3.3-70b-versatile`    | Groq model ID                                          |
-| `ANTHROPIC_API_KEY` | —                            | Anthropic API key                                      |
-| `CLAUDE_MODEL`      | `claude-3-5-sonnet-20241022` | Claude model ID                                        |
-| `GEMINI_API_KEY`    | —                            | Google Gemini API key                                  |
-| `GEMINI_MODEL`      | `gemini-2.0-flash`           | Gemini model ID                                        |
-| `AI_TEMPERATURE`    | `0.3`                        | Sampling temperature (all providers)                   |
-| `AI_MAX_TOKENS`     | `2048`                       | Max output tokens (all providers)                      |
+| Variable            | Default                   | Description                                            |
+| ------------------- | ------------------------- | ------------------------------------------------------ |
+| `PRIMARY_LLM`       | `groq`                    | First provider to attempt (`groq \| claude \| gemini`) |
+| `SECONDARY_LLM`     | `claude`                  | Second provider                                        |
+| `TERTIARY_LLM`      | `gemini`                  | Third provider                                         |
+| `GROQ_API_KEY`      | —                         | Groq API key                                           |
+| `GROQ_MODEL`        | `llama-3.3-70b-versatile` | Groq model ID                                          |
+| `ANTHROPIC_API_KEY` | —                         | Anthropic API key                                      |
+| `CLAUDE_MODEL`      | `claude-sonnet-4-6`       | Claude model ID                                        |
+| `GEMINI_API_KEY`    | —                         | Google Gemini API key                                  |
+| `GEMINI_MODEL`      | `gemini-2.0-flash`        | Gemini model ID                                        |
+| `AI_TEMPERATURE`    | `0.3`                     | Sampling temperature (all providers)                   |
+| `AI_MAX_TOKENS`     | `2048`                    | Max output tokens (all providers)                      |
 
 ### Embedding & RAG
 
 | Variable             | Default                         | Description                                                      |
 | -------------------- | ------------------------------- | ---------------------------------------------------------------- |
-| `EMBEDDING_MODEL`    | `Xenova/all-MiniLM-L6-v2`       | ONNX sentence embedding model (384-dim)                          |
+| `EMBEDDING_MODEL`    | `Xenova/bge-small-en-v1.5`      | ONNX sentence embedding model (384-dim); baked into Docker image |
 | `RERANKER_ENABLED`   | `false`                         | Set `true` to activate cross-encoder re-ranking                  |
 | `RERANKER_MODEL`     | `Xenova/ms-marco-MiniLM-L-6-v2` | Cross-encoder model                                              |
 | `RERANKER_TOP_N`     | `20`                            | Number of RRF candidates to score with cross-encoder             |
@@ -470,6 +475,14 @@ Create a `.env` file at the project root. See `.env.example` for a complete temp
 | `GET`  | `/api/ssg/courses/:ref`       | Get a single SSG course by reference number               |
 | `GET`  | `/api/ssg/job-roles`          | List WSG SkillsFramework job roles                        |
 | `POST` | `/api/ssg/recommendations`    | Personalised SSG courses by skill overlap                 |
+| `POST` | `/api/interview`              | AI mock interview session                                 |
+| `POST` | `/api/copilot/extract`        | Extract career profile from free text                     |
+| `POST` | `/api/copilot/chat`           | Multi-turn AI career copilot chat                         |
+| `GET`  | `/api/copilot/analyze/:id`    | Full career analysis for a profile                        |
+| `POST` | `/api/copilot/career-plan`    | Generate personalised career plan                         |
+| `POST` | `/api/copilot/resume-tips`    | Get resume improvement tips                               |
+| `GET`  | `/api/logs/recent`            | Last N structured log entries — JSON polling              |
+| `GET`  | `/api/logs/stream`            | Live log stream (SSE)                                     |
 
 ### Internal Automation Endpoints
 
@@ -520,7 +533,7 @@ dsai-capstone/
 │       │   └── providers/       # GroqProvider, ClaudeProvider, GeminiProvider
 │       ├── rag/                 # RAG pipeline
 │       │   ├── rag.service.ts   # Hybrid CTE search, RRF, feedback boost
-│       │   ├── embedding.service.ts   # ONNX all-MiniLM-L6-v2
+│       │   ├── embedding.service.ts   # ONNX bge-small-en-v1.5
 │       │   └── cross-encoder.service.ts  # ONNX ms-marco-MiniLM-L-6-v2
 │       ├── upskilling/          # Roadmap + course pathways
 │       ├── roles/               # Job role listing
@@ -601,6 +614,15 @@ dsai-capstone/
 - Pre-computed recommendation rationale (LLM generation at sync time)
 - Embedding backfill via EventBridge scheduler
 - Recommendation score pre-computation
+
+**Full feature roadmap** (see [docs/roadmap.md](docs/roadmap.md)):
+
+- Security hardening (CSRF, rate limiting, request-size limits, secrets rotation)
+- Core product enhancements (skill-gap dashboard, career roadmap, interview prep bot, job alerts)
+- Analytics (salary estimator, knowledge graph, learning progress tracker)
+- Monetisation (Stripe subscriptions, corporate portal, open partner API)
+- AI enhancements (multimodal retrieval, fine-tuned domain LLM, prompt-cost optimiser)
+- Compliance (GDPR/PDPA consent flow, SOC-2 / ISO 27001 readiness)
 
 **Enterprise roadmap** (see [Enterprise-Technical_Roadmap.md](Enterprise-Technical_Roadmap.md)):
 
