@@ -33,25 +33,45 @@ SkillBridge is a serverless, full-stack AI platform that helps SCTP learners and
 
 SkillBridge is deployed on AWS serverless infrastructure. The backend is a **containerized NestJS application** running on AWS Lambda via the `aws-serverless-express` adapter, exposed through API Gateway HTTP API v2. The frontend is a **Next.js static export** served from S3 + CloudFront. An **EventBridge Scheduler automation layer** handles all background processing — cache warming, SSG data sync, embedding backfill, and AI pre-computation — without any always-on infrastructure.
 
-```
-                    ┌─────────────────────────────────────────────────────────────┐
-                    │                      AWS Cloud (us-east-1)                  │
-                    │                                                             │
-  Users             │  CloudFront CDN          API Gateway HTTP API v2           │
-  ─────►  HTTPS ──►─┤─► S3 (frontend)    ──►──► Lambda (NestJS container) ──►──┐│
-                    │   next export static        aws-serverless-express         ││
-                    │                                                            ││
-                    │   EventBridge Scheduler                                    ││
-                    │   ┌──────────────────┐                                    ││
-                    │   │ ssg_sync (daily) │◄──────── Lambda Invoke ────────────┘│
-                    │   │ cache_cleanup    │             (internal endpoints)    ││
-                    │   │ market_insights  │                                     ││
-                    │   │ embedding_bkfill │         Aurora Serverless v2        ││
-                    │   │ lambda_warmup    │◄───────► PostgreSQL 16 + pgvector ◄─┘│
-                    │   └──────────────────┘         HNSW + tsvector GIN         │
-                    │                                                             │
-                    │   ECR (Docker images)   Secrets Manager   CloudWatch       │
-                    └─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    User(["👤 Users"])
+
+    subgraph AWS["AWS Cloud · us-east-1"]
+        CF["CloudFront CDN"]
+        S3["S3\nNext.js static export"]
+        APIGW["API Gateway\nHTTP API v2"]
+        Lambda["Lambda\nNestJS container\naws-serverless-express"]
+        Aurora[("Aurora Serverless v2\nPostgreSQL 16 + pgvector\nHNSW · tsvector GIN")]
+        ECR["ECR\nDocker images"]
+        SM["Secrets Manager"]
+        CW["CloudWatch\nMetrics · Alarms · Logs"]
+
+        subgraph EB["EventBridge Scheduler"]
+            SSG["ssg_sync\ndaily 01:00"]
+            REC["recommendation_refresh\ndaily 02:00"]
+            CACHE["cache_cleanup\ndaily 03:00"]
+            MKT["market_insights\ndaily 04:00"]
+            EMB["embedding_backfill\nevery 6 h"]
+            WARM["lambda_warmup\nevery 5 min"]
+        end
+    end
+
+    User -->|HTTPS| CF
+    CF --> S3
+    CF -->|"/api/*"| APIGW
+    APIGW --> Lambda
+    Lambda <-->|read/write| Aurora
+    Lambda -->|pull image| ECR
+    Lambda -->|fetch secrets| SM
+    Lambda -->|emit metrics| CW
+
+    SSG -->|Lambda Invoke\n/internal/*| Lambda
+    REC -->|Lambda Invoke\n/internal/*| Lambda
+    CACHE -->|Lambda Invoke\n/internal/*| Lambda
+    MKT -->|Lambda Invoke\n/internal/*| Lambda
+    EMB -->|Lambda Invoke\n/internal/*| Lambda
+    WARM -->|Lambda Invoke\n/internal/health| Lambda
 ```
 
 **Schema lifecycle**: On every Lambda cold start, `orm.getSchemaGenerator().updateSchema()` runs automatically. This is additive-only — it adds missing tables and columns but never drops anything, making it safe for zero-downtime Lambda deployments.
@@ -68,10 +88,10 @@ SkillBridge is deployed on AWS serverless infrastructure. The backend is a **con
 | ORM              | MikroORM 6 (PostgreSQL driver)                                                                                        |
 | Database         | PostgreSQL 16 + pgvector extension                                                                                    |
 | Vector index     | HNSW (`vector_cosine_ops`) + tsvector GIN                                                                             |
-| Auth             | Passport.js — JWT + Local strategies                                                                                  |
-| Embedding model  | `Xenova/all-MiniLM-L6-v2` (ONNX, 384-dim, runs in-process)                                                            |
-| Re-ranking model | `Xenova/ms-marco-MiniLM-L-6-v2` (cross-encoder, optional)                                                             |
-| LLM providers    | Groq (`llama-3.3-70b-versatile`), Anthropic Claude (`claude-3-5-sonnet-20241022`), Google Gemini (`gemini-2.0-flash`) |
+| Auth             | Passport.js — JWT + Local + LinkedIn OAuth strategies                                                                 |
+| Embedding model  | `Xenova/bge-small-en-v1.5` (ONNX, 384-dim, runs in-process)                                                        |
+| Re-ranking model | `Xenova/ms-marco-MiniLM-L-6-v2` (cross-encoder, optional)                                                          |
+| LLM providers    | Groq (`llama-3.3-70b-versatile`), Anthropic Claude (`claude-sonnet-4-6`), Google Gemini (`gemini-2.0-flash`)        |
 | File parsing     | `pdf-parse` (PDF), `mammoth` (DOCX)                                                                                   |
 | Validation       | `class-validator` + `class-transformer`                                                                               |
 
@@ -79,9 +99,9 @@ SkillBridge is deployed on AWS serverless infrastructure. The backend is a **con
 
 | Layer         | Technology                                     |
 | ------------- | ---------------------------------------------- |
-| Framework     | Next.js 16 (App Router) + React 19             |
-| Language      | TypeScript 5                                   |
-| Styling       | Tailwind CSS 4 + shadcn/ui (New York style)    |
+| Framework     | Next.js 16 (App Router) + React 19 (PWA-enabled) |
+| Language      | TypeScript 5                                     |
+| Styling       | Tailwind CSS 4 + shadcn/ui (New York style) + dark mode |
 | State         | Zustand 5 (modal store, profile builder store) |
 | Data fetching | TanStack Query v5 (React Query)                |
 | Charts        | Recharts 3                                     |
@@ -119,7 +139,7 @@ User query
     │
     ▼
 EmbeddingService.embed(query)
-  └─ ONNX pipeline: Xenova/all-MiniLM-L6-v2 (384-dim, in-process)
+  └─ ONNX pipeline: Xenova/bge-small-en-v1.5 (384-dim, in-process)
     │
     ▼
 Single SQL CTE (one DB round trip)
@@ -158,6 +178,11 @@ Overlapping chunks (1,500 chars, 200-char overlap, sentence-boundary aware)
 384-dim vectors → stored in document_chunk (pgvector column)
 ```
 
+**Embedding model note**: `Xenova/bge-small-en-v1.5` is baked into the Docker image at build time via `scripts/download-model.cjs`. `EmbeddingService` sets `allowRemoteModels=false` in production — the model must be present in `/app/.cache/huggingface` or the service will log an error at startup.
+
+```
+```
+
 ### Hybrid Scoring (Job Recommendations)
 
 The intelligence layer uses a weighted scoring formula separate from RAG retrieval:
@@ -192,7 +217,7 @@ GROQ_MODEL=llama-3.3-70b-versatile
 
 # Anthropic Claude (secondary fallback)
 ANTHROPIC_API_KEY=sk-ant-...
-CLAUDE_MODEL=claude-3-5-sonnet-20241022
+CLAUDE_MODEL=claude-sonnet-4-6
 
 # Google Gemini (tertiary fallback)
 GEMINI_API_KEY=AIza...
@@ -242,7 +267,18 @@ All automation functions share `base_automation.py` for token retrieval (from Se
 - **Market Insights** — Singapore labor market data: sector demand, salary benchmarks, skill trends
 - **Role Comparison** — Side-by-side comparison of up to multiple target roles
 - **Skill Progress Tracking** — Record skill advancement over time with dashboard visualisation
+- **Course Enrollment & Achievements** — Enroll in SCTP courses, track completion, earn gamified achievements; progress summary dashboard
+- **Interview Preparation Bot** — Structured AI mock interview sessions with turn-by-turn history persisted to `interview_session` / `interview_turn` entities
+- **Job Alerts** — Subscribe to role-specific job alerts; notifications delivered via `notification` entity
+- **Live Infocomm Job Matrix** — Real-time Singapore job matrix view backed by the data-intelligence pipeline (dataset versioning, diff tracking, trend signals)
 - **Dashboard** — Career health score, KPI tiles, opportunity feed, and growth vectors
+
+### Account & Compliance Features
+
+- **LinkedIn OAuth** — One-click sign-in via LinkedIn; auto-creates user + pre-fills profile from LinkedIn data via `LinkedInImportService`
+- **GDPR/PDPA Consent Management** — Full consent audit trail (`consent_record` entity); supports data export and right-to-erasure (`DELETE /api/consent/erase`, `DELETE /api/auth/me`)
+- **Dark Mode** — System-aware theme toggle persisted via `ThemeProvider`
+- **PWA** — Installable as a Progressive Web App with offline shell caching
 
 ### Platform Features
 
@@ -395,25 +431,25 @@ Create a `.env` file at the project root. See `.env.example` for a complete temp
 
 ### LLM Providers
 
-| Variable            | Default                      | Description                                            |
-| ------------------- | ---------------------------- | ------------------------------------------------------ |
-| `PRIMARY_LLM`       | `groq`                       | First provider to attempt (`groq \| claude \| gemini`) |
-| `SECONDARY_LLM`     | `claude`                     | Second provider                                        |
-| `TERTIARY_LLM`      | `gemini`                     | Third provider                                         |
-| `GROQ_API_KEY`      | —                            | Groq API key                                           |
-| `GROQ_MODEL`        | `llama-3.3-70b-versatile`    | Groq model ID                                          |
-| `ANTHROPIC_API_KEY` | —                            | Anthropic API key                                      |
-| `CLAUDE_MODEL`      | `claude-3-5-sonnet-20241022` | Claude model ID                                        |
-| `GEMINI_API_KEY`    | —                            | Google Gemini API key                                  |
-| `GEMINI_MODEL`      | `gemini-2.0-flash`           | Gemini model ID                                        |
-| `AI_TEMPERATURE`    | `0.3`                        | Sampling temperature (all providers)                   |
-| `AI_MAX_TOKENS`     | `2048`                       | Max output tokens (all providers)                      |
+| Variable            | Default                   | Description                                            |
+| ------------------- | ------------------------- | ------------------------------------------------------ |
+| `PRIMARY_LLM`       | `groq`                    | First provider to attempt (`groq \| claude \| gemini`) |
+| `SECONDARY_LLM`     | `claude`                  | Second provider                                        |
+| `TERTIARY_LLM`      | `gemini`                  | Third provider                                         |
+| `GROQ_API_KEY`      | —                         | Groq API key                                           |
+| `GROQ_MODEL`        | `llama-3.3-70b-versatile` | Groq model ID                                          |
+| `ANTHROPIC_API_KEY` | —                         | Anthropic API key                                      |
+| `CLAUDE_MODEL`      | `claude-sonnet-4-6`       | Claude model ID                                        |
+| `GEMINI_API_KEY`    | —                         | Google Gemini API key                                  |
+| `GEMINI_MODEL`      | `gemini-2.0-flash`        | Gemini model ID                                        |
+| `AI_TEMPERATURE`    | `0.3`                     | Sampling temperature (all providers)                   |
+| `AI_MAX_TOKENS`     | `2048`                    | Max output tokens (all providers)                      |
 
 ### Embedding & RAG
 
 | Variable             | Default                         | Description                                                      |
 | -------------------- | ------------------------------- | ---------------------------------------------------------------- |
-| `EMBEDDING_MODEL`    | `Xenova/all-MiniLM-L6-v2`       | ONNX sentence embedding model (384-dim)                          |
+| `EMBEDDING_MODEL`    | `Xenova/bge-small-en-v1.5`      | ONNX sentence embedding model (384-dim); baked into Docker image |
 | `RERANKER_ENABLED`   | `false`                         | Set `true` to activate cross-encoder re-ranking                  |
 | `RERANKER_MODEL`     | `Xenova/ms-marco-MiniLM-L-6-v2` | Cross-encoder model                                              |
 | `RERANKER_TOP_N`     | `20`                            | Number of RRF candidates to score with cross-encoder             |
@@ -444,32 +480,64 @@ Create a `.env` file at the project root. See `.env.example` for a complete temp
 
 | Method | Path                          | Description                                               |
 | ------ | ----------------------------- | --------------------------------------------------------- |
-| `POST` | `/api/auth/register`          | User registration                                         |
-| `POST` | `/api/auth/login`             | Login → returns JWT                                       |
-| `GET`  | `/api/auth/me`                | Current user info                                         |
-| `POST` | `/api/profile`                | Create user profile                                       |
+| `POST`   | `/api/auth/register`          | User registration                                         |
+| `POST`   | `/api/auth/login`             | Login → returns JWT                                       |
+| `GET`    | `/api/auth/me`                | Current user info                                         |
+| `PATCH`  | `/api/auth/me`                | Update account (email, display name)                      |
+| `DELETE` | `/api/auth/me`                | Delete account (GDPR/PDPA right to erasure)               |
+| `POST`   | `/api/auth/change-password`   | Change password                                           |
+| `POST`   | `/api/auth/logout`            | Invalidate refresh token                                  |
+| `POST`   | `/api/auth/refresh`           | Refresh JWT access token                                  |
+| `GET`    | `/api/auth/linkedin`          | Initiate LinkedIn OAuth flow                              |
+| `GET`    | `/api/auth/linkedin/callback` | LinkedIn OAuth callback                                   |
+| `GET`    | `/api/auth/linkedin/preview`  | Preview LinkedIn profile before import                    |
+| `POST`   | `/api/consent`                | Record GDPR/PDPA consent                                  |
+| `GET`    | `/api/consent`                | Get current consent status                                |
+| `GET`    | `/api/consent/history`        | Full consent audit trail                                  |
+| `GET`    | `/api/consent/export`         | Export personal data (PDPA data portability)              |
+| `DELETE` | `/api/consent/erase`          | Erase personal data (PDPA right to erasure)               |
+| `POST`   | `/api/profile`                | Create user profile                                       |
 | `POST` | `/api/upload-resume`          | Upload PDF/DOCX resume for parsing                        |
-| `POST` | `/api/recommend`              | Get job recommendations (auth optional)                   |
-| `GET`  | `/api/skill-gap/{id}`         | Skill gap analysis for a role                             |
-| `GET`  | `/api/upskilling/{id}`        | Upskilling roadmap for a role                             |
-| `POST` | `/api/jd-match`               | Match profile against job description (auth optional)     |
-| `POST` | `/api/chat`                   | Career coach chat — returns `{ reply, engine }` JSON      |
-| `GET`  | `/api/market-insights`        | Singapore labor market data                               |
-| `POST` | `/api/compare-roles`          | Multi-role comparison                                     |
-| `GET`  | `/api/roles`                  | List all job roles                                        |
-| `POST` | `/api/progress`               | Record skill progress                                     |
-| `GET`  | `/api/progress/{id}`          | Progress dashboard                                        |
-| `GET`  | `/api/progress/{id}/timeline` | Progress timeline                                         |
-| `GET`  | `/api/courses`                | List SCTP courses                                         |
-| `POST` | `/api/calculate-subsidy`      | Calculate SkillsFuture subsidy                            |
-| `POST` | `/api/rag/query`              | Hybrid RAG retrieval (pgvector HNSW + tsvector GIN + RRF) |
-| `POST` | `/api/rag/feedback`           | Submit thumbs-up/down for a retrieved chunk               |
-| `GET`  | `/api/dashboard/summary`      | Authenticated user's dashboard KPIs                       |
-| `POST` | `/api/resume-rewriter`        | AI-rewrite a resume bullet for a target role              |
-| `GET`  | `/api/ssg/courses/search`     | Search SkillsFuture courses (paginated)                   |
-| `GET`  | `/api/ssg/courses/:ref`       | Get a single SSG course by reference number               |
-| `GET`  | `/api/ssg/job-roles`          | List WSG SkillsFramework job roles                        |
-| `POST` | `/api/ssg/recommendations`    | Personalised SSG courses by skill overlap                 |
+| `POST`   | `/api/recommend`              | Get job recommendations (auth optional)                   |
+| `GET`    | `/api/skill-gap/{id}`         | Skill gap analysis for a role                             |
+| `GET`    | `/api/upskilling/{id}`        | Upskilling roadmap for a role                             |
+| `POST`   | `/api/jd-match`               | Match profile against job description (auth optional)     |
+| `POST`   | `/api/chat`                   | Career coach chat — returns `{ reply, engine }` JSON      |
+| `GET`    | `/api/market-insights`        | Singapore labor market data                               |
+| `POST`   | `/api/compare-roles`          | Multi-role comparison                                     |
+| `GET`    | `/api/roles`                  | List all job roles                                        |
+| `POST`   | `/api/progress`                              | Record skill progress                   |
+| `GET`    | `/api/progress/{id}`                         | Progress dashboard                      |
+| `GET`    | `/api/progress/{id}/timeline`                | Progress timeline                       |
+| `POST`   | `/api/progress/enroll`                       | Enroll in a course                      |
+| `PATCH`  | `/api/progress/enrollment/{id}/progress`     | Update course progress                  |
+| `PATCH`  | `/api/progress/enrollment/{id}/complete`     | Mark course complete                    |
+| `GET`    | `/api/progress/enrollments`                  | List all enrollments                    |
+| `GET`    | `/api/progress/summary`                      | Gamified progress summary               |
+| `GET`    | `/api/progress/achievements`                 | List earned achievements                |
+| `GET`    | `/api/progress/achievement-summary`          | Achievement statistics                  |
+| `GET`    | `/api/courses`                | List SCTP courses                                         |
+| `POST`   | `/api/calculate-subsidy`      | Calculate SkillsFuture subsidy                            |
+| `POST`   | `/api/rag/query`              | Hybrid RAG retrieval (pgvector HNSW + tsvector GIN + RRF) |
+| `POST`   | `/api/rag/feedback`           | Submit thumbs-up/down for a retrieved chunk               |
+| `GET`    | `/api/dashboard/summary`      | Authenticated user's dashboard KPIs                       |
+| `POST`   | `/api/resume-rewriter`        | AI-rewrite a resume bullet for a target role              |
+| `GET`    | `/api/ssg/courses/search`     | Search SkillsFuture courses (paginated)                   |
+| `GET`    | `/api/ssg/courses/:ref`       | Get a single SSG course by reference number               |
+| `GET`    | `/api/ssg/job-roles`          | List WSG SkillsFramework job roles                        |
+| `POST`   | `/api/ssg/recommendations`    | Personalised SSG courses by skill overlap                 |
+| `POST`   | `/api/interview`              | AI mock interview session                                 |
+| `POST`   | `/api/copilot/extract`        | Extract career profile from free text                     |
+| `POST`   | `/api/copilot/chat`           | Multi-turn AI career copilot chat                         |
+| `GET`    | `/api/copilot/analyze/:id`    | Full career analysis for a profile                        |
+| `POST`   | `/api/copilot/career-plan`    | Generate personalised career plan                         |
+| `POST`   | `/api/copilot/resume-tips`    | Get resume improvement tips                               |
+| `GET`  | `/api/logs/recent`            | Last N structured log entries — JSON polling              |
+| `GET`  | `/api/logs/stream`            | Live log stream (SSE)                                     |
+| `GET`  | `/api/live-matrix`            | Infocomm job matrix (live dataset)                        |
+| `GET`  | `/api/datasets`               | List ingested datasets + versions                         |
+| `GET`  | `/api/dataset-diff`           | Diff between two dataset versions                         |
+| `GET`  | `/api/trends`                 | Aggregated trend signals                                  |
 
 ### Internal Automation Endpoints
 
@@ -493,6 +561,8 @@ These are accessed via Lambda Invoke API only — not exposed on API Gateway. Al
 ## Security
 
 - **JWT authentication**: Signed tokens with configurable secret via `JWT_SECRET`. Core endpoints use `OptionalJwtAuthGuard` to allow unauthenticated access while still personalising responses when a valid token is present.
+- **LinkedIn OAuth**: Passport.js `LinkedInStrategy` with server-side callback; profile data is imported once on first login and never stored beyond what the user consents to.
+- **GDPR/PDPA compliance**: Full consent audit trail via `consent_record` entity. Users can export their data (`GET /api/consent/export`) or trigger erasure (`DELETE /api/consent/erase`, `DELETE /api/auth/me`) which cascades deletion across all personal data tables.
 - **Password hashing**: bcrypt (cost factor default from library) for all stored credentials.
 - **Internal endpoint isolation**: `/internal/*` routes are not registered on API Gateway. The `InternalTokenGuard` validates the `X-Internal-Token` header as a second layer of defence, but the primary guard is the absence of a public route.
 - **Input validation**: All request bodies validated with `class-validator` + `whitelist: true, forbidNonWhitelisted: true`. No extra fields reach controllers.
@@ -520,15 +590,16 @@ dsai-capstone/
 │       │   └── providers/       # GroqProvider, ClaudeProvider, GeminiProvider
 │       ├── rag/                 # RAG pipeline
 │       │   ├── rag.service.ts   # Hybrid CTE search, RRF, feedback boost
-│       │   ├── embedding.service.ts   # ONNX all-MiniLM-L6-v2
+│       │   ├── embedding.service.ts   # ONNX bge-small-en-v1.5
 │       │   └── cross-encoder.service.ts  # ONNX ms-marco-MiniLM-L-6-v2
 │       ├── upskilling/          # Roadmap + course pathways
 │       ├── roles/               # Job role listing
 │       ├── courses/             # SCTP course catalog + subsidy calculator
 │       ├── domain/              # Market insights + dashboard summary
 │       ├── ssg/                 # SkillsFuture/WSG API integration (3-tier fallback)
+│       ├── data-intelligence/   # Live job matrix, dataset versioning, trend signals
 │       ├── internal/            # Automation endpoints (Lambda Invoke only)
-│       ├── entities/            # MikroORM entities (12 tables)
+│       ├── entities/            # MikroORM entities (25+ tables)
 │       ├── migrations/          # MikroORM migrations (destructive changes only)
 │       ├── seeders/             # Reference data seeders
 │       └── common/              # Config, filters, interceptors, guards, utils
@@ -601,6 +672,14 @@ dsai-capstone/
 - Pre-computed recommendation rationale (LLM generation at sync time)
 - Embedding backfill via EventBridge scheduler
 - Recommendation score pre-computation
+
+**Full feature roadmap** (see [docs/roadmap.md](docs/roadmap.md)):
+
+- Security hardening (CSRF, rate limiting, request-size limits, secrets rotation)
+- Analytics (salary estimator, knowledge graph)
+- Monetisation (Stripe subscriptions, corporate portal, open partner API)
+- AI enhancements (multimodal retrieval, fine-tuned domain LLM, prompt-cost optimiser)
+- Compliance (SOC-2 / ISO 27001 readiness)
 
 **Enterprise roadmap** (see [Enterprise-Technical_Roadmap.md](Enterprise-Technical_Roadmap.md)):
 
