@@ -27,6 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api-client";
 
 /* ─── Types ─── */
 interface LogEntry {
@@ -44,6 +45,25 @@ interface Sector {
   roles: number;
   trend: "up" | "down" | "stable";
   topSkills: string[];
+}
+
+/* ─── Backend Types ─── */
+interface BackendMarketInsight {
+  role_category: string;
+  demand_level: string;
+  avg_salary_sgd: number;
+  yoy_growth_pct: number;
+  hiring_volume: number;
+  trending_skills: string[];
+  forecast_2026?: string;
+  outlook?: string;
+}
+
+interface BackendMarketInsightsResponse {
+  top_skills_overall: string[];
+  highest_demand_sectors: string[];
+  insights: BackendMarketInsight[];
+  last_updated?: string;
 }
 
 /* ─── Mock Data ─── */
@@ -220,7 +240,40 @@ export default function MarketIntelPage() {
     SYNC_LOG_ENTRIES.slice(0, 5),
   );
   const [isStreaming, setIsStreaming] = useState(true);
+  const [sectors, setSectors] = useState<Sector[]>([]);
+  const [loadingSectors, setLoadingSectors] = useState(true);
   const logRef = useRef<HTMLDivElement>(null);
+
+  // Fetch market insights from backend on mount
+  useEffect(() => {
+    const fetchMarketInsights = async () => {
+      try {
+        const res = await api.get<BackendMarketInsightsResponse>("/api/market-insights");
+        const insights = res.data.insights || [];
+        
+        // Transform backend data to frontend Sector format
+        const transformedSectors: Sector[] = insights.map((ins) => ({
+          name: ins.role_category,
+          growth: Math.round(ins.yoy_growth_pct),
+          demand: ins.demand_level as "High" | "Medium" | "Low",
+          roles: ins.hiring_volume,
+          trend: ins.yoy_growth_pct > 0 ? "up" : ins.yoy_growth_pct < 0 ? "down" : "stable",
+          topSkills: ins.trending_skills.slice(0, 4),
+        }));
+        
+        // Use transformed data or fallback to mock data
+        setSectors(transformedSectors.length > 0 ? transformedSectors : SECTORS);
+      } catch (err) {
+        console.error("Failed to fetch market insights:", err);
+        // Fallback to mock data on error
+        setSectors(SECTORS);
+      } finally {
+        setLoadingSectors(false);
+      }
+    };
+
+    fetchMarketInsights();
+  }, []);
 
   useEffect(() => {
     if (!isStreaming) return;
@@ -558,112 +611,140 @@ export default function MarketIntelPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => {
+                    setLoadingSectors(true);
+                    api.get<BackendMarketInsightsResponse>("/api/market-insights")
+                      .then((res) => {
+                        const insights = res.data.insights || [];
+                        const transformedSectors: Sector[] = insights.map((ins) => ({
+                          name: ins.role_category,
+                          growth: Math.round(ins.yoy_growth_pct),
+                          demand: ins.demand_level as "High" | "Medium" | "Low",
+                          roles: ins.hiring_volume,
+                          trend: ins.yoy_growth_pct > 0 ? "up" : ins.yoy_growth_pct < 0 ? "down" : "stable",
+                          topSkills: ins.trending_skills.slice(0, 4),
+                        }));
+                        setSectors(transformedSectors.length > 0 ? transformedSectors : SECTORS);
+                      })
+                      .catch(() => setSectors(SECTORS))
+                      .finally(() => setLoadingSectors(false));
+                  }}
                   className="text-[10px] uppercase tracking-widest font-bold border-primary/30 text-primary hover:bg-primary/10 rounded-lg h-8"
                 >
-                  <RefreshCw className="w-3 h-3 mr-1.5" /> Refresh
+                  <RefreshCw className={cn("w-3 h-3 mr-1.5", loadingSectors && "animate-spin")} />
+                  {loadingSectors ? "Loading..." : "Refresh"}
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {SECTORS.map((sector) => (
-                  <div
-                    key={sector.name}
-                    className="border border-border rounded-lg bg-card/50 p-5 hover:border-primary/40 transition-all group"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-bold uppercase tracking-tight text-foreground group-hover:text-primary transition-colors">
-                        {sector.name}
-                      </h3>
-                      <ArrowUpRight
-                        className={cn(
-                          "w-4 h-4",
-                          sector.trend === "up"
-                            ? "text-emerald-400"
-                            : "text-muted-foreground",
-                        )}
-                      />
-                    </div>
-
-                    {/* Growth Bar */}
-                    <div className="mb-4">
-                      <div className="flex justify-between text-[10px] uppercase tracking-widest mb-1">
-                        <span className="text-muted-foreground font-bold">
-                          Growth
-                        </span>
-                        <span
+              {loadingSectors ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="flex items-center gap-2 text-primary">
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span className="text-sm uppercase tracking-widest">Loading sector data...</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {sectors.map((sector) => (
+                    <div
+                      key={sector.name}
+                      className="border border-border rounded-lg bg-card/50 p-5 hover:border-primary/40 transition-all group"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold uppercase tracking-tight text-foreground group-hover:text-primary transition-colors">
+                          {sector.name}
+                        </h3>
+                        <ArrowUpRight
                           className={cn(
-                            "font-bold",
-                            sector.growth >= 25
+                            "w-4 h-4",
+                            sector.trend === "up"
                               ? "text-emerald-400"
-                              : sector.growth >= 15
-                                ? "text-primary"
-                                : "text-muted-foreground",
+                              : "text-muted-foreground",
                           )}
-                        >
-                          +{sector.growth}%
-                        </span>
-                      </div>
-                      <div className="score-bar-track">
-                        <div
-                          className="score-bar-fill bg-primary"
-                          style={{
-                            width: `${Math.min(sector.growth * 2.5, 100)}%`,
-                          }}
                         />
                       </div>
-                    </div>
 
-                    {/* Stats Row */}
-                    <div className="flex gap-3 mb-4">
-                      <div className="flex-1 bg-background/50 border border-border rounded-lg px-3 py-2 text-center">
-                        <p className="text-base font-bold text-foreground data-num">
-                          {sector.roles.toLocaleString()}
-                        </p>
-                        <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">
-                          Roles
-                        </p>
-                      </div>
-                      <div className="flex-1 bg-background/50 border border-border rounded-lg px-3 py-2 text-center">
-                        <p
-                          className={cn(
-                            "text-base font-bold",
-                            sector.demand === "High"
-                              ? "text-emerald-400"
-                              : "text-primary",
-                          )}
-                        >
-                          {sector.demand}
-                        </p>
-                        <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">
-                          Demand
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Top Skills */}
-                    <div>
-                      <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold mb-2">
-                        Top Skills
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {sector.topSkills.map((skill) => (
-                          <span
-                            key={skill}
-                            className="text-[10px] px-2 py-0.5 bg-primary/10 border border-primary/20 text-primary font-bold uppercase tracking-wider rounded"
-                          >
-                            {skill}
+                      {/* Growth Bar */}
+                      <div className="mb-4">
+                        <div className="flex justify-between text-[10px] uppercase tracking-widest mb-1">
+                          <span className="text-muted-foreground font-bold">
+                            Growth
                           </span>
-                        ))}
+                          <span
+                            className={cn(
+                              "font-bold",
+                              sector.growth >= 25
+                                ? "text-emerald-400"
+                                : sector.growth >= 15
+                                  ? "text-primary"
+                                  : "text-muted-foreground",
+                            )}
+                          >
+                            +{sector.growth}%
+                          </span>
+                        </div>
+                        <div className="score-bar-track">
+                          <div
+                            className="score-bar-fill bg-primary"
+                            style={{
+                              width: `${Math.min(sector.growth * 2.5, 100)}%`,
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Action */}
-                    <button className="w-full mt-4 flex items-center justify-center gap-1 text-[10px] uppercase tracking-widest font-bold text-primary hover:bg-primary/10 py-2 border border-primary/20 rounded-lg transition-colors">
-                      Deep Dive <ChevronRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+                      {/* Stats Row */}
+                      <div className="flex gap-3 mb-4">
+                        <div className="flex-1 bg-background/50 border border-border rounded-lg px-3 py-2 text-center">
+                          <p className="text-base font-bold text-foreground data-num">
+                            {sector.roles.toLocaleString()}
+                          </p>
+                          <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">
+                            Roles
+                          </p>
+                        </div>
+                        <div className="flex-1 bg-background/50 border border-border rounded-lg px-3 py-2 text-center">
+                          <p
+                            className={cn(
+                              "text-base font-bold",
+                              sector.demand === "High"
+                                ? "text-emerald-400"
+                                : "text-primary",
+                            )}
+                          >
+                            {sector.demand}
+                          </p>
+                          <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">
+                            Demand
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Top Skills */}
+                      <div>
+                        <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold mb-2">
+                          Top Skills
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {sector.topSkills.map((skill) => (
+                            <span
+                              key={skill}
+                              className="text-[10px] px-2 py-0.5 bg-primary/10 border border-primary/20 text-primary font-bold uppercase tracking-wider rounded"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Action */}
+                      <button className="w-full mt-4 flex items-center justify-center gap-1 text-[10px] uppercase tracking-widest font-bold text-primary hover:bg-primary/10 py-2 border border-primary/20 rounded-lg transition-colors">
+                        Deep Dive <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
