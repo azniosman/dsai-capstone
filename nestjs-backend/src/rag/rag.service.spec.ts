@@ -13,6 +13,7 @@ import { LogBusService } from '@app/common/log-bus.service';
 import { EmbeddingService, EMBEDDING_DIM } from './embedding.service';
 import { CrossEncoderService } from './cross-encoder.service';
 import { DocumentChunk } from '@app/entities/document-chunk.entity';
+import { ExecutionTraceService } from '@app/production-assurance/execution-trace.service';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,17 @@ const buildMockEm = () => ({
   }),
 });
 
+const buildMockExecutionTraceService = (): jest.Mocked<ExecutionTraceService> =>
+  ({
+    startTrace: jest.fn(),
+    endTrace: jest.fn(),
+    addStep: jest.fn(),
+    addTraceStep: jest.fn(),
+    failTrace: jest.fn(),
+    completeTrace: jest.fn(),
+    getTrace: jest.fn(),
+  }) as unknown as jest.Mocked<ExecutionTraceService>;
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('RagService', () => {
@@ -60,12 +72,14 @@ describe('RagService', () => {
   let crossEncoderService: jest.Mocked<CrossEncoderService>;
   let mockRepo: ReturnType<typeof buildMockRepo>;
   let mockEm: ReturnType<typeof buildMockEm>;
+  let executionTraceService: jest.Mocked<ExecutionTraceService>;
 
   beforeEach(async () => {
     mockRepo = buildMockRepo();
     mockEm = buildMockEm();
     embeddingService = buildMockEmbeddingService();
     crossEncoderService = buildMockCrossEncoderService();
+    executionTraceService = buildMockExecutionTraceService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -77,6 +91,10 @@ describe('RagService', () => {
         {
           provide: LogBusService,
           useValue: { emit: jest.fn(), getRecent: jest.fn() },
+        },
+        {
+          provide: ExecutionTraceService,
+          useValue: executionTraceService,
         },
       ],
     }).compile();
@@ -242,7 +260,12 @@ describe('RagService', () => {
       await service.query('test', 1, { profileId: 42 });
 
       const sqlCall = mockEm.getConnection().execute.mock.calls[0][0] as string;
-      expect(sqlCall).toContain('profile_id = 42');
+      // SQL uses parameterized queries ($8::int) with IS NULL check
+      expect(sqlCall).toContain('$8::int IS NULL OR dc.profile_id = $8::int');
+      // Check that profileId is passed as a parameter (8th parameter)
+      const params = mockEm.getConnection().execute.mock
+        .calls[0][1] as unknown[];
+      expect(params[7]).toBe(42);
     });
   });
 

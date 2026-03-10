@@ -142,7 +142,9 @@ export class LlmService {
    * has no active store.
    */
   getLastUsedProvider(): LlmProviderName | null {
-    return (this.cls.get<LlmProviderName>(CLS_PROVIDER_KEY)) ?? this.lastUsedProvider;
+    return (
+      this.cls.get<LlmProviderName>(CLS_PROVIDER_KEY) ?? this.lastUsedProvider
+    );
   }
 
   /**
@@ -248,7 +250,9 @@ export class LlmService {
     try {
       return JSON.parse(cleaned) as T;
     } catch {
-      throw new Error(`LLM returned invalid JSON for "${label}": ${cleaned.slice(0, 200)}`);
+      throw new Error(
+        `LLM returned invalid JSON for "${label}": ${cleaned.slice(0, 200)}`,
+      );
     }
   }
 
@@ -477,7 +481,10 @@ export class LlmService {
       systemPrompt,
     );
 
-    const parsed = this.parseJson<Record<string, unknown>>(raw, 'extractCareerIntelligence');
+    const parsed = this.parseJson<Record<string, unknown>>(
+      raw,
+      'extractCareerIntelligence',
+    );
     return {
       ...(parsed as any),
       analyzed_at: new Date().toISOString(),

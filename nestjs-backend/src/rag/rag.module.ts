@@ -10,7 +10,17 @@ import { RagPipelineService } from './rag-pipeline.service';
 @Module({
   imports: [MikroOrmModule.forFeature([DocumentChunk])],
   controllers: [RagController],
-  providers: [EmbeddingService, CrossEncoderService, RagService, RagPipelineService],
-  exports: [EmbeddingService, CrossEncoderService, RagService, RagPipelineService],
+  providers: [
+    EmbeddingService,
+    CrossEncoderService,
+    RagService,
+    RagPipelineService,
+  ],
+  exports: [
+    EmbeddingService,
+    CrossEncoderService,
+    RagService,
+    RagPipelineService,
+  ],
 })
 export class RagModule {}

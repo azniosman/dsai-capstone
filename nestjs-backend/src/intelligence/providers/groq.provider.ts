@@ -83,15 +83,18 @@ export class GroqProvider implements LlmProvider {
       throw new Error('Groq client not available');
     }
 
-    const groqMessages: {
+    const groqMessages: Array<{
       role: 'system' | 'user' | 'assistant';
       content: string;
-    }[] = [
-      { role: 'system', content: systemPrompt },
-      ...messages.map((m) => ({
-        role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
-        content: m.content,
-      })),
+    }> = [
+      { role: 'system' as const, content: systemPrompt },
+      ...messages.map(
+        (m): { role: 'system' | 'user' | 'assistant'; content: string } => ({
+          role:
+            m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+          content: m.content,
+        }),
+      ),
     ];
 
     const completion = await this.client.chat.completions.create({

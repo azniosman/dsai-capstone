@@ -57,13 +57,17 @@ Answer the user's question using ONLY the provided context sources below.`;
   /**
    * Called internally to build the pgvector system documentation base.
    */
-  async ingestChunks(chunks: IngestChunkDto[]): Promise<{ ingested: number; errors: number }> {
+  async ingestChunks(
+    chunks: IngestChunkDto[],
+  ): Promise<{ ingested: number; errors: number }> {
     let ingested = 0;
     let errors = 0;
 
     for (const chunk of chunks) {
       try {
-        const existing = await this.sysDocRepo.findOne({ chunkHash: chunk.chunkHash });
+        const existing = await this.sysDocRepo.findOne({
+          chunkHash: chunk.chunkHash,
+        });
         if (existing) continue;
 
         const embedding = await this.embeddingService.embed(chunk.content);
@@ -82,10 +86,12 @@ Answer the user's question using ONLY the provided context sources below.`;
         errors++;
       }
     }
-    
+
     if (ingested > 0) {
       await this.em.flush();
-      this.logger.log(`Flushed ${ingested} new system documents to the database.`);
+      this.logger.log(
+        `Flushed ${ingested} new system documents to the database.`,
+      );
     }
 
     return { ingested, errors };
@@ -114,7 +120,10 @@ Answer the user's question using ONLY the provided context sources below.`;
     try {
       results = await conn.execute(queryStr, [JSON.stringify(queryVector)]);
     } catch (err) {
-      this.logger.warn('system_documents query failed — table may not be seeded yet', (err as Error).message);
+      this.logger.warn(
+        'system_documents query failed — table may not be seeded yet',
+        (err as Error).message,
+      );
     }
     const searchTimeMs = Date.now() - searchStart;
 
@@ -127,7 +136,7 @@ Answer the user's question using ONLY the provided context sources below.`;
         contextStr += `[Source: ${row.file_path}]\n${row.content}\n\n`;
         // ensure unique sources list
         if (!sources.includes(row.file_path)) {
-            sources.push(row.file_path);
+          sources.push(row.file_path);
         }
       }
     }
@@ -149,8 +158,8 @@ Answer the user's question using ONLY the provided context sources below.`;
         embedTimeMs,
         searchTimeMs,
         llmTimeMs,
-        totalTimeMs: Date.now() - start
-      }
+        totalTimeMs: Date.now() - start,
+      },
     };
   }
 }

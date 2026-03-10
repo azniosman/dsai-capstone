@@ -20,9 +20,11 @@ export class DatasetSyncController {
     this.logger.log('Initiating automated dataset synchronization pipeline...');
 
     // Usually, this URL would be dynamically loaded from a global config or env var.
-    // For capstone context, we mock a stable public structural URL or use a local seed string 
+    // For capstone context, we mock a stable public structural URL or use a local seed string
     // to simulate the pipeline.
-    const SOURCE_URL = process.env.LIVE_MATRIX_SOURCE_URL || 'https://raw.githubusercontent.com/azniosman/dsai-capstone/main/data/seed/skills_intelligence.csv';
+    const SOURCE_URL =
+      process.env.LIVE_MATRIX_SOURCE_URL ||
+      'https://raw.githubusercontent.com/azniosman/dsai-capstone/main/data/seed/skills_intelligence.csv';
     const NEXT_VERSION = `v${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
 
     // 1. Ingest Data (Download -> Parse -> Valiate -> Store)
@@ -30,7 +32,7 @@ export class DatasetSyncController {
       'Singapore_Skills_Market',
       NEXT_VERSION,
       SOURCE_URL,
-      'csv'
+      'csv',
     );
 
     // 2. Generate Diffs
@@ -40,6 +42,10 @@ export class DatasetSyncController {
     await this.trendEngineService.generateTrendSignals(dataset.id);
 
     this.logger.log('Dataset synchronization pipeline completed successfully.');
-    return { success: true, datasetId: dataset.id, version: dataset.datasetVersion };
+    return {
+      success: true,
+      datasetId: dataset.id,
+      version: dataset.datasetVersion,
+    };
   }
 }

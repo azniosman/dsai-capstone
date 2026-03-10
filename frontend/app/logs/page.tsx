@@ -60,7 +60,7 @@ export interface LogEntry {
   component: string;
   message: string;
   traceId?: string;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 type ConnectionStatus = "connecting" | "connected" | "polling" | "error";
@@ -489,7 +489,7 @@ export default function LogsPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const JsonViewer = ({ data }: { data: any }) => {
+  const JsonViewer = ({ data }: { data: unknown }) => {
     if (!data) return null;
     let str = JSON.stringify(data, null, 2);
     // Simple fast regex syntax highlighting for JSON
@@ -1054,7 +1054,7 @@ export default function LogsPage() {
 
                             {/* Model */}
                             <span className="w-[100px] shrink-0 text-[11px] text-muted-foreground truncate font-mono">
-                              {entry.meta?.model || entry.meta?.provider || "-"}
+                              {typeof entry.meta?.model === "string" ? entry.meta.model : typeof entry.meta?.provider === "string" ? entry.meta.provider : "-"}
                             </span>
 
                             {/* Message */}

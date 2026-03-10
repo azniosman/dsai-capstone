@@ -24,7 +24,10 @@ import {
   CareerPlanDto,
   ResumeTipsDto,
 } from './dto/copilot.dto';
-import { SystemTerminalService, SystemChatDto } from './system-terminal.service';
+import {
+  SystemTerminalService,
+  SystemChatDto,
+} from './system-terminal.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
 

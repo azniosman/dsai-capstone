@@ -8,7 +8,6 @@ import { LlmService } from './llm.service';
 import { CopilotService } from './copilot.service';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { JobRole } from '@app/entities/job-role.entity';
-import { DomainModule } from '../domain/domain.module';
 import { RagModule } from '../rag/rag.module';
 import { SystemTerminalService } from './system-terminal.service';
 import { SystemDocument } from '../entities/system-document.entity';
@@ -17,11 +16,20 @@ import { SystemDocument } from '../entities/system-document.entity';
   imports: [
     ConfigModule,
     MikroOrmModule.forFeature([UserProfile, JobRole, SystemDocument]),
-    DomainModule,
     RagModule,
   ],
   controllers: [IntelligenceController, UploadController],
-  providers: [IntelligenceService, LlmService, CopilotService, SystemTerminalService],
-  exports: [IntelligenceService, LlmService, CopilotService, SystemTerminalService],
+  providers: [
+    IntelligenceService,
+    LlmService,
+    CopilotService,
+    SystemTerminalService,
+  ],
+  exports: [
+    IntelligenceService,
+    LlmService,
+    CopilotService,
+    SystemTerminalService,
+  ],
 })
 export class IntelligenceModule {}

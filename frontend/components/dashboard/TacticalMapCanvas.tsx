@@ -181,6 +181,7 @@ const TacticalMapCanvas = ({
   /** Initialise nodes and particles for the given canvas dimensions. */
   const initScene = useCallback(
     (width: number, height: number, cfg: TacticalMapConfig) => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       nodesRef.current = Array.from({ length: cfg.nodeCount }, () => {
         const colorRoll = Math.random();
         return {
@@ -199,6 +200,7 @@ const TacticalMapCanvas = ({
         };
       });
 
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       particlesRef.current = Array.from({ length: cfg.particleCount }, () => ({
         x: Math.random() * width,
         y: Math.random() * height,

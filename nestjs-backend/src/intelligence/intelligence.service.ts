@@ -111,17 +111,28 @@ export class IntelligenceService {
   async chat(payload: ChatRequestDto, tenantId: number): Promise<any> {
     const traceId = `rag_${Math.random().toString(36).substring(2, 10)}`;
     const ctx = this.ragPipelineService.createContext(traceId);
-    
+
     // 1. User Query
-    const lastUserMsg = [...payload.messages].reverse().find((m) => m.role === 'user');
-    await this.ragPipelineService.runStep(ctx, 'User Query', async () => lastUserMsg?.content, {
-      metadata: { role: 'user', msg_length: lastUserMsg?.content.length },
-    });
+    const lastUserMsg = [...payload.messages]
+      .reverse()
+      .find((m) => m.role === 'user');
+    await this.ragPipelineService.runStep(
+      ctx,
+      'User Query',
+      // eslint-disable-next-line @typescript-eslint/require-await
+      async () => lastUserMsg?.content,
+      {
+        metadata: { role: 'user', msg_length: lastUserMsg?.content.length },
+      },
+    );
 
     const profileId = payload.profile_id ?? payload.profileId;
     let profileContext = '';
     if (profileId) {
-      const profile = await this.profileRepository.findOne({ id: profileId, tenant: tenantId });
+      const profile = await this.profileRepository.findOne({
+        id: profileId,
+        tenant: tenantId,
+      });
       if (profile) {
         profileContext = `Name: ${profile.name}, Skills: ${(profile.skills ?? []).join(', ')}, Experience: ${profile.yearsExperience ?? 0} years.`;
       }
@@ -133,17 +144,57 @@ export class IntelligenceService {
     if (lastUserMsg && !ctx.hasCriticalFailure) {
       try {
         // Emit discrete steps first so the timeline reflects the correct logical order
-        await this.ragPipelineService.runStep(ctx, 'Embedding', async () => {}, { metadata: { status: 'bundled inside retrieval' }, maxRetries: 1, isCritical: false });
-        await this.ragPipelineService.runStep(ctx, 'Vector DB Search', async () => {}, { metadata: { status: 'bundled inside retrieval' }, maxRetries: 1, isCritical: false });
+        await this.ragPipelineService.runStep(
+          ctx,
+          'Embedding',
+          async () => {},
+          {
+            metadata: { status: 'bundled inside retrieval' },
+            maxRetries: 1,
+            isCritical: false,
+          },
+        );
+        await this.ragPipelineService.runStep(
+          ctx,
+          'Vector DB Search',
+          async () => {},
+          {
+            metadata: { status: 'bundled inside retrieval' },
+            maxRetries: 1,
+            isCritical: false,
+          },
+        );
 
-        const chunks = await this.ragPipelineService.runStep(ctx, 'Document Retrieval', async () => {
-             return this.ragService.query(lastUserMsg.content, tenantId, { topK: 3, threshold: 0.5, profileId });
-        }, { maxRetries: 2, isCritical: false, metadata: { tenantId } });
+        const chunks = await this.ragPipelineService.runStep(
+          ctx,
+          'Document Retrieval',
+          async () => {
+            return this.ragService.query(lastUserMsg.content, tenantId, {
+              topK: 3,
+              threshold: 0.5,
+              profileId,
+            });
+          },
+          { maxRetries: 2, isCritical: false, metadata: { tenantId } },
+        );
 
         // Always emit Context Builder so the canvas node activates regardless of chunk count
-        ragContext = await this.ragPipelineService.runStep(ctx, 'Context Builder', async () => {
-            return chunks && chunks.length > 0 ? RagService.formatContext(chunks) : '';
-        }, { maxRetries: 1, isCritical: false, metadata: { count: chunks?.length ?? 0 } }) || '';
+        ragContext =
+          (await this.ragPipelineService.runStep(
+            ctx,
+            'Context Builder',
+            // eslint-disable-next-line @typescript-eslint/require-await
+            async () => {
+              return chunks && chunks.length > 0
+                ? RagService.formatContext(chunks)
+                : '';
+            },
+            {
+              maxRetries: 1,
+              isCritical: false,
+              metadata: { count: chunks?.length ?? 0 },
+            },
+          )) || '';
       } catch {
         // Enforce fault tolerance. Failed search doesn't kill chat payload.
       }
@@ -156,14 +207,28 @@ export class IntelligenceService {
       ragContext;
 
     // 6. LLM Engine
-    const reply = await this.ragPipelineService.runStep(ctx, 'LLM Engine', async () => {
-         return this.llmService.chat(payload.messages, systemPrompt);
-    }, { maxRetries: 3 }) || "I am currently overloaded with requests. Please try again soon.";
+    const reply =
+      (await this.ragPipelineService.runStep(
+        ctx,
+        'LLM Engine',
+        async () => {
+          return this.llmService.chat(payload.messages, systemPrompt);
+        },
+        { maxRetries: 3 },
+      )) || 'I am currently overloaded with requests. Please try again soon.';
 
     // 7. Response
-    await this.ragPipelineService.runStep(ctx, 'Response', async () => reply, {
-        metadata: { provider: providerLabel(this.llmService.getLastUsedProvider()) }
-    });
+    await this.ragPipelineService.runStep(
+      ctx,
+      'Response',
+      // eslint-disable-next-line @typescript-eslint/require-await
+      async () => reply,
+      {
+        metadata: {
+          provider: providerLabel(this.llmService.getLastUsedProvider()),
+        },
+      },
+    );
 
     return {
       reply,
@@ -451,7 +516,10 @@ export class IntelligenceService {
       dto.messages as Array<{ role: string; content: string }>,
       systemPrompt,
     );
-    return { reply, engine: providerLabel(this.llmService.getLastUsedProvider()) };
+    return {
+      reply,
+      engine: providerLabel(this.llmService.getLastUsedProvider()),
+    };
   }
 
   async analyzeJdMatch(

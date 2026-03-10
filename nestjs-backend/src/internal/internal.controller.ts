@@ -16,7 +16,10 @@ import { SsgCacheService } from '../ssg/ssg-cache.service';
 import { DomainService } from '../domain/domain.service';
 import { RagService } from '../rag/rag.service';
 import { IntelligenceService } from '../intelligence/intelligence.service';
-import { SystemTerminalService, IngestChunkDto } from '../intelligence/system-terminal.service';
+import {
+  SystemTerminalService,
+  IngestChunkDto,
+} from '../intelligence/system-terminal.service';
 
 class BackfillDto {
   @IsOptional()

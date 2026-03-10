@@ -122,14 +122,14 @@ export default function SkillBridgeTerminal() {
           pipeline: data.pipeline,
         },
       ]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setActivePipelineStep(null);
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: "system",
-          content: `[ERROR] ${err.message}`,
+          content: `[ERROR] ${err instanceof Error ? err.message : "Unknown error"}`,
         },
       ]);
     } finally {

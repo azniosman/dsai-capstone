@@ -11,6 +11,12 @@ import {
 } from "lucide-react";
 import type { LogEntry } from "../../page";
 
+interface StepMeta {
+  status?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
 interface ActivityTimelineProps {
   entries: LogEntry[];
 }
@@ -69,7 +75,7 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
             id: stepName.toLowerCase(),
             label: stepName,
             status: "pending",
-            meta: {} as any,
+            meta: {} as StepMeta,
           });
           continue;
         }
@@ -87,7 +93,7 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
           id: stepName.toLowerCase(),
           label: stepName,
           status,
-          meta: latestMeta,
+          meta: latestMeta as StepMeta,
         });
       }
       return result;
@@ -124,7 +130,7 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
       id: "req",
       label: "Request Received",
       status: "completed",
-      meta: {} as any,
+      meta: {} as StepMeta,
     });
 
     if (hasEmbed)
@@ -132,14 +138,14 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
         id: "emb",
         label: "Generating Embeddings",
         status: "completed",
-        meta: {} as any,
+        meta: {} as StepMeta,
       });
     else if (hasQuery)
       result.push({
         id: "emb",
         label: "Generating Embeddings",
         status: "running",
-        meta: {} as any,
+        meta: {} as StepMeta,
       });
 
     if (hasRetrieval)
@@ -147,14 +153,14 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
         id: "ret",
         label: "Vector Search",
         status: "completed",
-        meta: {} as any,
+        meta: {} as StepMeta,
       });
     else if (hasEmbed)
       result.push({
         id: "ret",
         label: "Vector Search",
         status: "running",
-        meta: {} as any,
+        meta: {} as StepMeta,
       });
 
     if (hasLlm)
@@ -162,14 +168,14 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
         id: "llm",
         label: "LLM Generation",
         status: "completed",
-        meta: {} as any,
+        meta: {} as StepMeta,
       });
     else if (hasRetrieval)
       result.push({
         id: "llm",
         label: "LLM Generation",
         status: "running",
-        meta: {} as any,
+        meta: {} as StepMeta,
       });
 
     if (hasError) {
@@ -204,7 +210,7 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
         <div className="absolute left-3 top-2 bottom-6 w-0.5 bg-slate-800 z-0" />
 
         <AnimatePresence>
-          {steps.map((step, idx) => (
+          {steps.map((step) => (
             <motion.div
               key={step.id}
               initial={{ opacity: 0, x: -10 }}
@@ -294,36 +300,35 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
                 </p>
                 <p className="text-xs text-slate-500 flex items-center gap-2 mt-1">
                   <span className="capitalize">{step.status}</span>
-                  {step.meta?.durationMs !== undefined && (
+                  {step.meta && typeof step.meta.durationMs === "number" && (
                     <span className="text-[10px] bg-slate-800/50 border border-slate-700/50 px-1.5 rounded text-slate-400">
-                      {step.meta.durationMs}ms
+                      {step.meta.durationMs as number}ms
                     </span>
                   )}
-                  {step.meta?.model && (
+                  {step.meta && typeof step.meta.model === "string" && (
                     <span className="text-[10px] bg-purple-500/10 border border-purple-500/30 px-1.5 rounded text-purple-400">
-                      {step.meta.model}
+                      {step.meta.model as string}
                     </span>
                   )}
-                  {step.meta?.provider && (
+                  {step.meta && typeof step.meta.provider === "string" && (
                     <span className="text-[10px] bg-blue-500/10 border border-blue-500/30 px-1.5 rounded text-blue-400">
-                      {step.meta.provider}
+                      {step.meta.provider as string}
                     </span>
                   )}
-                  {(step.meta?.tokens || step.meta?.contextTokens) && (
+                  {step.meta && (typeof step.meta.tokens === "number" || typeof step.meta.contextTokens === "number") && (
                     <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 px-1.5 rounded text-emerald-400">
-                      {step.meta.tokens || step.meta.contextTokens} tokens
+                      {(step.meta.tokens as number | undefined) || (step.meta.contextTokens as number | undefined)} tokens
                     </span>
                   )}
-                  {(step.meta?.docs_found !== undefined ||
-                    step.meta?.documentsFound !== undefined) && (
+                  {step.meta && (step.meta.docs_found !== undefined || step.meta.documentsFound !== undefined) && (
                     <span className="text-[10px] bg-cyan-500/10 border border-cyan-500/30 px-1.5 rounded text-cyan-400">
-                      Top {step.meta.docs_found ?? step.meta.documentsFound}{" "}
+                      Top {(step.meta.docs_found as number | undefined) ?? (step.meta.documentsFound as number | undefined)}{" "}
                       docs
                     </span>
                   )}
-                  {step.meta?.attempts > 1 && (
+                  {step.meta && typeof step.meta.attempts === "number" && step.meta.attempts > 1 && (
                     <span className="text-[10px] bg-[#fb923c]/20 border border-[#fb923c]/30 px-1.5 rounded text-[#fb923c]">
-                      {step.meta.attempts} retries
+                      {step.meta.attempts as number} retries
                     </span>
                   )}
                   {step.status === "skipped" && (

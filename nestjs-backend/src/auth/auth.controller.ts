@@ -176,7 +176,9 @@ export class AuthController {
     try {
       const secret = this.configService.get<string>('REFRESH_TOKEN_SECRET');
       if (!secret)
-        throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
+        throw new Error(
+          'REFRESH_TOKEN_SECRET environment variable is required',
+        );
       payload = this.jwtService.verify(token, { secret });
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');

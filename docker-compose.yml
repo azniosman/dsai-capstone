@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: ${POSTGRES_DB:-capstone}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -27,6 +27,8 @@ services:
       DATABASE_PORT: 5432
       DATABASE_NAME: ${POSTGRES_DB:-capstone}
       JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_me}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-refresh_token_secret_change_me}
+      INTERNAL_AUTOMATION_TOKEN: ${INTERNAL_AUTOMATION_TOKEN:-internal_automation_token_change_me}
       OMP_NUM_THREADS: "1"
       # SSG/WSG API credentials — optional; service falls back to seeded data when absent
       SSG_CLIENT_ID: ${SSG_CLIENT_ID:-}
@@ -34,6 +36,10 @@ services:
       SSG_API_BASE_URL: ${SSG_API_BASE_URL:-https://uat-api.ssg-wsg.gov.sg}
       SSG_TOKEN_URL: ${SSG_TOKEN_URL:-}
       SSG_CACHE_TTL_SECONDS: ${SSG_CACHE_TTL_SECONDS:-3600}
+      # Live Matrix Dataset Source
+      LIVE_MATRIX_SOURCE_URL: ${LIVE_MATRIX_SOURCE_URL:-https://raw.githubusercontent.com/azniosman/dsai-capstone/main/data/seed/skills_intelligence.csv}
+    volumes:
+      - ./data/seed:/app/data/seed:ro
     depends_on:
       db:
         condition: service_healthy

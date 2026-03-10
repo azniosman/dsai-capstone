@@ -39,6 +39,10 @@ import { emitEMF } from '@app/common/utils/metrics.util';
 import { LogBusService } from '@app/common/log-bus.service';
 import { EmbeddingService } from './embedding.service';
 import { CrossEncoderService } from './cross-encoder.service';
+import {
+  ExecutionTraceService,
+  TraceType,
+} from '@app/production-assurance/execution-trace.service';
 
 /** A retrieved chunk with its similarity score. */
 export interface RetrievedChunk {
@@ -98,6 +102,7 @@ export class RagService {
     private readonly embeddingService: EmbeddingService,
     private readonly crossEncoderService: CrossEncoderService,
     private readonly logBus: LogBusService,
+    private readonly executionTrace: ExecutionTraceService,
   ) {}
 
   // ─── Ingestion ─────────────────────────────────────────────────────────────
@@ -210,54 +215,108 @@ export class RagService {
     tenantId: number,
     opts: QueryOptions = {},
   ): Promise<RetrievedChunk[]> {
+    const traceId = await this.executionTrace.startTrace(
+      'RAG Query',
+      TraceType.RAG_PIPELINE,
+      'rag-service',
+      { queryText, tenantId, opts },
+    );
+
     const { topK = 3, threshold = 0.5, profileId } = opts;
     const t0 = Date.now();
 
-    this.logBus.emit({
-      type: 'RAG',
-      component: 'RagService',
-      message: `Hybrid RAG query started (tenant=${tenantId} topK=${topK})`,
-      meta: { tenantId, topK, threshold, profileId: profileId ?? 'anon' },
-    });
-
-    const queryEmbedding = await this.embeddingService.embed(queryText);
-    if (queryEmbedding.length === 0) {
-      this.logger.warn('RAG query skipped — embedding service unavailable');
+    try {
       this.logBus.emit({
-        type: 'WARN',
-        component: 'EmbeddingService',
-        message: 'RAG query skipped — embedding service unavailable',
+        type: 'RAG',
+        component: 'RagService',
+        message: `Hybrid RAG query started (tenant=${tenantId} topK=${topK})`,
+        meta: { tenantId, topK, threshold, profileId: profileId ?? 'anon' },
       });
-      this.emitQueryMetrics(Date.now() - t0, []);
-      return [];
-    }
 
-    const results = await this.hybridQuery(
-      queryText,
-      queryEmbedding,
-      tenantId,
-      {
+      // Trace: Embedding generation
+      await this.executionTrace.addTraceStep(traceId, {
+        name: 'Embedding Generation',
+        type: TraceType.EMBEDDING,
+        input: { queryText },
+      });
+
+      const queryEmbedding = await this.embeddingService.embed(queryText);
+
+      await this.executionTrace.addTraceStep(traceId, {
+        name: 'Embedding Complete',
+        type: TraceType.EMBEDDING,
+        input: { queryText },
+        output: { dimensions: queryEmbedding.length },
+      });
+
+      if (queryEmbedding.length === 0) {
+        this.logger.warn('RAG query skipped — embedding service unavailable');
+        this.logBus.emit({
+          type: 'WARN',
+          component: 'EmbeddingService',
+          message: 'RAG query skipped — embedding service unavailable',
+        });
+        this.emitQueryMetrics(Date.now() - t0, []);
+        await this.executionTrace.completeTrace(traceId, {
+          chunks: [],
+          reason: 'embedding_failed',
+        });
+        return [];
+      }
+
+      // Trace: Vector Search
+      await this.executionTrace.addTraceStep(traceId, {
+        name: 'Vector Search',
+        type: TraceType.VECTOR_SEARCH,
+        input: { embeddingDimensions: queryEmbedding.length, topK, threshold },
+      });
+
+      const results = await this.hybridQuery(
+        queryText,
+        queryEmbedding,
+        tenantId,
+        {
+          topK,
+          threshold,
+          profileId,
+        },
+      );
+
+      await this.executionTrace.addTraceStep(traceId, {
+        name: 'Vector Search Complete',
+        type: TraceType.VECTOR_SEARCH,
+        output: { chunksRetrieved: results.length },
+      });
+
+      const latencyMs = Date.now() - t0;
+      this.emitQueryMetrics(latencyMs, results);
+
+      this.logger.log(
+        `RAG query returned ${results.length} chunks (tenant=${tenantId} topK=${topK} threshold=${threshold} latencyMs=${latencyMs})`,
+      );
+
+      this.logBus.emit({
+        type: 'RAG',
+        component: 'RagService',
+        message: `Hybrid RAG query complete: ${results.length} chunks returned (${latencyMs}ms)`,
+        meta: { chunks: results.length, latencyMs, topK, threshold },
+      });
+
+      await this.executionTrace.completeTrace(traceId, {
+        chunks: results.length,
+        latencyMs,
         topK,
         threshold,
-        profileId,
-      },
-    );
+      });
 
-    const latencyMs = Date.now() - t0;
-    this.emitQueryMetrics(latencyMs, results);
-
-    this.logger.log(
-      `RAG query returned ${results.length} chunks (tenant=${tenantId} topK=${topK} threshold=${threshold} latencyMs=${latencyMs})`,
-    );
-
-    this.logBus.emit({
-      type: 'RAG',
-      component: 'RagService',
-      message: `Hybrid RAG query complete: ${results.length} chunks returned (${latencyMs}ms)`,
-      meta: { chunks: results.length, latencyMs, topK, threshold },
-    });
-
-    return results;
+      return results;
+    } catch (error) {
+      await this.executionTrace.failTrace(
+        traceId,
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      throw error;
+    }
   }
 
   /**

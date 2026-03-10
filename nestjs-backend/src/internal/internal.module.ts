@@ -15,7 +15,13 @@ import { DatasetSyncController } from './dataset-sync.controller';
  * public API Gateway route.
  */
 @Module({
-  imports: [SsgModule, DomainModule, RagModule, IntelligenceModule, DataIntelligenceModule],
+  imports: [
+    SsgModule,
+    DomainModule,
+    RagModule,
+    IntelligenceModule,
+    DataIntelligenceModule,
+  ],
   controllers: [InternalController, DatasetSyncController],
 })
 export class InternalModule {}

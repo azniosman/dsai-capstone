@@ -10,7 +10,12 @@ export type PipelineStep =
   | 'LLM Engine'
   | 'Response';
 
-export type StepStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
+export type StepStatus =
+  | 'PENDING'
+  | 'RUNNING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'SKIPPED';
 
 export interface RagContext {
   traceId: string;
@@ -39,7 +44,7 @@ export class RagPipelineService {
     context: RagContext,
     step: PipelineStep,
     fn: () => Promise<T>,
-    options?: { maxRetries?: number; isCritical?: boolean; metadata?: any }
+    options?: { maxRetries?: number; isCritical?: boolean; metadata?: any },
   ): Promise<T | null> {
     const { maxRetries = 1, isCritical = true, metadata = {} } = options || {};
 
@@ -57,29 +62,41 @@ export class RagPipelineService {
         attempts++;
         const result = await fn();
         const duration = Date.now() - startTime;
-        
+
         // Append result sizes if arrays
         const resolvedMeta = { ...metadata };
         if (Array.isArray(result)) {
-           resolvedMeta.count = result.length;
+          resolvedMeta.count = result.length;
         } else if (result && typeof result === 'object' && 'length' in result) {
-           resolvedMeta.length = (result as any).length;
+          resolvedMeta.length = (result as any).length;
         }
 
-        this.emitLog(context.traceId, step, 'COMPLETED', duration, attempts, resolvedMeta);
+        this.emitLog(
+          context.traceId,
+          step,
+          'COMPLETED',
+          duration,
+          attempts,
+          resolvedMeta,
+        );
         return result;
       } catch (error: any) {
         const duration = Date.now() - startTime;
-        this.logger.warn(`Step [${step}] attempt ${attempts} failed: ${error?.message || error}`);
-        
+        this.logger.warn(
+          `Step [${step}] attempt ${attempts} failed: ${error?.message || error}`,
+        );
+
         if (attempts >= maxRetries) {
-          this.emitLog(context.traceId, step, 'FAILED', duration, attempts, { ...metadata, error: error?.message || String(error) });
+          this.emitLog(context.traceId, step, 'FAILED', duration, attempts, {
+            ...metadata,
+            error: error?.message || String(error),
+          });
           if (isCritical) {
-             context.hasCriticalFailure = true;
+            context.hasCriticalFailure = true;
           }
           throw error;
         }
-        
+
         // Exponential backoff
         await new Promise((res) => setTimeout(res, 500 * attempts));
       }
@@ -88,12 +105,12 @@ export class RagPipelineService {
   }
 
   private emitLog(
-    traceId: string, 
-    step: PipelineStep, 
-    status: StepStatus, 
-    durationMs: number, 
-    attempts: number, 
-    metadata: any
+    traceId: string,
+    step: PipelineStep,
+    status: StepStatus,
+    durationMs: number,
+    attempts: number,
+    metadata: any,
   ) {
     this.logBus.emit({
       type: 'RAG',

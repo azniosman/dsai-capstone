@@ -31,44 +31,52 @@ export class TrendEngineService {
     for (const record of records) {
       // 1. High Growth Detection
       if (record.growthRate >= 15) {
-        signals.push(this.em.create(TrendSignal, {
-          dataset,
-          sector: record.sector,
-          jobRole: record.jobRole,
-          trendType: 'HIGH_GROWTH',
-          trendScore: record.growthRate,
-          confidence: 0.95,
-        }));
+        signals.push(
+          this.em.create(TrendSignal, {
+            dataset,
+            sector: record.sector,
+            jobRole: record.jobRole,
+            trendType: 'HIGH_GROWTH',
+            trendScore: record.growthRate,
+            confidence: 0.95,
+          }),
+        );
       }
 
       // 2. Declining Demand
       if (record.growthRate <= -5 || record.demandIndex < 0.2) {
-        signals.push(this.em.create(TrendSignal, {
-          dataset,
-          sector: record.sector,
-          jobRole: record.jobRole,
-          trendType: 'DECLINING_DEMAND',
-          trendScore: record.growthRate,
-          confidence: 0.85,
-        }));
+        signals.push(
+          this.em.create(TrendSignal, {
+            dataset,
+            sector: record.sector,
+            jobRole: record.jobRole,
+            trendType: 'DECLINING_DEMAND',
+            trendScore: record.growthRate,
+            confidence: 0.85,
+          }),
+        );
       }
 
       // 3. Emerging Skills / Supply Gap
       const supplyGap = record.demandIndex - record.supplyIndex;
       if (supplyGap > 0.4 && record.growthRate > 5) {
-        signals.push(this.em.create(TrendSignal, {
-          dataset,
-          sector: record.sector,
-          jobRole: record.jobRole,
-          trendType: 'EMERGING_SKILL',
-          trendScore: supplyGap,
-          confidence: 0.9,
-        }));
+        signals.push(
+          this.em.create(TrendSignal, {
+            dataset,
+            sector: record.sector,
+            jobRole: record.jobRole,
+            trendType: 'EMERGING_SKILL',
+            trendScore: supplyGap,
+            confidence: 0.9,
+          }),
+        );
       }
     }
 
     if (signals.length > 0) {
-      this.logger.log(`Synthesized ${signals.length} strategic trend signals for Dataset ${datasetId}.`);
+      this.logger.log(
+        `Synthesized ${signals.length} strategic trend signals for Dataset ${datasetId}.`,
+      );
       this.em.persist(signals);
       await this.em.flush();
     }

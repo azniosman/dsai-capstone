@@ -28,7 +28,7 @@ describeE2E('Data Intelligence - Live Matrix (e2e)', () => {
 
   beforeAll(async () => {
     // Dynamically import AppModule to avoid loading it in unit-test environments
-    const { AppModule } = await import('../src/app.module');
+    const { AppModule } = await import('../src/app.module.js');
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -92,7 +92,7 @@ describeE2E('Data Intelligence - Live Matrix (e2e)', () => {
         jobRole: 'Data Analyst',
         skillCategory: 'Analytics',
         demandIndex: 0.85,
-        supplyIndex: 0.60,
+        supplyIndex: 0.6,
         growthRate: 12.5,
       });
       await em.persistAndFlush(matrixData);
@@ -406,14 +406,14 @@ describeE2E('Data Intelligence - Live Matrix (e2e)', () => {
         jobRole: 'Software Engineer',
         trendType: 'GROWTH',
         trendScore: 0.85,
-        confidence: 0.80,
+        confidence: 0.8,
       });
       em.create(TrendSignal, {
         dataset,
         sector: 'Healthcare',
         jobRole: 'Nurse',
         trendType: 'STABLE',
-        trendScore: 0.70,
+        trendScore: 0.7,
         confidence: 0.75,
       });
       await em.flush();

@@ -22,7 +22,7 @@ describeE2E('RAG pipeline (e2e)', () => {
 
   beforeAll(async () => {
     // Dynamically import AppModule to avoid loading it in unit-test environments
-    const { AppModule } = await import('../src/app.module');
+    const { AppModule } = await import('../src/app.module.js');
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
