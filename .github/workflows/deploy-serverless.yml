@@ -76,19 +76,12 @@ jobs:
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
           echo "=== Preflight checks for $E environment ==="
-          
-          # Check VPC quota
-          VPC_QUOTA=$(aws ec2 describe-account-attributes \
-            --attribute-names vpc --query 'AccountAttributes[0].AttributeValues[0].AttributeValue' \
-            --output text 2>/dev/null || echo "5")
+
+          # Verify VPC cleanup worked (should have deleted orphaned VPCs)
           VPC_COUNT=$(aws ec2 describe-vpcs \
             --query 'Vpcs[].VpcId' --output text 2>/dev/null | wc -w | tr -d ' ')
-          echo "  VPC quota: $VPC_QUOTA, current VPCs: $VPC_COUNT"
-          if [ "$VPC_COUNT" -ge "$VPC_QUOTA" ]; then
-            echo "  ERROR: VPC limit reached ($VPC_COUNT/$VPC_QUOTA). Please delete orphaned VPCs first."
-            exit 1
-          fi
-          
+          echo "  Current VPCs: $VPC_COUNT"
+
           # Check if uploads bucket already exists (should be cleaned up first)
           UPLOADS_BUCKET="${P}-${E}-uploads"
           if aws s3api head-bucket --bucket "$UPLOADS_BUCKET" 2>/dev/null; then
@@ -96,7 +89,7 @@ jobs:
             echo "  Please run the workflow with skip_terraform=false first to clean up."
             exit 1
           fi
-          
+
           echo "  Preflight checks passed"
 
       # Aurora master password forbids: '/', '@', '"', space
@@ -132,6 +125,97 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+
+      # ── Cleanup orphaned VPCs (runs before preflight checks) ──────────────────
+      # This step deletes orphaned VPCs from previous failed deployments to avoid
+      # hitting the VPC quota limit. It runs for both skip_terraform paths.
+      - name: Cleanup orphaned VPCs
+        run: |
+          set -euo pipefail
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+
+          echo "=== Cleanup: Delete orphaned VPCs ==="
+          VPC_QUOTA=$(aws ec2 describe-account-attributes \
+            --attribute-names vpc --query 'AccountAttributes[0].AttributeValues[0].AttributeValue' \
+            --output text 2>/dev/null || echo "5")
+          VPC_COUNT=$(aws ec2 describe-vpcs \
+            --query 'Vpcs[].VpcId' --output text 2>/dev/null | wc -w | tr -d ' ')
+          echo "  VPC quota: $VPC_QUOTA, current VPCs: $VPC_COUNT"
+
+          # List and delete orphaned VPCs (tagged with ${P}-*-vpc but not ${P}-${E}-vpc)
+          for VPC_ID in $(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${P}-*-vpc" \
+            --query 'Vpcs[].VpcId' --output text 2>/dev/null | tr '\t' '\n'); do
+            [ -z "$VPC_ID" ] || [ "$VPC_ID" = "None" ] && continue
+
+            VPC_NAME=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" \
+              --query 'Vpcs[0].Tags[?Key==`Name`].Value[0]' --output text 2>/dev/null)
+
+            # Skip current environment's VPC - it will be handled by Terraform
+            if [ "$VPC_NAME" = "${P}-${E}-vpc" ]; then
+              echo "  Skipping current environment VPC: $VPC_ID ($VPC_NAME)"
+              continue
+            fi
+
+            # Only delete VPCs that match the pattern ${P}-*-vpc
+            if [[ "$VPC_NAME" =~ ^${P}-.*-vpc$ ]]; then
+              echo "  Deleting orphaned VPC: $VPC_ID ($VPC_NAME)"
+
+              # Get and delete any attached internet gateways
+              for IGW in $(aws ec2 describe-internet-gateways \
+                --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+                --query 'InternetGateways[].InternetGatewayId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 detach-internet-gateway \
+                  --internet-gateway-id "$IGW" --vpc-id "$VPC_ID" 2>/dev/null || true
+                aws ec2 delete-internet-gateway \
+                  --internet-gateway-id "$IGW" 2>/dev/null || true
+              done
+
+              # Delete route tables (non-main)
+              for RT in $(aws ec2 describe-route-tables \
+                --filters "Name=vpc-id,Values=$VPC_ID" \
+                --query 'RouteTables[?Associations[0].Main != `true`].RouteTableId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 delete-route-table --route-table-id "$RT" 2>/dev/null || true
+              done
+
+              # Delete subnets
+              for SUBNET in $(aws ec2 describe-subnets \
+                --filters "Name=vpc-id,Values=$VPC_ID" \
+                --query 'Subnets[].SubnetId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 delete-subnet --subnet-id "$SUBNET" 2>/dev/null || true
+              done
+
+              # Delete security groups (non-default)
+              for SG in $(aws ec2 describe-security-groups \
+                --filters "Name=vpc-id,Values=$VPC_ID" \
+                --query 'SecurityGroups[?GroupName != `default`].GroupId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 delete-security-group --group-id "$SG" 2>/dev/null || true
+              done
+
+              # Delete NAT gateways (and their EIPs)
+              for NAT in $(aws ec2 describe-nat-gateways \
+                --filter "Name=vpc-id,Values=$VPC_ID" \
+                --query 'NatGateways[].NatGatewayId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 delete-nat-gateway --nat-gateway-id "$NAT" 2>/dev/null || true
+              done
+
+              # Delete VPC (must be empty at this point)
+              aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>/dev/null || true
+              echo "  Deleted orphaned VPC: $VPC_ID"
+            fi
+          done
+
+          # Check VPC count after cleanup
+          VPC_COUNT_AFTER=$(aws ec2 describe-vpcs \
+            --query 'Vpcs[].VpcId' --output text 2>/dev/null | wc -w | tr -d ' ')
+          echo "  VPCs after cleanup: $VPC_COUNT_AFTER/$VPC_QUOTA"
 
       # ── Terraform fmt check (catches formatting errors before any apply) ──────
       - name: Terraform fmt check
@@ -342,83 +426,6 @@ jobs:
           P="${{ env.PROJECT_NAME }}"
           E="${{ env.ENVIRONMENT }}"
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-
-          echo "=== Step 0: Pre-cleanup - delete any orphaned VPCs (to avoid VPC limit) ==="
-          # First, check VPC quota to avoid surprises
-          VPC_QUOTA=$(aws ec2 describe-account-attributes \
-            --attribute-names vpc --query 'AccountAttributes[0].AttributeValues[0].AttributeValue' \
-            --output text 2>/dev/null || echo "5")
-          VPC_COUNT=$(aws ec2 describe-vpcs \
-            --query 'Vpcs[].VpcId' --output text 2>/dev/null | wc -w | tr -d ' ')
-          echo "  VPC quota: $VPC_QUOTA, current VPCs: $VPC_COUNT"
-          if [ "$VPC_COUNT" -ge "$VPC_QUOTA" ]; then
-            echo "  WARNING: VPC limit reached ($VPC_COUNT/$VPC_QUOTA). Proceeding with cleanup..."
-          fi
-          
-          # List all VPCs in the account and delete any that are not needed
-          # This handles cases where previous deployments failed mid-cleanup
-          for VPC_ID in $(aws ec2 describe-vpcs \
-            --filters "Name=tag:Name,Values=${P}-*-vpc" \
-            --query 'Vpcs[].VpcId' --output text 2>/dev/null | tr '\t' '\n'); do
-            [ -z "$VPC_ID" ] || [ "$VPC_ID" = "None" ] && continue
-            
-            # Verify VPC has correct tags before deletion
-            VPC_NAME=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" \
-              --query 'Vpcs[0].Tags[?Key==`Name`].Value[0]' --output text 2>/dev/null)
-            
-            # Only delete VPCs that match the pattern ${P}-*-vpc (not ${P}-${E}-vpc which is handled in Step 5)
-            if [[ "$VPC_NAME" =~ ^${P}-.*-vpc$ ]] && [[ "$VPC_NAME" != "${P}-${E}-vpc" ]]; then
-              echo "  Deleting orphaned VPC: $VPC_ID ($VPC_NAME)"
-
-              # Get and delete any attached internet gateways
-              for IGW in $(aws ec2 describe-internet-gateways \
-                --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
-                --query 'InternetGateways[].InternetGatewayId' \
-                --output text 2>/dev/null | tr '\t' '\n'); do
-                aws ec2 detach-internet-gateway \
-                  --internet-gateway-id "$IGW" --vpc-id "$VPC_ID" 2>/dev/null || true
-                aws ec2 delete-internet-gateway \
-                  --internet-gateway-id "$IGW" 2>/dev/null || true
-              done
-
-              # Delete route tables (non-main)
-              for RT in $(aws ec2 describe-route-tables \
-                --filters "Name=vpc-id,Values=$VPC_ID" \
-                --query 'RouteTables[?Associations[0].Main != `true`].RouteTableId' \
-                --output text 2>/dev/null | tr '\t' '\n'); do
-                aws ec2 delete-route-table --route-table-id "$RT" 2>/dev/null || true
-              done
-
-              # Delete subnets
-              for SUBNET in $(aws ec2 describe-subnets \
-                --filters "Name=vpc-id,Values=$VPC_ID" \
-                --query 'Subnets[].SubnetId' \
-                --output text 2>/dev/null | tr '\t' '\n'); do
-                aws ec2 delete-subnet --subnet-id "$SUBNET" 2>/dev/null || true
-              done
-
-              # Delete security groups (non-default)
-              for SG in $(aws ec2 describe-security-groups \
-                --filters "Name=vpc-id,Values=$VPC_ID" \
-                --query 'SecurityGroups[?GroupName != `default`].GroupId' \
-                --output text 2>/dev/null | tr '\t' '\n'); do
-                aws ec2 delete-security-group --group-id "$SG" 2>/dev/null || true
-              done
-
-              # Delete NAT gateways (and their EIPs)
-              for NAT in $(aws ec2 describe-nat-gateways \
-                --filter "Name=vpc-id,Values=$VPC_ID" \
-                --query 'NatGateways[].NatGatewayId' \
-                --output text 2>/dev/null | tr '\t' '\n'); do
-                aws ec2 delete-nat-gateway --nat-gateway-id "$NAT" 2>/dev/null || true
-              done
-
-              # Delete VPC (must be empty at this point)
-              aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>/dev/null || true
-              echo "  Deleted orphaned VPC: $VPC_ID"
-            fi
-          done
-          echo "  Pre-cleanup VPC check complete"
 
           echo "=== Step 1: Remove non-ECR modules from Terraform state ==="
           # module.iam is intentionally kept in state so Terraform updates roles
