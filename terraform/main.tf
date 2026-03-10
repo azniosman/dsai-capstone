@@ -37,8 +37,12 @@ module "security_groups" {
 
 # 2b. S3 Uploads bucket — resume PDFs and voice Transcribe staging
 # Referenced in the IAM policy and needed by resume-upload + voice Lambdas.
+resource "random_id" "uploads_suffix" {
+  byte_length = 4
+}
+
 resource "aws_s3_bucket" "uploads" {
-  bucket        = "${var.project_name}-${var.environment}-uploads"
+  bucket        = "${var.project_name}-${var.environment}-uploads-${random_id.uploads_suffix.hex}"
   force_destroy = true
 
   tags = { Name = "${var.project_name}-${var.environment}-uploads" }
