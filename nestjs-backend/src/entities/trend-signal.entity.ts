@@ -3,9 +3,9 @@ import {
   PrimaryKey,
   Property,
   ManyToOne,
-  Rel,
   OptionalProps,
 } from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import { Dataset } from './dataset.entity';
 
 @Entity({ tableName: 'trend_signals' })

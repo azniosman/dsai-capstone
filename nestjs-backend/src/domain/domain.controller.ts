@@ -2,7 +2,7 @@ import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { DomainService } from './domain.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
-import {
+import type {
   AuthenticatedRequest,
   OptionalAuthenticatedRequest,
 } from '../types/auth-request.interface';

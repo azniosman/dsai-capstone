@@ -15,7 +15,7 @@ import {
   SsgRecommendationsRequestDto,
 } from './dto/ssg.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
-import { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
+import type { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
 
 @Controller('ssg')
 export class SsgController {

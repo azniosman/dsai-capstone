@@ -5,8 +5,8 @@ import {
   Enum,
   OptionalProps,
   ManyToOne,
-  Rel,
 } from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import {
   ProductionReadinessReport,
   ReadinessCategory,

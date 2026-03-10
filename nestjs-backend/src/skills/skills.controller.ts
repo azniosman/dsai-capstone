@@ -14,7 +14,7 @@ import {
 import { SkillsService } from './skills.service';
 import { CreateProgressDto, UpdateProgressLevelDto } from './dto/progress.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedRequest } from '../types/auth-request.interface';
+import type { AuthenticatedRequest } from '../types/auth-request.interface';
 
 @UseGuards(JwtAuthGuard)
 @Controller('progress')

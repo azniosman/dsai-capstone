@@ -16,7 +16,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ParseResumeDto } from './dto/parse-resume.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
-import {
+import type {
   AuthenticatedRequest,
   OptionalAuthenticatedRequest,
 } from '../types/auth-request.interface';

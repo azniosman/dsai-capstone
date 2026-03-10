@@ -3,9 +3,9 @@ import {
   PrimaryKey,
   Property,
   ManyToOne,
-  Rel,
   OptionalProps,
 } from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import { UserProfile } from './user-profile.entity';
 import { Tenant } from './tenant.entity';
 

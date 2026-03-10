@@ -24,12 +24,10 @@ import {
   CareerPlanDto,
   ResumeTipsDto,
 } from './dto/copilot.dto';
-import {
-  SystemTerminalService,
-  SystemChatDto,
-} from './system-terminal.service';
+import type { SystemChatDto } from './dto/system-chat.dto';
+import { SystemTerminalService } from './system-terminal.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
-import { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
+import type { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
 
 @Throttle({ default: { ttl: 60_000, limit: 20 } })
 @Controller()

@@ -1,4 +1,5 @@
-import { Entity, PrimaryKey, Property, ManyToOne, Rel } from '@mikro-orm/core';
+import { Entity, PrimaryKey, Property, ManyToOne } from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import { Tenant } from './tenant.entity';
 
 @Entity({ tableName: 'sctp_courses' })

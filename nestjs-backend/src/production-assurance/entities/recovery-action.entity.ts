@@ -5,9 +5,9 @@ import {
   Enum,
   OptionalProps,
   ManyToOne,
-  Rel,
   Index,
 } from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import { ExecutionTrace } from './execution-trace.entity';
 
 export enum RecoveryActionType {

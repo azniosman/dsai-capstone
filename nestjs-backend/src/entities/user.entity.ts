@@ -4,9 +4,9 @@ import {
   Property,
   Enum,
   ManyToOne,
-  Rel,
   OptionalProps,
 } from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import { Role } from '@app/common/enums/role.enum';
 import { Tenant } from './tenant.entity';
 

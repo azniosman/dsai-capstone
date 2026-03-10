@@ -23,7 +23,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { AuthenticatedRequest } from '../types/auth-request.interface';
+import type { AuthenticatedRequest } from '../types/auth-request.interface';
 
 @Throttle({ default: { ttl: 60_000, limit: 10 } })
 @Controller('auth')
