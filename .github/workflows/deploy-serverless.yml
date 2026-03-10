@@ -113,6 +113,10 @@ jobs:
       # This step deletes orphaned VPCs from previous failed deployments to avoid
       # hitting the VPC quota limit. It runs for both skip_terraform paths.
       - name: Cleanup orphaned VPCs
+        env:
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          AWS_REGION: ${{ env.AWS_REGION }}
         run: |
           bash .github/workflows/delete_orphaned_vpcs.sh
 
@@ -561,10 +565,17 @@ jobs:
             --force-delete-without-recovery 2>/dev/null || true
 
           echo "=== Step 10: Empty + delete uploads S3 bucket (if it exists) ==="
-          UPLOADS_BUCKET="${P}-${E}-uploads"
-          aws s3 rm "s3://${UPLOADS_BUCKET}" --recursive 2>/dev/null || true
-          aws s3api delete-bucket --bucket "${UPLOADS_BUCKET}" \
-            --region "${{ env.AWS_REGION }}" 2>/dev/null || true
+          # Bucket name is now dynamic: skillbridge-{env}-uploads-{random}-{account_id}
+          # List all buckets with the uploads prefix and delete them
+          BUCKETS=$(aws s3api list-buckets --query 'Buckets[?contains(Name, `-uploads-`)].Name' --output text 2>/dev/null || true)
+          for BUCKET in $BUCKETS; do
+            if [[ "$BUCKET" =~ ^${P}-${E}-uploads-[a-f0-9]{8}-[0-9]{12}$ ]]; then
+              echo "  Deleting uploads bucket: $BUCKET"
+              aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+              aws s3api delete-bucket --bucket "${BUCKET}" \
+                --region "${{ env.AWS_REGION }}" 2>/dev/null || true
+            fi
+          done
 
           echo "=== Step 11: Clear CNAME aliases from any existing CloudFront distributions ==="
           # CloudFront distributions with CNAME aliases (e.g. sklbr.co) must have those
