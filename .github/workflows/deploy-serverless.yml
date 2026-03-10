@@ -1,745 +1,1101 @@
 name: Deploy Serverless Stack
-true:
+
+# Manual dispatch only — prevents CI failures on every push when AWS
+# credentials haven't been provisioned yet.
+# Run from: GitHub → Actions → Deploy Serverless Stack → Run workflow
+
+on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Target environment
+        description: "Target environment"
         required: true
-        default: dev
+        default: "dev"
         type: choice
-        options:
-        - dev
-        - prod
+        options: [dev, prod]
       skip_terraform:
-        description: Skip Terraform apply (image + frontend only)
+        description: "Skip Terraform apply (image + frontend only)"
         required: false
         default: false
         type: boolean
       enable_cloudfront:
-        description: Enable CloudFront (requires AWS account verification)
+        description: "Enable CloudFront (requires AWS account verification)"
         required: false
         default: false
         type: boolean
       enable_custom_domain:
-        description: Provision Route 53 DNS zone and ACM certificates for custom domain
+        description: "Provision Route 53 DNS zone and ACM certificates for custom domain"
         required: false
         default: false
         type: boolean
       custom_domain:
-        description: The apex domain to attach (e.g., 'sklbr.co')
+        description: "The apex domain to attach (e.g., 'sklbr.co')"
         required: false
-        default: ''
+        default: ""
         type: string
+
+# Auth: static IAM keys stored in the GitHub "dev"/"prod" environment secrets.
+# To upgrade to OIDC (keyless): create an OIDC provider + IAM role in AWS,
+# add AWS_ROLE_ARN secret, swap the credentials step to use role-to-assume,
+# and change id-token permission to write.
 permissions:
   contents: read
+
 env:
   AWS_REGION: us-east-1
   PROJECT_NAME: skillbridge
-  TF_VERSION: 1.9.0
-  NODE_VERSION: '20'
+  TF_VERSION: "1.9.0"
+  NODE_VERSION: "20"
+
 jobs:
   deploy:
     name: Build & Deploy (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
+
     env:
       ENVIRONMENT: ${{ github.event.inputs.environment }}
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-    - name: Preflight checks
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      run: "P=\"${{ env.PROJECT_NAME }}\"\nE=\"${{ env.ENVIRONMENT }}\"\necho \"===\
-        \ Preflight checks for $E environment ===\"\n\n# Verify VPC cleanup worked\
-        \ (should have deleted orphaned VPCs)\nVPC_COUNT=$(aws ec2 describe-vpcs \\\
-        \n  --query 'Vpcs[].VpcId' --output text 2>/dev/null | wc -w | tr -d ' ')\n\
-        echo \"  Current VPCs: $VPC_COUNT\"\n\n# Check if uploads bucket already exists\
-        \ (should be cleaned up first)\nUPLOADS_BUCKET=\"${P}-${E}-uploads\"\nif aws\
-        \ s3api head-bucket --bucket \"$UPLOADS_BUCKET\" 2>/dev/null; then\n  echo\
-        \ \"  ERROR: Uploads bucket $UPLOADS_BUCKET already exists.\"\n  echo \" \
-        \ Please run the workflow with skip_terraform=false first to clean up.\"\n\
-        \  exit 1\nfi\n\necho \"  Preflight checks passed\"\n"
-    - name: Sanitize DB password for Aurora compatibility
-      run: "SAFE=$(printf '%s' \"$RAW\" | tr -d '/@\" ')\nif [ ${#SAFE} -lt 8 ]; then\n\
-        \  echo \"ERROR: DB_PASSWORD is too short after sanitization (< 8 chars).\"\
-        \n  echo \"Regenerate with: openssl rand -hex 24\"\n  exit 1\nfi\necho \"\
-        SAFE_DB_PASSWORD=${SAFE}\" >> $GITHUB_ENV\n"
-      env:
-        RAW: ${{ secrets.DB_PASSWORD }}
-    - name: Compute CORS allowed origins
-      run: "DOMAIN=\"${{ github.event.inputs.custom_domain }}\"\nif [ -n \"$DOMAIN\"\
-        \ ]; then\n  CORS=\"[\\\"https://${DOMAIN}\\\",\\\"http://localhost:3000\\\
-        \",\\\"http://localhost:5173\\\"]\"\nelse\n  CORS='[\"http://localhost:3000\"\
-        ,\"http://localhost:5173\"]'\nfi\necho \"TF_VAR_cors_allowed_origins=${CORS}\"\
-        \ >> $GITHUB_ENV\n"
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: ${{ env.TF_VERSION }}
-    - name: Cleanup orphaned VPCs
-      run: bash .github/workflows/delete_orphaned_vpcs.sh
-    - name: Terraform fmt check
-      working-directory: ./terraform
-      run: terraform fmt -check -recursive
-    - name: Ensure Terraform state bucket exists
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      run: "ACCOUNT=$(aws sts get-caller-identity --query Account --output text)\n\
-        STATE_BUCKET=\"skillbridge-tfstate-${ACCOUNT}-${{ env.ENVIRONMENT }}\"\necho\
-        \ \"STATE_BUCKET=${STATE_BUCKET}\" >> $GITHUB_ENV\n\n# us-east-1 does NOT\
-        \ use --create-bucket-configuration\naws s3api create-bucket \\\n  --bucket\
-        \ \"$STATE_BUCKET\" \\\n  --region \"${{ env.AWS_REGION }}\" 2>/dev/null ||\
-        \ true\n\n# Versioning preserves state file history\naws s3api put-bucket-versioning\
-        \ \\\n  --bucket \"$STATE_BUCKET\" \\\n  --versioning-configuration Status=Enabled\
-        \ 2>/dev/null || true\n\n# Block all public access on state bucket\naws s3api\
-        \ put-public-access-block \\\n  --bucket \"$STATE_BUCKET\" \\\n  --public-access-block-configuration\
-        \ \\\n    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true\
-        \ \\\n  2>/dev/null || true\n\n# Enable SSE-S3 encryption\naws s3api put-bucket-encryption\
-        \ \\\n  --bucket \"$STATE_BUCKET\" \\\n  --server-side-encryption-configuration\
-        \ \\\n    '{\"Rules\":[{\"ApplyServerSideEncryptionByDefault\":{\"SSEAlgorithm\"\
-        :\"AES256\"}}]}' \\\n  2>/dev/null || true\n\necho \"State bucket: $STATE_BUCKET\"\
-        \n"
-    - name: Terraform Init
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      working-directory: ./terraform
-      run: "terraform init \\\n  -upgrade \\\n  -input=false \\\n  -backend-config=\"\
-        bucket=${{ env.STATE_BUCKET }}\" \\\n  -backend-config=\"key=${{ env.ENVIRONMENT\
-        \ }}/terraform.tfstate\" \\\n  -backend-config=\"region=${{ env.AWS_REGION\
-        \ }}\" \\\n  -backend-config=\"encrypt=true\"\n"
-    - name: Terraform Init (skip_terraform path)
-      if: ${{ github.event.inputs.skip_terraform == 'true' }}
-      working-directory: ./terraform
-      run: "ACCOUNT=$(aws sts get-caller-identity --query Account --output text)\n\
-        STATE_BUCKET=\"skillbridge-tfstate-${ACCOUNT}-${{ env.ENVIRONMENT }}\"\necho\
-        \ \"STATE_BUCKET=${STATE_BUCKET}\" >> $GITHUB_ENV\nterraform init \\\n  -upgrade\
-        \ \\\n  -input=false \\\n  -backend-config=\"bucket=${STATE_BUCKET}\" \\\n\
-        \  -backend-config=\"key=${{ env.ENVIRONMENT }}/terraform.tfstate\" \\\n \
-        \ -backend-config=\"region=${{ env.AWS_REGION }}\" \\\n  -backend-config=\"\
-        encrypt=true\"\n"
-    - name: Terraform validate
-      working-directory: ./terraform
-      run: terraform validate
-    - name: Create ECR repository
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: "P=\"${{ env.PROJECT_NAME }}\"\nE=\"${{ env.ENVIRONMENT }}\"\n\n# Remove\
-        \ from state first so import is idempotent on re-runs\nterraform state rm\
-        \ module.ecr.aws_ecr_repository.backend 2>/dev/null || true\nterraform state\
-        \ rm module.ecr.aws_ecr_lifecycle_policy.backend 2>/dev/null || true\n\n#\
-        \ Import if the ECR repo already exists in AWS (re-run safety)\nterraform\
-        \ import -input=false \\\n  module.ecr.aws_ecr_repository.backend \\\n  \"\
-        ${P}-${E}-backend\" \\\n  2>&1 | grep -v \"^$\" || true\n\nterraform import\
-        \ -input=false \\\n  module.ecr.aws_ecr_lifecycle_policy.backend \\\n  \"\
-        ${P}-${E}-backend\" \\\n  2>&1 | grep -v \"^$\" || true\n\nterraform apply\
-        \ -target=module.ecr -auto-approve -input=false\n"
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Login to ECR
-      id: ecr-login
-      uses: aws-actions/amazon-ecr-login@v2
-    - name: Cache Docker layers
-      uses: actions/cache@v4
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ hashFiles('Dockerfile.lambda', 'nestjs-backend/package-lock.json')
-          }}
-        restore-keys: '${{ runner.os }}-buildx-
+      # ── Checkout ─────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
 
-          '
-    - name: Build and push Lambda image
-      env:
-        IMAGE_TAG: ${{ github.sha }}
-      run: "set -euo pipefail\nACCOUNT=$(aws sts get-caller-identity --query Account\
-        \ --output text)\nECR=\"${ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${PROJECT_NAME}-${ENVIRONMENT}-backend\"\
-        \n\ndocker buildx build \\\n  --platform linux/amd64 \\\n  -f Dockerfile.lambda\
-        \ \\\n  --provenance=false \\\n  --cache-from \"type=local,src=/tmp/.buildx-cache\"\
-        \ \\\n  --cache-to   \"type=local,dest=/tmp/.buildx-cache-new,mode=max\" \\\
-        \n  -t \"${ECR}:${IMAGE_TAG}\" \\\n  -t \"${ECR}:latest\" \\\n  --push \\\n\
-        \  .\n\n# Rotate cache to prevent unbounded growth\nrm -rf /tmp/.buildx-cache\n\
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache\n\necho \"IMAGE_URI=${ECR}:${IMAGE_TAG}\"\
-        \ >> $GITHUB_ENV\n"
-    - name: Update Lambda function code (skip_terraform path)
-      if: ${{ github.event.inputs.skip_terraform == 'true' }}
-      run: "set -euo pipefail\nP=\"${{ env.PROJECT_NAME }}\"\nE=\"${{ env.ENVIRONMENT\
-        \ }}\"\nfor FN in api voice rag-query embed-gen gap-analysis resume-upload\
-        \ \\\n          ssg-sync cache-cleanup recommendation-refresh \\\n       \
-        \   embedding-backfill market-insights warmup; do\n  FNAME=\"${P}-${E}-${FN}\"\
-        \n  if aws lambda get-function --function-name \"$FNAME\" &>/dev/null; then\n\
-        \    echo \"Updating ${FNAME}...\"\n    aws lambda update-function-code \\\
-        \n      --function-name \"$FNAME\" \\\n      --image-uri \"${{ env.IMAGE_URI\
-        \ }}\" \\\n      --output text --query 'FunctionName'\n  else\n    echo \"\
-        \  ${FNAME} not found \u2014 skipping\"\n  fi\ndone\n"
-    - name: Clean up AWS resources for clean-slate Terraform apply
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: "# Disable bash -e for this entire step.\n# This is a delete/cleanup script:\
-        \ every AWS CLI and terraform command\n# uses explicit \"|| true\" or structured\
-        \ if/else for error handling.\n# bash -e causes the step to abort immediately\
-        \ when any command\n# substitution (RESULT=$(aws ...)) returns non-zero, which\
-        \ always\n# happens on a first deploy when no resources exist yet (exit 254).\n\
-        set +e\n\nP=\"${{ env.PROJECT_NAME }}\"\nE=\"${{ env.ENVIRONMENT }}\"\nACCOUNT=$(aws\
-        \ sts get-caller-identity --query Account --output text)\n\necho \"=== Step\
-        \ 1: Remove non-ECR modules from Terraform state ===\"\n# module.iam is intentionally\
-        \ kept in state so Terraform updates roles\n# in place rather than trying\
-        \ to create them (avoids 409 EntityAlreadyExists\n# when IAM roles survive\
-        \ the AWS cleanup due to attached managed policies).\n# module.eventbridge\
-        \ is removed \u2014 schedules are re-imported in Step 4c.\nfor MOD in \\\n\
-        \  module.vpc \\\n  module.security_groups \\\n  module.rds \\\n  module.lambda_backend\
-        \ \\\n  module.api_gateway \\\n  module.s3_frontend \\\n  module.eventbridge;\
-        \ do\n  terraform state rm \"$MOD\" 2>&1 | head -3 || true\ndone\n# Indexed\
-        \ (count-based) modules use bracket notation\nterraform state rm 'module.cloudfront[0]'\
-        \  2>/dev/null || true\nterraform state rm 'module.opensearch[0]'  2>/dev/null\
-        \ || true\nterraform state rm 'module.websocket[0]'   2>/dev/null || true\n\
-        terraform state rm 'module.sagemaker[0]'   2>/dev/null || true\n# DNS module\
-        \ (Route 53 zone + ACM cert) \u2014 zone persists in AWS; re-imported below\n\
-        terraform state rm 'module.dns[0]'         2>/dev/null || true\n# CloudFront\
-        \ alias records (root-level resources in main.tf)\nterraform state rm 'aws_route53_record.cf_alias_root_a[0]'\
-        \    2>/dev/null || true\nterraform state rm 'aws_route53_record.cf_alias_root_aaaa[0]'\
-        \ 2>/dev/null || true\nterraform state rm 'aws_route53_record.cf_alias_www_a[0]'\
-        \     2>/dev/null || true\nterraform state rm 'aws_route53_record.cf_alias_www_aaaa[0]'\
-        \  2>/dev/null || true\n# Uploads bucket + internal-token secret (root-level\
-        \ resources)\nterraform state rm 'aws_s3_bucket.uploads'                 \
-        \         2>/dev/null || true\nterraform state rm 'aws_s3_bucket_public_access_block.uploads'\
-        \      2>/dev/null || true\nterraform state rm 'aws_s3_bucket_server_side_encryption_configuration.uploads'\
-        \ 2>/dev/null || true\nterraform state rm 'aws_secretsmanager_secret.internal_token'\
-        \        2>/dev/null || true\nterraform state rm 'aws_secretsmanager_secret_version.internal_token'\
-        \ 2>/dev/null || true\n\necho \"=== Step 2: Kick off Aurora cluster deletion\
-        \ (async) ===\"\nCLUSTER_ID=\"${P}-${E}-aurora\"\nfor INST in $(aws rds describe-db-clusters\
-        \ \\\n  --db-cluster-identifier \"$CLUSTER_ID\" \\\n  --query 'DBClusters[0].DBClusterMembers[].DBInstanceIdentifier'\
-        \ \\\n  --output text 2>/dev/null | tr '\\t' '\\n'); do\n  echo \"  Deleting\
-        \ Aurora instance: $INST\"\n  aws rds delete-db-instance \\\n    --db-instance-identifier\
-        \ \"$INST\" \\\n    --skip-final-snapshot 2>/dev/null || true\ndone\naws rds\
-        \ delete-db-cluster \\\n  --db-cluster-identifier \"$CLUSTER_ID\" \\\n  --skip-final-snapshot\
-        \ 2>/dev/null || true\n\necho \"=== Step 3: Delete Lambda functions, API Gateway,\
-        \ CWL log groups ===\"\nfor FN in api voice rag-query embed-gen gap-analysis\
-        \ resume-upload \\\n          ssg-sync cache-cleanup recommendation-refresh\
-        \ \\\n          embedding-backfill market-insights warmup; do\n  aws lambda\
-        \ delete-function \\\n    --function-name \"${P}-${E}-${FN}\" 2>/dev/null\
-        \ || true\ndone\n# Delete both the HTTP API and ALL WebSocket voice-ws APIs\
-        \ (avoid duplicates)\nfor API_NAME in \"${P}-${E}-api\" \"${P}-${E}-voice-ws\"\
-        ; do\n  API_IDS=$(aws apigatewayv2 get-apis \\\n    --query \"Items[?Name=='${API_NAME}'].ApiId\"\
-        \ \\\n    --output text 2>/dev/null || echo \"\")\n  for AID in $API_IDS;\
-        \ do\n    [ -z \"$AID\" ] || [ \"$AID\" = \"None\" ] && continue\n    echo\
-        \ \"  Deleting API Gateway: ${API_NAME} (${AID})\"\n    aws apigatewayv2 delete-api\
-        \ --api-id \"$AID\" 2>/dev/null || true\n  done\ndone\nfor LG in \\\n  \"\
-        /aws/lambda/${P}-${E}-api\" \\\n  \"/aws/lambda/${P}-${E}-voice\" \\\n  \"\
-        /aws/lambda/${P}-${E}-rag-query\" \\\n  \"/aws/lambda/${P}-${E}-embed-gen\"\
-        \ \\\n  \"/aws/lambda/${P}-${E}-gap-analysis\" \\\n  \"/aws/lambda/${P}-${E}-resume-upload\"\
-        \ \\\n  \"/aws/lambda/${P}-${E}-ssg-sync\" \\\n  \"/aws/lambda/${P}-${E}-cache-cleanup\"\
-        \ \\\n  \"/aws/lambda/${P}-${E}-recommendation-refresh\" \\\n  \"/aws/lambda/${P}-${E}-embedding-backfill\"\
-        \ \\\n  \"/aws/lambda/${P}-${E}-market-insights\" \\\n  \"/aws/lambda/${P}-${E}-warmup\"\
-        \ \\\n  \"/aws/apigateway/${P}-${E}\"; do\n  aws logs delete-log-group --log-group-name\
-        \ \"$LG\" 2>/dev/null || true\ndone\n\n# Step 4: IAM roles and policies are\
-        \ intentionally NOT deleted here.\n# module.iam is kept in Terraform state\
-        \ (see Step 1 comment) so Terraform\n# updates roles in place on re-deploy\
-        \ rather than attempting to create them.\n\necho \"=== Step 4: Delete Secrets\
-        \ Manager secret ===\"\naws secretsmanager delete-secret \\\n  --secret-id\
-        \ \"${P}/internal-token\" \\\n  --force-delete-without-recovery 2>/dev/null\
-        \ || true\n\necho \"=== Step 5: Delete ALL project-tagged VPCs and their dependencies\
-        \ ===\"\nfor VPC_ID in $(aws ec2 describe-vpcs \\\n  --filters \"Name=tag:Name,Values=${P}-${E}-vpc\"\
-        \ \\\n  --query 'Vpcs[].VpcId' --output text 2>/dev/null | tr '\\t' '\\n');\
-        \ do\n  [ -z \"$VPC_ID\" ] || [ \"$VPC_ID\" = \"None\" ] && continue\n  echo\
-        \ \"  Cleaning VPC: $VPC_ID\"\n\n  # \u2500\u2500 FIX: Delete Lambda/RDS Elastic\
-        \ Network Interfaces first \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
-        \u2500\u2500\n  # Lambda functions in VPCs create ENIs that persist for up\
-        \ to 20 min\n  # after the function is deleted. These block subnet deletion.\n\
-        \  # We must explicitly detach + delete them before touching subnets.\n  echo\
-        \ \"  Waiting for Lambda ENIs to become 'available' (up to 3 min)...\"\n \
-        \ for i in $(seq 1 18); do\n    IN_USE=$(aws ec2 describe-network-interfaces\
-        \ \\\n      --filters \"Name=vpc-id,Values=$VPC_ID\" \"Name=status,Values=in-use\"\
-        \ \\\n      --query 'NetworkInterfaces[?Description!=`null`] | length(@)'\
-        \ \\\n      --output text 2>/dev/null || echo \"0\")\n    [ \"$IN_USE\" =\
-        \ \"0\" ] && break\n    echo \"    $IN_USE ENIs still in-use ($i/18)...\"\n\
-        \    sleep 10\n  done\n  for ENI in $(aws ec2 describe-network-interfaces\
-        \ \\\n    --filters \"Name=vpc-id,Values=$VPC_ID\" \"Name=status,Values=available\"\
-        \ \\\n    --query 'NetworkInterfaces[].NetworkInterfaceId' \\\n    --output\
-        \ text 2>/dev/null | tr '\\t' '\\n'); do\n    [ -z \"$ENI\" ] && continue\n\
-        \    echo \"    Deleting ENI: $ENI\"\n    aws ec2 delete-network-interface\
-        \ \\\n      --network-interface-id \"$ENI\" 2>/dev/null || true\n  done\n\n\
-        \  # Security Groups (non-default)\n  for SG in $(aws ec2 describe-security-groups\
-        \ \\\n    --filters \"Name=vpc-id,Values=$VPC_ID\" \\\n    --query 'SecurityGroups[?GroupName\
-        \ != `default`].GroupId' \\\n    --output text 2>/dev/null | tr '\\t' '\\\
-        n'); do\n    aws ec2 delete-security-group --group-id \"$SG\" 2>/dev/null\
-        \ || true\n  done\n\n  # NAT Gateways (async delete)\n  for NAT in $(aws ec2\
-        \ describe-nat-gateways \\\n    --filter \"Name=vpc-id,Values=$VPC_ID\" \\\
-        \n             \"Name=state,Values=available,pending\" \\\n    --query 'NatGateways[].NatGatewayId'\
-        \ \\\n    --output text 2>/dev/null | tr '\\t' '\\n'); do\n    aws ec2 delete-nat-gateway\
-        \ --nat-gateway-id \"$NAT\" 2>/dev/null || true\n  done\n  # Wait for NAT\
-        \ GW deletion (up to 3 min)\n  for i in $(seq 1 18); do\n    PENDING=$(aws\
-        \ ec2 describe-nat-gateways \\\n      --filter \"Name=vpc-id,Values=$VPC_ID\"\
-        \ \\\n               \"Name=state,Values=available,pending,deleting\" \\\n\
-        \      --query 'NatGateways[].NatGatewayId' --output text 2>/dev/null)\n \
-        \   [ -z \"$PENDING\" ] && break\n    echo \"  Waiting for NAT GW... ($i/18)\"\
-        \n    sleep 10\n  done\n\n  # Internet Gateway\n  for IGW in $(aws ec2 describe-internet-gateways\
-        \ \\\n    --filters \"Name=attachment.vpc-id,Values=$VPC_ID\" \\\n    --query\
-        \ 'InternetGateways[].InternetGatewayId' \\\n    --output text 2>/dev/null\
-        \ | tr '\\t' '\\n'); do\n    aws ec2 detach-internet-gateway \\\n      --internet-gateway-id\
-        \ \"$IGW\" --vpc-id \"$VPC_ID\" 2>/dev/null || true\n    aws ec2 delete-internet-gateway\
-        \ \\\n      --internet-gateway-id \"$IGW\" 2>/dev/null || true\n  done\n\n\
-        \  # Route tables (non-main)\n  for RT in $(aws ec2 describe-route-tables\
-        \ \\\n    --filters \"Name=vpc-id,Values=$VPC_ID\" \\\n    --query 'RouteTables[?Associations[0].Main\
-        \ != `true`].RouteTableId' \\\n    --output text 2>/dev/null | tr '\\t' '\\\
-        n'); do\n    aws ec2 delete-route-table --route-table-id \"$RT\" 2>/dev/null\
-        \ || true\n  done\n\n  # Subnets (after ENIs and NAT GW are gone)\n  for SUBNET\
-        \ in $(aws ec2 describe-subnets \\\n    --filters \"Name=vpc-id,Values=$VPC_ID\"\
-        \ \\\n    --query 'Subnets[].SubnetId' \\\n    --output text 2>/dev/null |\
-        \ tr '\\t' '\\n'); do\n    aws ec2 delete-subnet --subnet-id \"$SUBNET\" 2>/dev/null\
-        \ || true\n  done\n\n  aws ec2 delete-vpc --vpc-id \"$VPC_ID\" 2>/dev/null\
-        \ || true\n  echo \"  Deleted VPC: $VPC_ID\"\ndone\n\necho \"=== Step 6: Release\
-        \ unassociated project EIPs ===\"\nfor EIP in $(aws ec2 describe-addresses\
-        \ \\\n  --filters \"Name=tag:Name,Values=${P}-${E}-nat-eip\" \\\n  --query\
-        \ 'Addresses[].AllocationId' \\\n  --output text 2>/dev/null | tr '\\t' '\\\
-        n'); do\n  [ -n \"$EIP\" ] && aws ec2 release-address \\\n    --allocation-id\
-        \ \"$EIP\" 2>/dev/null || true\ndone\n\necho \"=== Step 7: Wait for Aurora\
-        \ cluster deletion (up to 15 min) ===\"\nfor i in $(seq 1 90); do\n  STATUS=$(aws\
-        \ rds describe-db-clusters \\\n    --db-cluster-identifier \"$CLUSTER_ID\"\
-        \ \\\n    --query 'DBClusters[0].Status' \\\n    --output text 2>/dev/null\
-        \ || echo \"gone\")\n  if [ \"$STATUS\" = \"gone\" ] || [ \"$STATUS\" = \"\
-        None\" ] || [ -z \"$STATUS\" ]; then\n    echo \"  Aurora is gone \u2014 proceeding\"\
-        \n    break\n  fi\n  echo \"  Aurora status: $STATUS ($i/90)\"\n  sleep 10\n\
-        done\n\necho \"=== Step 8: Delete RDS subnet group + parameter group (with\
-        \ retries) ===\"\nfor i in $(seq 1 60); do\n  RESULT=$(aws rds delete-db-subnet-group\
-        \ \\\n    --db-subnet-group-name \"${P}-${E}-db-subnet\" 2>&1)\n  if [ $?\
-        \ -eq 0 ] || echo \"$RESULT\" | grep -qi \"DBSubnetGroupNotFoundFault\\|Cannot\
-        \ find\"; then\n    echo \"  Subnet group deleted (or already gone)\"\n  \
-        \  break\n  fi\n  echo \"  Waiting for subnet group ($i/60): $RESULT\"\n \
-        \ sleep 10\ndone\nfor i in $(seq 1 12); do\n  RESULT=$(aws rds delete-db-cluster-parameter-group\
-        \ \\\n    --db-cluster-parameter-group-name \"${P}-${E}-aurora-pg16\" 2>&1)\n\
-        \  if [ $? -eq 0 ] || echo \"$RESULT\" | grep -qi \"DBParameterGroupNotFoundFault\\\
-        |Cannot find\"; then\n    echo \"  Cluster parameter group deleted (or already\
-        \ gone)\"\n    break\n  fi\n  echo \"  Waiting for parameter group ($i/12):\
-        \ $RESULT\"\n  sleep 10\ndone\naws rds delete-db-parameter-group \\\n  --db-parameter-group-name\
-        \ \"${P}-${E}-pg16\" 2>/dev/null || true\n\necho \"=== Step 9: Delete Secrets\
-        \ Manager secret ===\"\naws secretsmanager delete-secret \\\n  --secret-id\
-        \ \"${P}/${E}/db-credentials\" \\\n  --force-delete-without-recovery 2>/dev/null\
-        \ || true\n\necho \"=== Step 10: Empty + delete uploads S3 bucket (if it exists)\
-        \ ===\"\nUPLOADS_BUCKET=\"${P}-${E}-uploads\"\n# Safety check: only proceed\
-        \ if bucket exists AND has correct tags\n# This prevents accidentally deleting\
-        \ buckets from other sources\nif aws s3api head-bucket --bucket \"$UPLOADS_BUCKET\"\
-        \ 2>/dev/null; then\n  echo \"  Bucket $UPLOADS_BUCKET exists, verifying tags...\"\
-        \n  # Verify bucket has the expected tag: Name=${P}-${E}-uploads\n  BUCKET_TAGS=$(aws\
-        \ s3api get-bucket-tagging --bucket \"$UPLOADS_BUCKET\" 2>/dev/null)\n  EXPECTED_TAG=\"\
-        \\\"Key\\\":\\\"Name\\\",\\\"Value\\\":\\\"${P}-${E}-uploads\\\"\"\n  if echo\
-        \ \"$BUCKET_TAGS\" | grep -q \"$EXPECTED_TAG\"; then\n    echo \"  Bucket\
-        \ tags verified, proceeding with deletion...\"\n    # Remove bucket policy\
-        \ if it exists (can block deletion)\n    aws s3api delete-bucket-policy --bucket\
-        \ \"$UPLOADS_BUCKET\" 2>/dev/null || true\n    # Remove any encryption configuration\n\
-        \    aws s3api delete-bucket-encryption --bucket \"$UPLOADS_BUCKET\" 2>/dev/null\
-        \ || true\n    # Remove public access block\n    aws s3api delete-public-access-block\
-        \ --bucket \"$UPLOADS_BUCKET\" 2>/dev/null || true\n    # Empty the bucket\
-        \ (including all versions if versioning was enabled)\n    aws s3 rm \"s3://${UPLOADS_BUCKET}\"\
-        \ --recursive --include \"*\" 2>/dev/null || true\n    # Delete the bucket\n\
-        \    aws s3api delete-bucket --bucket \"$UPLOADS_BUCKET\" \\\n      --region\
-        \ \"${{ env.AWS_REGION }}\" 2>/dev/null || true\n    echo \"  Bucket $UPLOADS_BUCKET\
-        \ deleted\"\n  else\n    echo \"  WARNING: Bucket $UPLOADS_BUCKET exists but\
-        \ has unexpected tags. Skipping deletion.\"\n    echo \"  This may indicate\
-        \ a bucket from another source. Manual intervention required.\"\n  fi\nelse\n\
-        \  echo \"  Bucket $UPLOADS_BUCKET does not exist\"\nfi\n\necho \"=== Step\
-        \ 11: Clear CNAME aliases from any existing CloudFront distributions ===\"\
-        \n# CloudFront distributions with CNAME aliases (e.g. sklbr.co) must have\
-        \ those\n# aliases removed before Terraform can create a new distribution\
-        \ with the same CNAMEs.\n# Updating aliases on an enabled distribution is\
-        \ instant and does not require disabling.\n# Search by actual alias value\
-        \ (not by Comment) so we find distributions regardless\n# of how they were\
-        \ originally created or what comment they were given.\nCF_DOMAIN=\"${{ github.event.inputs.custom_domain\
-        \ }}\"\nif [ -n \"$CF_DOMAIN\" ]; then\n  ALL_DISTS=$(aws cloudfront list-distributions\
-        \ --output json 2>/dev/null || echo '{\"DistributionList\":{\"Items\":[]}}')\n\
-        \  for DIST_ID in $(echo \"$ALL_DISTS\" | jq -r --arg d \"$CF_DOMAIN\" \\\n\
-        \    '.DistributionList.Items[]? | select(any(.Aliases.Items[]?; . == $d))\
-        \ | .Id' 2>/dev/null); do\n    [ -z \"$DIST_ID\" ] || [ \"$DIST_ID\" = \"\
-        None\" ] && continue\n    echo \"  Clearing CNAME aliases from CloudFront\
-        \ distribution: $DIST_ID\"\n    ETAG=$(aws cloudfront get-distribution-config\
-        \ --id \"$DIST_ID\" \\\n      --query 'ETag' --output text 2>/dev/null)\n\
-        \    CONFIG=$(aws cloudfront get-distribution-config --id \"$DIST_ID\" \\\n\
-        \      --query 'DistributionConfig' --output json 2>/dev/null)\n    if [ -n\
-        \ \"$ETAG\" ] && [ \"$ETAG\" != \"None\" ]; then\n      UPDATED=$(echo \"\
-        $CONFIG\" | jq '.Aliases = {\"Quantity\": 0, \"Items\": []}')\n      aws cloudfront\
-        \ update-distribution \\\n        --id \"$DIST_ID\" \\\n        --distribution-config\
-        \ \"$UPDATED\" \\\n        --if-match \"$ETAG\" \\\n        --output text\
-        \ --query 'Distribution.Id' 2>/dev/null || true\n      echo \"  Aliases cleared\
-        \ from $DIST_ID\"\n    fi\n  done\nfi\n\necho \"Cleanup complete \u2014 Terraform\
-        \ will rebuild all resources from scratch\"\nexit 0\n"
-    - name: Import ECR into Terraform state
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: "P=\"${{ env.PROJECT_NAME }}\"\nE=\"${{ env.ENVIRONMENT }}\"\n\n# Remove\
-        \ from state first in case the earlier targeted apply left it there\nterraform\
-        \ state rm module.ecr.aws_ecr_repository.backend 2>/dev/null || true\nterraform\
-        \ state rm module.ecr.aws_ecr_lifecycle_policy.backend 2>/dev/null || true\n\
-        \nterraform import -input=false \\\n  module.ecr.aws_ecr_repository.backend\
-        \ \\\n  \"${P}-${E}-backend\" \\\n  2>&1 | grep -v \"^$\" || true\n\nterraform\
-        \ import -input=false \\\n  module.ecr.aws_ecr_lifecycle_policy.backend \\\
-        \n  \"${P}-${E}-backend\" \\\n  2>&1 | grep -v \"^$\" || true\n\necho \"ECR\
-        \ import complete\"\n"
-    - name: Import IAM into Terraform state
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: "P=\"${{ env.PROJECT_NAME }}\"\nE=\"${{ env.ENVIRONMENT }}\"\nACCOUNT=$(aws\
-        \ sts get-caller-identity --query Account --output text)\n\n# Helper: remove\
-        \ from state then import (idempotent \u2014 safe to re-run)\nimport_iam_role()\
-        \ {\n  local addr=\"$1\" name=\"$2\"\n  terraform state rm \"$addr\" 2>/dev/null\
-        \ || true\n  terraform import -input=false \"$addr\" \"$name\" 2>&1 | grep\
-        \ -v \"^$\" || true\n}\nimport_iam_policy() {\n  local addr=\"$1\" arn=\"\
-        $2\"\n  terraform state rm \"$addr\" 2>/dev/null || true\n  terraform import\
-        \ -input=false \"$addr\" \"$arn\" 2>&1 | grep -v \"^$\" || true\n}\nimport_iam_attachment()\
-        \ {\n  local addr=\"$1\" id=\"$2\"\n  terraform state rm \"$addr\" 2>/dev/null\
-        \ || true\n  terraform import -input=false \"$addr\" \"$id\" 2>&1 | grep -v\
-        \ \"^$\" || true\n}\n\n# \u2500\u2500 Lambda exec role (main backend) \u2500\
-        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
-        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
-        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nimport_iam_role   \"module.iam.aws_iam_role.lambda_exec\"\
-        \              \"${P}-${E}-lambda-exec\"\nimport_iam_policy \"module.iam.aws_iam_policy.skillbridge_lambda\"\
-        \     \"arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy\"\nimport_iam_attachment\
-        \ \"module.iam.aws_iam_role_policy_attachment.lambda_basic_execution\" \\\n\
-        \  \"${P}-${E}-lambda-exec/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole\"\
-        \nimport_iam_attachment \"module.iam.aws_iam_role_policy_attachment.lambda_vpc_access\"\
-        \ \\\n  \"${P}-${E}-lambda-exec/arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole\"\
-        \nimport_iam_attachment \"module.iam.aws_iam_role_policy_attachment.skillbridge_lambda\"\
-        \ \\\n  \"${P}-${E}-lambda-exec/arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy\"\
-        \n\n# \u2500\u2500 EventBridge automation Lambda role \u2500\u2500\u2500\u2500\
-        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
-        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
-        \u2500\u2500\nimport_iam_role   \"module.iam.aws_iam_role.automation_lambda\"\
-        \              \"${P}-${E}-automation-lambda\"\nimport_iam_policy \"module.iam.aws_iam_policy.automation_lambda\"\
-        \            \"arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-automation-lambda-policy\"\
-        \nimport_iam_attachment \"module.iam.aws_iam_role_policy_attachment.automation_lambda_basic\"\
-        \ \\\n  \"${P}-${E}-automation-lambda/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole\"\
-        \nimport_iam_attachment \"module.iam.aws_iam_role_policy_attachment.automation_lambda\"\
-        \ \\\n  \"${P}-${E}-automation-lambda/arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-automation-lambda-policy\"\
-        \n\n# \u2500\u2500 EventBridge Scheduler role \u2500\u2500\u2500\u2500\u2500\
-        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
-        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
-        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nimport_iam_role\
-        \   \"module.iam.aws_iam_role.eventbridge_scheduler\"              \"${P}-${E}-eventbridge-scheduler\"\
-        \nimport_iam_policy \"module.iam.aws_iam_policy.eventbridge_scheduler\"  \
-        \          \"arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-eventbridge-scheduler-policy\"\
-        \nimport_iam_attachment \"module.iam.aws_iam_role_policy_attachment.eventbridge_scheduler\"\
-        \ \\\n  \"${P}-${E}-eventbridge-scheduler/arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-eventbridge-scheduler-policy\"\
-        \n\necho \"IAM import complete\"\n"
-    - name: Import EventBridge Schedules into Terraform state
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: "P=\"${{ env.PROJECT_NAME }}\"\nE=\"${{ env.ENVIRONMENT }}\"\n\nimport_schedule()\
-        \ {\n  local addr=\"$1\" name=\"$2\"\n  terraform state rm \"$addr\" 2>/dev/null\
-        \ || true\n  terraform import -input=false \"$addr\" \"default/${name}\" 2>&1\
-        \ | grep -v \"^$\" || true\n}\n\nimport_schedule \"module.eventbridge.aws_scheduler_schedule.ssg_course_sync\"\
-        \              \"${P}-${E}-ssg-course-sync\"\nimport_schedule \"module.eventbridge.aws_scheduler_schedule.ssg_jobrole_sync\"\
-        \             \"${P}-${E}-ssg-jobrole-sync\"\nimport_schedule \"module.eventbridge.aws_scheduler_schedule.recommendation_precompute\"\
-        \    \"${P}-${E}-recommendation-precompute\"\nimport_schedule \"module.eventbridge.aws_scheduler_schedule.recommendation_rationale_pregen\"\
-        \ \"${P}-${E}-rationale-pregen\"\nimport_schedule \"module.eventbridge.aws_scheduler_schedule.cache_cleanup\"\
-        \               \"${P}-${E}-cleanup-expired-cache\"\nimport_schedule \"module.eventbridge.aws_scheduler_schedule.market_insights\"\
-        \             \"${P}-${E}-market-insights-aggregation\"\nimport_schedule \"\
-        module.eventbridge.aws_scheduler_schedule.embedding_backfill\"          \"\
-        ${P}-${E}-embedding-backfill\"\n# lambda_warmup is count-based (count = var.enable_warmup\
-        \ ? 1 : 0)\nimport_schedule \"module.eventbridge.aws_scheduler_schedule.lambda_warmup[0]\"\
-        \            \"${P}-${E}-lambda-warmup-ping\"\n\necho \"EventBridge schedule\
-        \ import complete\"\n"
-    - name: Import CloudWatch Query Definitions into Terraform state
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: "P=\"${{ env.PROJECT_NAME }}\"\nE=\"${{ env.ENVIRONMENT }}\"\n\nACCOUNT=$(aws\
-        \ sts get-caller-identity --query Account --output text)\nREGION=\"${{ env.AWS_REGION\
-        \ }}\"\n\nimport_cw_query() {\n  local addr=\"$1\" name=\"$2\"\n  local qid\
-        \ arn\n  qid=$(aws logs describe-query-definitions \\\n    --query-definition-name-prefix\
-        \ \"${name}\" \\\n    --query \"queryDefinitions[?name=='${name}'].queryDefinitionId\
-        \ | [0]\" \\\n    --output text 2>/dev/null)\n  if [ -n \"$qid\" ] && [ \"\
-        $qid\" != \"None\" ] && [ \"$qid\" != \"null\" ]; then\n    arn=\"arn:aws:logs:${REGION}:${ACCOUNT}:query-definition:${qid}\"\
-        \n    echo \"Importing CW query definition ${name}: ${arn}\"\n    terraform\
-        \ state rm \"$addr\" 2>/dev/null || true\n    terraform import -input=false\
-        \ \"$addr\" \"$arn\" 2>&1 | grep -v \"^$\" || true\n  else\n    echo \"No\
-        \ existing CW query definition ${name} \u2014 Terraform will create it\"\n\
-        \  fi\n}\n\nimport_cw_query \\\n  \"module.eventbridge.aws_cloudwatch_query_definition.rag_latency_and_miss_rate\"\
-        \ \\\n  \"${P}/${E}/RAG/LatencyAndMissRate\"\nimport_cw_query \\\n  \"module.eventbridge.aws_cloudwatch_query_definition.rag_similarity_distribution\"\
-        \ \\\n  \"${P}/${E}/RAG/SimilarityDistribution\"\n\necho \"CloudWatch query\
-        \ definition import complete\"\n"
-    - name: Import DNS into Terraform state
-      if: ${{ github.event.inputs.skip_terraform != 'true' && github.event.inputs.enable_custom_domain
-        == 'true' && github.event.inputs.custom_domain != '' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: "DOMAIN=\"${{ github.event.inputs.custom_domain }}\"\n\n# Import Route\
-        \ 53 hosted zone if one already exists for this domain\nZONE_ID=$(aws route53\
-        \ list-hosted-zones-by-name \\\n  --dns-name \"${DOMAIN}.\" \\\n  --query\
-        \ \"HostedZones[?Name=='${DOMAIN}.'].Id | [0]\" \\\n  --output text 2>/dev/null\
-        \ | sed 's|/hostedzone/||')\nif [ -n \"$ZONE_ID\" ] && [ \"$ZONE_ID\" != \"\
-        None\" ] && [ \"$ZONE_ID\" != \"null\" ]; then\n  echo \"Importing Route 53\
-        \ zone: ${ZONE_ID}\"\n  terraform state rm 'module.dns[0].aws_route53_zone.main'\
-        \ 2>/dev/null || true\n  terraform import -input=false \\\n    'module.dns[0].aws_route53_zone.main'\
-        \ \"${ZONE_ID}\" \\\n    2>&1 | grep -v \"^$\" || true\nelse\n  echo \"No\
-        \ existing Route 53 zone for ${DOMAIN} \u2014 Terraform will create it\"\n\
-        fi\n\n# Import ACM certificate if one already exists for this domain (us-east-1)\n\
-        CERT_ARN=$(aws acm list-certificates \\\n  --region us-east-1 \\\n  --query\
-        \ \"CertificateSummaryList[?DomainName=='${DOMAIN}'].CertificateArn | [0]\"\
-        \ \\\n  --output text 2>/dev/null)\nif [ -n \"$CERT_ARN\" ] && [ \"$CERT_ARN\"\
-        \ != \"None\" ] && [ \"$CERT_ARN\" != \"null\" ]; then\n  echo \"Importing\
-        \ ACM certificate: ${CERT_ARN}\"\n  terraform state rm 'module.dns[0].aws_acm_certificate.cert'\
-        \ 2>/dev/null || true\n  terraform import -input=false \\\n    'module.dns[0].aws_acm_certificate.cert'\
-        \ \"${CERT_ARN}\" \\\n    2>&1 | grep -v \"^$\" || true\nelse\n  echo \"No\
-        \ existing ACM certificate for ${DOMAIN} \u2014 Terraform will create it\"\
-        \nfi\n\necho \"DNS import complete\"\n"
-    - name: Import CloudFront into Terraform state
-      if: ${{ github.event.inputs.skip_terraform != 'true' && github.event.inputs.enable_cloudfront
-        == 'true' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: "P=\"${{ env.PROJECT_NAME }}\"\nE=\"${{ env.ENVIRONMENT }}\"\n\n# Import\
-        \ OAC if it already exists\nOAC_ID=$(aws cloudfront list-origin-access-controls\
-        \ \\\n  --query \"OriginAccessControlList.Items[?Name=='${P}-${E}-oac'].Id\
-        \ | [0]\" \\\n  --output text 2>/dev/null)\nif [ -n \"$OAC_ID\" ] && [ \"\
-        $OAC_ID\" != \"None\" ] && [ \"$OAC_ID\" != \"null\" ]; then\n  echo \"Importing\
-        \ CloudFront OAC: ${OAC_ID}\"\n  terraform state rm 'module.cloudfront[0].aws_cloudfront_origin_access_control.web'\
-        \ 2>/dev/null || true\n  terraform import -input=false \\\n    'module.cloudfront[0].aws_cloudfront_origin_access_control.web'\
-        \ \"${OAC_ID}\" \\\n    2>&1 | grep -v \"^$\" || true\nelse\n  echo \"No existing\
-        \ CloudFront OAC \u2014 Terraform will create it\"\nfi\n\n# Import CloudFront\
-        \ distribution if it already exists.\n# Search by OAC name first (reliable\
-        \ after our own deploys), then fall back\n# to searching by custom_domain\
-        \ alias (catches manually-created distributions).\nDIST_ID=$(aws cloudfront\
-        \ list-distributions \\\n  --query \"DistributionList.Items[?Comment=='${P}-${E}'].Id\
-        \ | [0]\" \\\n  --output text 2>/dev/null)\nif [ -z \"$DIST_ID\" ] || [ \"\
-        $DIST_ID\" = \"None\" ] || [ \"$DIST_ID\" = \"null\" ]; then\n  CF_DOMAIN=\"\
-        ${{ github.event.inputs.custom_domain }}\"\n  if [ -n \"$CF_DOMAIN\" ]; then\n\
-        \    ALL_DISTS=$(aws cloudfront list-distributions --output json 2>/dev/null\
-        \ || echo '{\"DistributionList\":{\"Items\":[]}}')\n    DIST_ID=$(echo \"\
-        $ALL_DISTS\" | jq -r --arg d \"$CF_DOMAIN\" \\\n      '.DistributionList.Items[]?\
-        \ | select(any(.Aliases.Items[]?; . == $d)) | .Id' 2>/dev/null | head -1)\n\
-        \  fi\nfi\nif [ -n \"$DIST_ID\" ] && [ \"$DIST_ID\" != \"None\" ] && [ \"\
-        $DIST_ID\" != \"null\" ]; then\n  echo \"Importing CloudFront distribution:\
-        \ ${DIST_ID}\"\n  terraform state rm 'module.cloudfront[0].aws_cloudfront_distribution.web'\
-        \ 2>/dev/null || true\n  terraform import -input=false \\\n    'module.cloudfront[0].aws_cloudfront_distribution.web'\
-        \ \"${DIST_ID}\" \\\n    2>&1 | grep -v \"^$\" || true\nelse\n  echo \"No\
-        \ existing CloudFront distribution \u2014 Terraform will create it\"\nfi\n\
-        \necho \"CloudFront import complete\"\n"
-    - name: Terraform Plan
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_groq_api_key: ${{ secrets.GROQ_API_KEY }}
-        TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-        TF_VAR_gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-        TF_VAR_lambda_image_uri: ${{ env.IMAGE_URI }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: terraform plan -out=tfplan -input=false
-    - name: Terraform Apply
-      if: ${{ github.event.inputs.skip_terraform != 'true' }}
-      working-directory: ./terraform
-      env:
-        TF_VAR_aws_region: ${{ env.AWS_REGION }}
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
-        TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
-        TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
-        TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
-        TF_VAR_groq_api_key: ${{ secrets.GROQ_API_KEY }}
-        TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-        TF_VAR_gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-        TF_VAR_lambda_image_uri: ${{ env.IMAGE_URI }}
-        TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
-        TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain
-          }}
-        TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
-        TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
-      run: terraform apply tfplan
-    - name: Read Terraform outputs
-      id: tf
-      working-directory: ./terraform
-      run: 'echo "api_url=$(terraform output -raw api_endpoint | sed ''s|/$||'')"
-        >> $GITHUB_OUTPUT
+      # ── AWS Auth ─────────────────────────────────────────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-        echo "s3_bucket=$(terraform output -raw s3_bucket_name)"      >> $GITHUB_OUTPUT
+      # Aurora master password forbids: '/', '@', '"', space
+      # base64 output (from openssl rand -base64) may contain '/' — strip it.
+      - name: Sanitize DB password for Aurora compatibility
+        run: |
+          SAFE=$(printf '%s' "$RAW" | tr -d '/@" ')
+          if [ ${#SAFE} -lt 8 ]; then
+            echo "ERROR: DB_PASSWORD is too short after sanitization (< 8 chars)."
+            echo "Regenerate with: openssl rand -hex 24"
+            exit 1
+          fi
+          echo "SAFE_DB_PASSWORD=${SAFE}" >> $GITHUB_ENV
+        env:
+          RAW: ${{ secrets.DB_PASSWORD }}
 
-        echo "cf_domain=$(terraform output -raw cloudfront_domain)"   >> $GITHUB_OUTPUT
+      # ── Compute CORS allowed origins ──────────────────────────────────────────
+      # Allow localhost for dev + custom domain (if set). Written to $GITHUB_ENV
+      # as TF_VAR_cors_allowed_origins so all downstream Terraform steps pick it
+      # up automatically without needing to add it to every env: block.
+      - name: Compute CORS allowed origins
+        run: |
+          DOMAIN="${{ github.event.inputs.custom_domain }}"
+          if [ -n "$DOMAIN" ]; then
+            CORS="[\"https://${DOMAIN}\",\"http://localhost:3000\",\"http://localhost:5173\"]"
+          else
+            CORS='["http://localhost:3000","http://localhost:5173"]'
+          fi
+          echo "TF_VAR_cors_allowed_origins=${CORS}" >> $GITHUB_ENV
 
-        echo "cf_id=$(terraform output -raw cloudfront_id)"           >> $GITHUB_OUTPUT
+      # ── Setup Terraform (early — needed for fmt/validate before ECR step) ────
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
-        echo "frontend_url=$(terraform output -raw frontend_url)"     >> $GITHUB_OUTPUT
+      # ── Cleanup orphaned VPCs (runs before preflight checks) ──────────────────
+      # This step deletes orphaned VPCs from previous failed deployments to avoid
+      # hitting the VPC quota limit. It runs for both skip_terraform paths.
+      - name: Cleanup orphaned VPCs
+        run: |
+          bash .github/workflows/delete_orphaned_vpcs.sh
 
-        echo "ws_url=$(terraform output -raw websocket_endpoint)"     >> $GITHUB_OUTPUT
+      # ── Terraform fmt check (catches formatting errors before any apply) ──────
+      - name: Terraform fmt check
+        working-directory: ./terraform
+        run: terraform fmt -check -recursive
 
-        echo "name_servers=$(terraform output -json name_servers 2>/dev/null || echo
-        ''[]'')" >> $GITHUB_OUTPUT
+      # ── Terraform state bucket (idempotent) ──────────────────────────────────
+      # S3 backend keeps state across CI runs so resources aren't re-created.
+      - name: Ensure Terraform state bucket exists
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        run: |
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          STATE_BUCKET="skillbridge-tfstate-${ACCOUNT}-${{ env.ENVIRONMENT }}"
+          echo "STATE_BUCKET=${STATE_BUCKET}" >> $GITHUB_ENV
 
-        '
-    - name: Compute effective API URL
-      run: "DOMAIN=\"${{ github.event.inputs.custom_domain }}\"\nCF=\"${{ github.event.inputs.enable_cloudfront\
-        \ }}\"\nif [ -n \"$DOMAIN\" ] && [ \"$CF\" = \"true\" ]; then\n  echo \"EFFECTIVE_API_URL=https://${DOMAIN}\"\
-        \ >> $GITHUB_ENV\nelif [ \"$CF\" = \"true\" ]; then\n  echo \"EFFECTIVE_API_URL=https://${{\
-        \ steps.tf.outputs.cf_domain }}\" >> $GITHUB_ENV\nelse\n  echo \"EFFECTIVE_API_URL=${{\
-        \ steps.tf.outputs.api_url }}\" >> $GITHUB_ENV\nfi\n"
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: npm
-        cache-dependency-path: frontend/package-lock.json
-    - name: Install frontend dependencies
-      working-directory: ./frontend
-      run: npm ci
-    - name: Build frontend (Next.js static export)
-      working-directory: ./frontend
-      env:
-        NEXT_PUBLIC_API_URL: ${{ env.EFFECTIVE_API_URL }}
-        NEXT_PUBLIC_APP_URL: ${{ steps.tf.outputs.frontend_url }}
-        NEXT_PUBLIC_VOICE_WS_URL: ${{ steps.tf.outputs.ws_url }}
-        NEXT_OUTPUT: export
-      run: npm run build
-    - name: Sync frontend to S3
-      run: "set -euo pipefail\nBUCKET=\"${{ steps.tf.outputs.s3_bucket }}\"\n\n# Pass\
-        \ 1: immutable assets (JS, CSS, fonts, images) \u2014 long-lived cache\naws\
-        \ s3 sync frontend/out/ \"s3://${BUCKET}/\" \\\n  --delete \\\n  --cache-control\
-        \ \"public, max-age=31536000, immutable\" \\\n  --exclude \"*.html\" \\\n\
-        \  --region \"${{ env.AWS_REGION }}\"\n\n# Pass 2: HTML files only \u2014\
-        \ always revalidate\n# --exclude \"*\" MUST come before --include \"*.html\"\
-        \ to scope the filter\naws s3 sync frontend/out/ \"s3://${BUCKET}/\" \\\n\
-        \  --cache-control \"no-cache, no-store, must-revalidate\" \\\n  --exclude\
-        \ \"*\" \\\n  --include \"*.html\" \\\n  --region \"${{ env.AWS_REGION }}\"\
-        \n\n# Pass 3: Extension-less copies for clean URL routing.\n# Next.js App\
-        \ Router static export generates flat `login.html` files.\n# S3 website hosting\
-        \ only serves /login.html for the exact key \"login.html\",\n# NOT for the\
-        \ URL \"/login\". Copy each route HTML as an extension-less key\n# so S3 serves\
-        \ /login, /dashboard, etc. directly without CloudFront.\n# index.html and\
-        \ 404.html are excluded (served by S3 website config already).\nwhile IFS=\
-        \ read -r key; do\n  route=\"${key%.html}\"\n  aws s3 cp \"s3://${BUCKET}/${key}\"\
-        \ \"s3://${BUCKET}/${route}\" \\\n    --content-type \"text/html; charset=utf-8\"\
-        \ \\\n    --cache-control \"no-cache, no-store, must-revalidate\" \\\n   \
-        \ --metadata-directive REPLACE \\\n    --region \"${{ env.AWS_REGION }}\"\n\
-        done < <(aws s3 ls \"s3://${BUCKET}/\" --recursive --region \"${{ env.AWS_REGION\
-        \ }}\" \\\n  | awk '/\\.html$/ {print $4}' \\\n  | grep -v -E '^(index|404|_not-found)\\\
-        .html$')\n"
-    - name: Invalidate CloudFront
-      if: ${{ steps.tf.outputs.cf_id != '' }}
-      run: "aws cloudfront create-invalidation \\\n  --distribution-id \"${{ steps.tf.outputs.cf_id\
-        \ }}\" \\\n  --paths \"/*\"\n"
-    - name: API smoke test
-      run: "set -euo pipefail\nAPI=\"${{ steps.tf.outputs.api_url }}\"\necho \"Waiting\
-        \ 60s for Lambda cold-start + DB initialisation ...\"\nsleep 60\necho \"Polling\
-        \ ${API}/api/health ...\"\nfor i in $(seq 1 18); do\n  HTTP=$(curl -s -o /dev/null\
-        \ -w \"%{http_code}\" \\\n    --connect-timeout 15 --max-time 45 \\\n    \"\
-        ${API}/api/health\" || echo \"000\")\n  echo \"  Attempt $i/18 \u2014 HTTP\
-        \ ${HTTP}\"\n  if [ \"$HTTP\" = \"200\" ]; then\n    echo \"  API is live\"\
-        \n    break\n  fi\n  if [ \"$i\" = \"18\" ]; then\n    echo \"ERROR: API did\
-        \ not return 200 after 18 attempts (~6 min total)\"\n    echo \"Check CloudWatch\
-        \ Logs: /aws/lambda/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-api\"\n\
-        \    exit 1\n  fi\n  sleep 20\ndone\n"
-    - name: Deployment summary
-      if: always()
-      run: "echo \"## Deployment Complete\" >> $GITHUB_STEP_SUMMARY\necho \"\" >>\
-        \ $GITHUB_STEP_SUMMARY\necho \"| Resource | Value |\" >> $GITHUB_STEP_SUMMARY\n\
-        echo \"|----------|-------|\" >> $GITHUB_STEP_SUMMARY\necho \"| Frontend \
-        \  | ${{ steps.tf.outputs.frontend_url }} |\" >> $GITHUB_STEP_SUMMARY\necho\
-        \ \"| API        | ${{ steps.tf.outputs.api_url }} |\" >> $GITHUB_STEP_SUMMARY\n\
-        echo \"| WebSocket  | ${{ steps.tf.outputs.ws_url }} |\" >> $GITHUB_STEP_SUMMARY\n\
-        echo \"| S3 Bucket  | ${{ steps.tf.outputs.s3_bucket }} |\" >> $GITHUB_STEP_SUMMARY\n\
-        echo \"| Image      | ${{ env.IMAGE_URI }} |\" >> $GITHUB_STEP_SUMMARY\n\n\
-        # Custom domain + nameserver instructions\nDOMAIN=\"${{ github.event.inputs.custom_domain\
-        \ }}\"\nNS='${{ steps.tf.outputs.name_servers }}'\nif [ -n \"$DOMAIN\" ] &&\
-        \ [ \"$NS\" != \"[]\" ] && [ -n \"$NS\" ]; then\n  echo \"\" >> $GITHUB_STEP_SUMMARY\n\
-        \  echo \"### Custom Domain: ${DOMAIN}\" >> $GITHUB_STEP_SUMMARY\n  echo \"\
-        \" >> $GITHUB_STEP_SUMMARY\n  echo \"Update your registrar's nameservers to:\"\
-        \ >> $GITHUB_STEP_SUMMARY\n  echo '```' >> $GITHUB_STEP_SUMMARY\n  echo \"\
-        ${NS}\" | tr -d '[]\"' | tr ',' '\\n' | sed 's/^ *//' | grep -v '^$' >> $GITHUB_STEP_SUMMARY\n\
-        \  echo '```' >> $GITHUB_STEP_SUMMARY\n  echo \"> DNS propagation takes 5\u2013\
-        60 minutes after updating the registrar.\" >> $GITHUB_STEP_SUMMARY\nfi\n\n\
-        echo \"\" >> $GITHUB_STEP_SUMMARY\necho \"**Cost notes:**\" >> $GITHUB_STEP_SUMMARY\n\
-        echo \"- Aurora Serverless v2: ~\\$43/mo (0.5 ACU min)\" >> $GITHUB_STEP_SUMMARY\n\
-        echo \"- NAT Gateway: ~\\$32/mo \u2014 destroy with:\" >> $GITHUB_STEP_SUMMARY\n\
-        echo \"  \\`terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.aws_eip.nat'\\\
-        `\" >> $GITHUB_STEP_SUMMARY\n"
+          # us-east-1 does NOT use --create-bucket-configuration
+          aws s3api create-bucket \
+            --bucket "$STATE_BUCKET" \
+            --region "${{ env.AWS_REGION }}" 2>/dev/null || true
+
+          # Versioning preserves state file history
+          aws s3api put-bucket-versioning \
+            --bucket "$STATE_BUCKET" \
+            --versioning-configuration Status=Enabled 2>/dev/null || true
+
+          # Block all public access on state bucket
+          aws s3api put-public-access-block \
+            --bucket "$STATE_BUCKET" \
+            --public-access-block-configuration \
+              BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true \
+            2>/dev/null || true
+
+          # Enable SSE-S3 encryption
+          aws s3api put-bucket-encryption \
+            --bucket "$STATE_BUCKET" \
+            --server-side-encryption-configuration \
+              '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' \
+            2>/dev/null || true
+
+          echo "State bucket: $STATE_BUCKET"
+
+      # ── Terraform Init ────────────────────────────────────────────────────────
+      - name: Terraform Init
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        run: |
+          terraform init \
+            -upgrade \
+            -input=false \
+            -backend-config="bucket=${{ env.STATE_BUCKET }}" \
+            -backend-config="key=${{ env.ENVIRONMENT }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true"
+
+      # skip_terraform path: init with existing state so we can read outputs
+      - name: Terraform Init (skip_terraform path)
+        if: ${{ github.event.inputs.skip_terraform == 'true' }}
+        working-directory: ./terraform
+        run: |
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          STATE_BUCKET="skillbridge-tfstate-${ACCOUNT}-${{ env.ENVIRONMENT }}"
+          echo "STATE_BUCKET=${STATE_BUCKET}" >> $GITHUB_ENV
+          terraform init \
+            -upgrade \
+            -input=false \
+            -backend-config="bucket=${STATE_BUCKET}" \
+            -backend-config="key=${{ env.ENVIRONMENT }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true"
+
+      # ── Terraform validate (catches HCL errors before any AWS API calls) ──────
+      - name: Terraform validate
+        working-directory: ./terraform
+        run: terraform validate
+
+      # ── Step 1: Create ECR repository ────────────────────────────────────────
+      # Import existing ECR if it was created in a previous run, then apply.
+      # IMPORTANT: we do NOT import before this step — ECR may not exist yet on
+      # the first run. The import + targeted apply is the single source of truth.
+      - name: Create ECR repository
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+
+          # Remove from state first so import is idempotent on re-runs
+          terraform state rm module.ecr.aws_ecr_repository.backend 2>/dev/null || true
+          terraform state rm module.ecr.aws_ecr_lifecycle_policy.backend 2>/dev/null || true
+
+          # Import if the ECR repo already exists in AWS (re-run safety)
+          terraform import -input=false \
+            module.ecr.aws_ecr_repository.backend \
+            "${P}-${E}-backend" \
+            2>&1 | grep -v "^$" || true
+
+          terraform import -input=false \
+            module.ecr.aws_ecr_lifecycle_policy.backend \
+            "${P}-${E}-backend" \
+            2>&1 | grep -v "^$" || true
+
+          terraform apply -target=module.ecr -auto-approve -input=false
+
+      # ── Step 2: Build and push Lambda container image ─────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Cache Docker layers in the GitHub Actions cache to avoid re-downloading
+      # PyTorch (~600 MB) and spaCy on every run. Cache key includes the
+      # Dockerfile + requirements hash so it's invalidated on dependency changes.
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('Dockerfile.lambda', 'nestjs-backend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build and push Lambda image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          ECR="${ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${PROJECT_NAME}-${ENVIRONMENT}-backend"
+
+          docker buildx build \
+            --platform linux/amd64 \
+            -f Dockerfile.lambda \
+            --provenance=false \
+            --cache-from "type=local,src=/tmp/.buildx-cache" \
+            --cache-to   "type=local,dest=/tmp/.buildx-cache-new,mode=max" \
+            -t "${ECR}:${IMAGE_TAG}" \
+            -t "${ECR}:latest" \
+            --push \
+            .
+
+          # Rotate cache to prevent unbounded growth
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+          echo "IMAGE_URI=${ECR}:${IMAGE_TAG}" >> $GITHUB_ENV
+
+      # ── Step 2b: Update Lambda functions when skipping Terraform ────────────────
+      # When skip_terraform=true, Terraform doesn't run so Lambda still points to
+      # the old image URI. Explicitly call update-function-code for all functions.
+      - name: Update Lambda function code (skip_terraform path)
+        if: ${{ github.event.inputs.skip_terraform == 'true' }}
+        run: |
+          set -euo pipefail
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+          for FN in api voice rag-query embed-gen gap-analysis resume-upload \
+                    ssg-sync cache-cleanup recommendation-refresh \
+                    embedding-backfill market-insights warmup; do
+            FNAME="${P}-${E}-${FN}"
+            if aws lambda get-function --function-name "$FNAME" &>/dev/null; then
+              echo "Updating ${FNAME}..."
+              aws lambda update-function-code \
+                --function-name "$FNAME" \
+                --image-uri "${{ env.IMAGE_URI }}" \
+                --output text --query 'FunctionName'
+            else
+              echo "  ${FNAME} not found — skipping"
+            fi
+          done
+
+      # ── Step 3: Clean up AWS resources for clean-slate Terraform apply ─────────
+      # Strategy: remove all non-ECR modules from Terraform state, then delete
+      # their corresponding AWS resources so Terraform rebuilds everything fresh.
+      # ECR is preserved (contains the image we just pushed).
+      - name: Clean up AWS resources for clean-slate Terraform apply
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          # Disable bash -e for this entire step.
+          # This is a delete/cleanup script: every AWS CLI and terraform command
+          # uses explicit "|| true" or structured if/else for error handling.
+          # bash -e causes the step to abort immediately when any command
+          # substitution (RESULT=$(aws ...)) returns non-zero, which always
+          # happens on a first deploy when no resources exist yet (exit 254).
+          set +e
+
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+
+          echo "=== Step 1: Remove non-ECR modules from Terraform state ==="
+          # module.iam is intentionally kept in state so Terraform updates roles
+          # in place rather than trying to create them (avoids 409 EntityAlreadyExists
+          # when IAM roles survive the AWS cleanup due to attached managed policies).
+          # module.eventbridge is removed — schedules are re-imported in Step 4c.
+          for MOD in \
+            module.vpc \
+            module.security_groups \
+            module.rds \
+            module.lambda_backend \
+            module.api_gateway \
+            module.s3_frontend \
+            module.eventbridge; do
+            terraform state rm "$MOD" 2>&1 | head -3 || true
+          done
+          # Indexed (count-based) modules use bracket notation
+          terraform state rm 'module.cloudfront[0]'  2>/dev/null || true
+          terraform state rm 'module.opensearch[0]'  2>/dev/null || true
+          terraform state rm 'module.websocket[0]'   2>/dev/null || true
+          terraform state rm 'module.sagemaker[0]'   2>/dev/null || true
+          # DNS module (Route 53 zone + ACM cert) — zone persists in AWS; re-imported below
+          terraform state rm 'module.dns[0]'         2>/dev/null || true
+          # CloudFront alias records (root-level resources in main.tf)
+          terraform state rm 'aws_route53_record.cf_alias_root_a[0]'    2>/dev/null || true
+          terraform state rm 'aws_route53_record.cf_alias_root_aaaa[0]' 2>/dev/null || true
+          terraform state rm 'aws_route53_record.cf_alias_www_a[0]'     2>/dev/null || true
+          terraform state rm 'aws_route53_record.cf_alias_www_aaaa[0]'  2>/dev/null || true
+          # Uploads bucket + internal-token secret (root-level resources)
+          terraform state rm 'aws_s3_bucket.uploads'                          2>/dev/null || true
+          terraform state rm 'aws_s3_bucket_public_access_block.uploads'      2>/dev/null || true
+          terraform state rm 'aws_s3_bucket_server_side_encryption_configuration.uploads' 2>/dev/null || true
+          terraform state rm 'aws_secretsmanager_secret.internal_token'        2>/dev/null || true
+          terraform state rm 'aws_secretsmanager_secret_version.internal_token' 2>/dev/null || true
+
+          echo "=== Step 2: Kick off Aurora cluster deletion (async) ==="
+          CLUSTER_ID="${P}-${E}-aurora"
+          for INST in $(aws rds describe-db-clusters \
+            --db-cluster-identifier "$CLUSTER_ID" \
+            --query 'DBClusters[0].DBClusterMembers[].DBInstanceIdentifier' \
+            --output text 2>/dev/null | tr '\t' '\n'); do
+            echo "  Deleting Aurora instance: $INST"
+            aws rds delete-db-instance \
+              --db-instance-identifier "$INST" \
+              --skip-final-snapshot 2>/dev/null || true
+          done
+          aws rds delete-db-cluster \
+            --db-cluster-identifier "$CLUSTER_ID" \
+            --skip-final-snapshot 2>/dev/null || true
+
+          echo "=== Step 3: Delete Lambda functions, API Gateway, CWL log groups ==="
+          for FN in api voice rag-query embed-gen gap-analysis resume-upload \
+                    ssg-sync cache-cleanup recommendation-refresh \
+                    embedding-backfill market-insights warmup; do
+            aws lambda delete-function \
+              --function-name "${P}-${E}-${FN}" 2>/dev/null || true
+          done
+          # Delete both the HTTP API and ALL WebSocket voice-ws APIs (avoid duplicates)
+          for API_NAME in "${P}-${E}-api" "${P}-${E}-voice-ws"; do
+            API_IDS=$(aws apigatewayv2 get-apis \
+              --query "Items[?Name=='${API_NAME}'].ApiId" \
+              --output text 2>/dev/null || echo "")
+            for AID in $API_IDS; do
+              [ -z "$AID" ] || [ "$AID" = "None" ] && continue
+              echo "  Deleting API Gateway: ${API_NAME} (${AID})"
+              aws apigatewayv2 delete-api --api-id "$AID" 2>/dev/null || true
+            done
+          done
+          for LG in \
+            "/aws/lambda/${P}-${E}-api" \
+            "/aws/lambda/${P}-${E}-voice" \
+            "/aws/lambda/${P}-${E}-rag-query" \
+            "/aws/lambda/${P}-${E}-embed-gen" \
+            "/aws/lambda/${P}-${E}-gap-analysis" \
+            "/aws/lambda/${P}-${E}-resume-upload" \
+            "/aws/lambda/${P}-${E}-ssg-sync" \
+            "/aws/lambda/${P}-${E}-cache-cleanup" \
+            "/aws/lambda/${P}-${E}-recommendation-refresh" \
+            "/aws/lambda/${P}-${E}-embedding-backfill" \
+            "/aws/lambda/${P}-${E}-market-insights" \
+            "/aws/lambda/${P}-${E}-warmup" \
+            "/aws/apigateway/${P}-${E}"; do
+            aws logs delete-log-group --log-group-name "$LG" 2>/dev/null || true
+          done
+
+          # Step 4: IAM roles and policies are intentionally NOT deleted here.
+          # module.iam is kept in Terraform state (see Step 1 comment) so Terraform
+          # updates roles in place on re-deploy rather than attempting to create them.
+
+          echo "=== Step 4: Delete Secrets Manager secret ==="
+          aws secretsmanager delete-secret \
+            --secret-id "${P}/internal-token" \
+            --force-delete-without-recovery 2>/dev/null || true
+
+          echo "=== Step 5: Delete ALL project-tagged VPCs and their dependencies ==="
+          for VPC_ID in $(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${P}-${E}-vpc" \
+            --query 'Vpcs[].VpcId' --output text 2>/dev/null | tr '\t' '\n'); do
+            [ -z "$VPC_ID" ] || [ "$VPC_ID" = "None" ] && continue
+            echo "  Cleaning VPC: $VPC_ID"
+
+            # ── FIX: Delete Lambda/RDS Elastic Network Interfaces first ──────────
+            # Lambda functions in VPCs create ENIs that persist for up to 20 min
+            # after the function is deleted. These block subnet deletion.
+            # We must explicitly detach + delete them before touching subnets.
+            echo "  Waiting for Lambda ENIs to become 'available' (up to 3 min)..."
+            for i in $(seq 1 18); do
+              IN_USE=$(aws ec2 describe-network-interfaces \
+                --filters "Name=vpc-id,Values=$VPC_ID" "Name=status,Values=in-use" \
+                --query 'NetworkInterfaces[?Description!=`null`] | length(@)' \
+                --output text 2>/dev/null || echo "0")
+              [ "$IN_USE" = "0" ] && break
+              echo "    $IN_USE ENIs still in-use ($i/18)..."
+              sleep 10
+            done
+            for ENI in $(aws ec2 describe-network-interfaces \
+              --filters "Name=vpc-id,Values=$VPC_ID" "Name=status,Values=available" \
+              --query 'NetworkInterfaces[].NetworkInterfaceId' \
+              --output text 2>/dev/null | tr '\t' '\n'); do
+              [ -z "$ENI" ] && continue
+              echo "    Deleting ENI: $ENI"
+              aws ec2 delete-network-interface \
+                --network-interface-id "$ENI" 2>/dev/null || true
+            done
+
+            # Security Groups (non-default)
+            for SG in $(aws ec2 describe-security-groups \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'SecurityGroups[?GroupName != `default`].GroupId' \
+              --output text 2>/dev/null | tr '\t' '\n'); do
+              aws ec2 delete-security-group --group-id "$SG" 2>/dev/null || true
+            done
+
+            # NAT Gateways (async delete)
+            for NAT in $(aws ec2 describe-nat-gateways \
+              --filter "Name=vpc-id,Values=$VPC_ID" \
+                       "Name=state,Values=available,pending" \
+              --query 'NatGateways[].NatGatewayId' \
+              --output text 2>/dev/null | tr '\t' '\n'); do
+              aws ec2 delete-nat-gateway --nat-gateway-id "$NAT" 2>/dev/null || true
+            done
+            # Wait for NAT GW deletion (up to 3 min)
+            for i in $(seq 1 18); do
+              PENDING=$(aws ec2 describe-nat-gateways \
+                --filter "Name=vpc-id,Values=$VPC_ID" \
+                         "Name=state,Values=available,pending,deleting" \
+                --query 'NatGateways[].NatGatewayId' --output text 2>/dev/null)
+              [ -z "$PENDING" ] && break
+              echo "  Waiting for NAT GW... ($i/18)"
+              sleep 10
+            done
+
+            # Internet Gateway
+            for IGW in $(aws ec2 describe-internet-gateways \
+              --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+              --query 'InternetGateways[].InternetGatewayId' \
+              --output text 2>/dev/null | tr '\t' '\n'); do
+              aws ec2 detach-internet-gateway \
+                --internet-gateway-id "$IGW" --vpc-id "$VPC_ID" 2>/dev/null || true
+              aws ec2 delete-internet-gateway \
+                --internet-gateway-id "$IGW" 2>/dev/null || true
+            done
+
+            # Route tables (non-main)
+            for RT in $(aws ec2 describe-route-tables \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'RouteTables[?Associations[0].Main != `true`].RouteTableId' \
+              --output text 2>/dev/null | tr '\t' '\n'); do
+              aws ec2 delete-route-table --route-table-id "$RT" 2>/dev/null || true
+            done
+
+            # Subnets (after ENIs and NAT GW are gone)
+            for SUBNET in $(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'Subnets[].SubnetId' \
+              --output text 2>/dev/null | tr '\t' '\n'); do
+              aws ec2 delete-subnet --subnet-id "$SUBNET" 2>/dev/null || true
+            done
+
+            aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>/dev/null || true
+            echo "  Deleted VPC: $VPC_ID"
+          done
+
+          echo "=== Step 6: Release unassociated project EIPs ==="
+          for EIP in $(aws ec2 describe-addresses \
+            --filters "Name=tag:Name,Values=${P}-${E}-nat-eip" \
+            --query 'Addresses[].AllocationId' \
+            --output text 2>/dev/null | tr '\t' '\n'); do
+            [ -n "$EIP" ] && aws ec2 release-address \
+              --allocation-id "$EIP" 2>/dev/null || true
+          done
+
+          echo "=== Step 7: Wait for Aurora cluster deletion (up to 15 min) ==="
+          for i in $(seq 1 90); do
+            STATUS=$(aws rds describe-db-clusters \
+              --db-cluster-identifier "$CLUSTER_ID" \
+              --query 'DBClusters[0].Status' \
+              --output text 2>/dev/null || echo "gone")
+            if [ "$STATUS" = "gone" ] || [ "$STATUS" = "None" ] || [ -z "$STATUS" ]; then
+              echo "  Aurora is gone — proceeding"
+              break
+            fi
+            echo "  Aurora status: $STATUS ($i/90)"
+            sleep 10
+          done
+
+          echo "=== Step 8: Delete RDS subnet group + parameter group (with retries) ==="
+          for i in $(seq 1 60); do
+            RESULT=$(aws rds delete-db-subnet-group \
+              --db-subnet-group-name "${P}-${E}-db-subnet" 2>&1)
+            if [ $? -eq 0 ] || echo "$RESULT" | grep -qi "DBSubnetGroupNotFoundFault\|Cannot find"; then
+              echo "  Subnet group deleted (or already gone)"
+              break
+            fi
+            echo "  Waiting for subnet group ($i/60): $RESULT"
+            sleep 10
+          done
+          for i in $(seq 1 12); do
+            RESULT=$(aws rds delete-db-cluster-parameter-group \
+              --db-cluster-parameter-group-name "${P}-${E}-aurora-pg16" 2>&1)
+            if [ $? -eq 0 ] || echo "$RESULT" | grep -qi "DBParameterGroupNotFoundFault\|Cannot find"; then
+              echo "  Cluster parameter group deleted (or already gone)"
+              break
+            fi
+            echo "  Waiting for parameter group ($i/12): $RESULT"
+            sleep 10
+          done
+          aws rds delete-db-parameter-group \
+            --db-parameter-group-name "${P}-${E}-pg16" 2>/dev/null || true
+
+          echo "=== Step 9: Delete Secrets Manager secret ==="
+          aws secretsmanager delete-secret \
+            --secret-id "${P}/${E}/db-credentials" \
+            --force-delete-without-recovery 2>/dev/null || true
+
+          echo "=== Step 10: Empty + delete uploads S3 bucket (if it exists) ==="
+          UPLOADS_BUCKET="${P}-${E}-uploads"
+          aws s3 rm "s3://${UPLOADS_BUCKET}" --recursive 2>/dev/null || true
+          aws s3api delete-bucket --bucket "${UPLOADS_BUCKET}" \
+            --region "${{ env.AWS_REGION }}" 2>/dev/null || true
+
+          echo "=== Step 11: Clear CNAME aliases from any existing CloudFront distributions ==="
+          # CloudFront distributions with CNAME aliases (e.g. sklbr.co) must have those
+          # aliases removed before Terraform can create a new distribution with the same CNAMEs.
+          # Updating aliases on an enabled distribution is instant and does not require disabling.
+          # Search by actual alias value (not by Comment) so we find distributions regardless
+          # of how they were originally created or what comment they were given.
+          CF_DOMAIN="${{ github.event.inputs.custom_domain }}"
+          if [ -n "$CF_DOMAIN" ]; then
+            ALL_DISTS=$(aws cloudfront list-distributions --output json 2>/dev/null || echo '{"DistributionList":{"Items":[]}}')
+            for DIST_ID in $(echo "$ALL_DISTS" | jq -r --arg d "$CF_DOMAIN" \
+              '.DistributionList.Items[]? | select(any(.Aliases.Items[]?; . == $d)) | .Id' 2>/dev/null); do
+              [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ] && continue
+              echo "  Clearing CNAME aliases from CloudFront distribution: $DIST_ID"
+              ETAG=$(aws cloudfront get-distribution-config --id "$DIST_ID" \
+                --query 'ETag' --output text 2>/dev/null)
+              CONFIG=$(aws cloudfront get-distribution-config --id "$DIST_ID" \
+                --query 'DistributionConfig' --output json 2>/dev/null)
+              if [ -n "$ETAG" ] && [ "$ETAG" != "None" ]; then
+                UPDATED=$(echo "$CONFIG" | jq '.Aliases = {"Quantity": 0, "Items": []}')
+                aws cloudfront update-distribution \
+                  --id "$DIST_ID" \
+                  --distribution-config "$UPDATED" \
+                  --if-match "$ETAG" \
+                  --output text --query 'Distribution.Id' 2>/dev/null || true
+                echo "  Aliases cleared from $DIST_ID"
+              fi
+            done
+          fi
+
+          echo "Cleanup complete — Terraform will rebuild all resources from scratch"
+          exit 0
+
+      # ── Step 4: Re-import ECR (only resource we kept across the cleanup) ───────
+      - name: Import ECR into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+
+          # Remove from state first in case the earlier targeted apply left it there
+          terraform state rm module.ecr.aws_ecr_repository.backend 2>/dev/null || true
+          terraform state rm module.ecr.aws_ecr_lifecycle_policy.backend 2>/dev/null || true
+
+          terraform import -input=false \
+            module.ecr.aws_ecr_repository.backend \
+            "${P}-${E}-backend" \
+            2>&1 | grep -v "^$" || true
+
+          terraform import -input=false \
+            module.ecr.aws_ecr_lifecycle_policy.backend \
+            "${P}-${E}-backend" \
+            2>&1 | grep -v "^$" || true
+
+          echo "ECR import complete"
+
+      # ── Step 4b: Import IAM into Terraform state (safety net) ───────────────
+      # If module.iam was removed from state in a previous run (state corruption),
+      # the IAM roles/policies still exist in AWS and Terraform would fail with
+      # 409 EntityAlreadyExists. Import them so Terraform updates in place.
+      # All imports use || true so the step is idempotent on fresh deploys where
+      # the resources don't exist yet (import fails, Terraform creates them).
+      - name: Import IAM into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+
+          # Helper: remove from state then import (idempotent — safe to re-run)
+          import_iam_role() {
+            local addr="$1" name="$2"
+            terraform state rm "$addr" 2>/dev/null || true
+            terraform import -input=false "$addr" "$name" 2>&1 | grep -v "^$" || true
+          }
+          import_iam_policy() {
+            local addr="$1" arn="$2"
+            terraform state rm "$addr" 2>/dev/null || true
+            terraform import -input=false "$addr" "$arn" 2>&1 | grep -v "^$" || true
+          }
+          import_iam_attachment() {
+            local addr="$1" id="$2"
+            terraform state rm "$addr" 2>/dev/null || true
+            terraform import -input=false "$addr" "$id" 2>&1 | grep -v "^$" || true
+          }
+
+          # ── Lambda exec role (main backend) ───────────────────────────────────
+          import_iam_role   "module.iam.aws_iam_role.lambda_exec"              "${P}-${E}-lambda-exec"
+          import_iam_policy "module.iam.aws_iam_policy.skillbridge_lambda"     "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.lambda_basic_execution" \
+            "${P}-${E}-lambda-exec/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.lambda_vpc_access" \
+            "${P}-${E}-lambda-exec/arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.skillbridge_lambda" \
+            "${P}-${E}-lambda-exec/arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-lambda-policy"
+
+          # ── EventBridge automation Lambda role ────────────────────────────────
+          import_iam_role   "module.iam.aws_iam_role.automation_lambda"              "${P}-${E}-automation-lambda"
+          import_iam_policy "module.iam.aws_iam_policy.automation_lambda"            "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-automation-lambda-policy"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.automation_lambda_basic" \
+            "${P}-${E}-automation-lambda/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.automation_lambda" \
+            "${P}-${E}-automation-lambda/arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-automation-lambda-policy"
+
+          # ── EventBridge Scheduler role ─────────────────────────────────────────
+          import_iam_role   "module.iam.aws_iam_role.eventbridge_scheduler"              "${P}-${E}-eventbridge-scheduler"
+          import_iam_policy "module.iam.aws_iam_policy.eventbridge_scheduler"            "arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-eventbridge-scheduler-policy"
+          import_iam_attachment "module.iam.aws_iam_role_policy_attachment.eventbridge_scheduler" \
+            "${P}-${E}-eventbridge-scheduler/arn:aws:iam::${ACCOUNT}:policy/${P}-${E}-eventbridge-scheduler-policy"
+
+          echo "IAM import complete"
+
+      # ── Step 4c: Import EventBridge Schedules into Terraform state ────────────
+      # EventBridge Scheduler Schedules are NOT deleted in the cleanup step
+      # (module.eventbridge is removed from state but the AWS schedules persist).
+      # Import them so Terraform updates in place rather than failing with
+      # ConflictException: Schedule already exists.
+      # Import format: default/<schedule-name>
+      - name: Import EventBridge Schedules into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+
+          import_schedule() {
+            local addr="$1" name="$2"
+            terraform state rm "$addr" 2>/dev/null || true
+            terraform import -input=false "$addr" "default/${name}" 2>&1 | grep -v "^$" || true
+          }
+
+          import_schedule "module.eventbridge.aws_scheduler_schedule.ssg_course_sync"              "${P}-${E}-ssg-course-sync"
+          import_schedule "module.eventbridge.aws_scheduler_schedule.ssg_jobrole_sync"             "${P}-${E}-ssg-jobrole-sync"
+          import_schedule "module.eventbridge.aws_scheduler_schedule.recommendation_precompute"    "${P}-${E}-recommendation-precompute"
+          import_schedule "module.eventbridge.aws_scheduler_schedule.recommendation_rationale_pregen" "${P}-${E}-rationale-pregen"
+          import_schedule "module.eventbridge.aws_scheduler_schedule.cache_cleanup"               "${P}-${E}-cleanup-expired-cache"
+          import_schedule "module.eventbridge.aws_scheduler_schedule.market_insights"             "${P}-${E}-market-insights-aggregation"
+          import_schedule "module.eventbridge.aws_scheduler_schedule.embedding_backfill"          "${P}-${E}-embedding-backfill"
+          # lambda_warmup is count-based (count = var.enable_warmup ? 1 : 0)
+          import_schedule "module.eventbridge.aws_scheduler_schedule.lambda_warmup[0]"            "${P}-${E}-lambda-warmup-ping"
+
+          echo "EventBridge schedule import complete"
+
+      # ── Step 4c.5: Import CloudWatch Query Definitions ────────────────────────
+      # CW Query Definitions persist across clean-slate deploys (not deleted by
+      # the cleanup step). Import them so Terraform updates in place rather than
+      # failing with InvalidParameterException: A query with this name already exists.
+      - name: Import CloudWatch Query Definitions into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          REGION="${{ env.AWS_REGION }}"
+
+          import_cw_query() {
+            local addr="$1" name="$2"
+            local qid arn
+            qid=$(aws logs describe-query-definitions \
+              --query-definition-name-prefix "${name}" \
+              --query "queryDefinitions[?name=='${name}'].queryDefinitionId | [0]" \
+              --output text 2>/dev/null)
+            if [ -n "$qid" ] && [ "$qid" != "None" ] && [ "$qid" != "null" ]; then
+              arn="arn:aws:logs:${REGION}:${ACCOUNT}:query-definition:${qid}"
+              echo "Importing CW query definition ${name}: ${arn}"
+              terraform state rm "$addr" 2>/dev/null || true
+              terraform import -input=false "$addr" "$arn" 2>&1 | grep -v "^$" || true
+            else
+              echo "No existing CW query definition ${name} — Terraform will create it"
+            fi
+          }
+
+          import_cw_query \
+            "module.eventbridge.aws_cloudwatch_query_definition.rag_latency_and_miss_rate" \
+            "${P}/${E}/RAG/LatencyAndMissRate"
+          import_cw_query \
+            "module.eventbridge.aws_cloudwatch_query_definition.rag_similarity_distribution" \
+            "${P}/${E}/RAG/SimilarityDistribution"
+
+          echo "CloudWatch query definition import complete"
+
+      # ── Step 4d: Import DNS resources into Terraform state ────────────────────
+      # When enable_custom_domain=true the Route 53 zone and ACM certificate
+      # survive the cleanup step (AWS doesn't delete them). Re-import them so
+      # Terraform updates in place rather than failing to create duplicates.
+      # Skipped automatically when enable_custom_domain=false (no zone exists).
+      - name: Import DNS into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' && github.event.inputs.enable_custom_domain == 'true' && github.event.inputs.custom_domain != '' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          DOMAIN="${{ github.event.inputs.custom_domain }}"
+
+          # Import Route 53 hosted zone if one already exists for this domain
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+            --dns-name "${DOMAIN}." \
+            --query "HostedZones[?Name=='${DOMAIN}.'].Id | [0]" \
+            --output text 2>/dev/null | sed 's|/hostedzone/||')
+          if [ -n "$ZONE_ID" ] && [ "$ZONE_ID" != "None" ] && [ "$ZONE_ID" != "null" ]; then
+            echo "Importing Route 53 zone: ${ZONE_ID}"
+            terraform state rm 'module.dns[0].aws_route53_zone.main' 2>/dev/null || true
+            terraform import -input=false \
+              'module.dns[0].aws_route53_zone.main' "${ZONE_ID}" \
+              2>&1 | grep -v "^$" || true
+          else
+            echo "No existing Route 53 zone for ${DOMAIN} — Terraform will create it"
+          fi
+
+          # Import ACM certificate if one already exists for this domain (us-east-1)
+          CERT_ARN=$(aws acm list-certificates \
+            --region us-east-1 \
+            --query "CertificateSummaryList[?DomainName=='${DOMAIN}'].CertificateArn | [0]" \
+            --output text 2>/dev/null)
+          if [ -n "$CERT_ARN" ] && [ "$CERT_ARN" != "None" ] && [ "$CERT_ARN" != "null" ]; then
+            echo "Importing ACM certificate: ${CERT_ARN}"
+            terraform state rm 'module.dns[0].aws_acm_certificate.cert' 2>/dev/null || true
+            terraform import -input=false \
+              'module.dns[0].aws_acm_certificate.cert' "${CERT_ARN}" \
+              2>&1 | grep -v "^$" || true
+          else
+            echo "No existing ACM certificate for ${DOMAIN} — Terraform will create it"
+          fi
+
+          echo "DNS import complete"
+
+      # ── Step 4e: Import CloudFront into Terraform state ───────────────────────
+      # When enable_cloudfront=true, a previous partial apply may have created the
+      # OAC and/or distribution before failing. Import them so Terraform updates
+      # in place rather than failing with "resource already exists".
+      - name: Import CloudFront into Terraform state
+        if: ${{ github.event.inputs.skip_terraform != 'true' && github.event.inputs.enable_cloudfront == 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+
+          # Import OAC if it already exists
+          OAC_ID=$(aws cloudfront list-origin-access-controls \
+            --query "OriginAccessControlList.Items[?Name=='${P}-${E}-oac'].Id | [0]" \
+            --output text 2>/dev/null)
+          if [ -n "$OAC_ID" ] && [ "$OAC_ID" != "None" ] && [ "$OAC_ID" != "null" ]; then
+            echo "Importing CloudFront OAC: ${OAC_ID}"
+            terraform state rm 'module.cloudfront[0].aws_cloudfront_origin_access_control.web' 2>/dev/null || true
+            terraform import -input=false \
+              'module.cloudfront[0].aws_cloudfront_origin_access_control.web' "${OAC_ID}" \
+              2>&1 | grep -v "^$" || true
+          else
+            echo "No existing CloudFront OAC — Terraform will create it"
+          fi
+
+          # Import CloudFront distribution if it already exists.
+          # Search by OAC name first (reliable after our own deploys), then fall back
+          # to searching by custom_domain alias (catches manually-created distributions).
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Comment=='${P}-${E}'].Id | [0]" \
+            --output text 2>/dev/null)
+          if [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ] || [ "$DIST_ID" = "null" ]; then
+            CF_DOMAIN="${{ github.event.inputs.custom_domain }}"
+            if [ -n "$CF_DOMAIN" ]; then
+              ALL_DISTS=$(aws cloudfront list-distributions --output json 2>/dev/null || echo '{"DistributionList":{"Items":[]}}')
+              DIST_ID=$(echo "$ALL_DISTS" | jq -r --arg d "$CF_DOMAIN" \
+                '.DistributionList.Items[]? | select(any(.Aliases.Items[]?; . == $d)) | .Id' 2>/dev/null | head -1)
+            fi
+          fi
+          if [ -n "$DIST_ID" ] && [ "$DIST_ID" != "None" ] && [ "$DIST_ID" != "null" ]; then
+            echo "Importing CloudFront distribution: ${DIST_ID}"
+            terraform state rm 'module.cloudfront[0].aws_cloudfront_distribution.web' 2>/dev/null || true
+            terraform import -input=false \
+              'module.cloudfront[0].aws_cloudfront_distribution.web' "${DIST_ID}" \
+              2>&1 | grep -v "^$" || true
+          else
+            echo "No existing CloudFront distribution — Terraform will create it"
+          fi
+
+          echo "CloudFront import complete"
+
+      # ── Step 5: Terraform Plan + Apply ────────────────────────────────────────
+      - name: Terraform Plan
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_groq_api_key: ${{ secrets.GROQ_API_KEY }}
+          TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          TF_VAR_gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          TF_VAR_lambda_image_uri: ${{ env.IMAGE_URI }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: terraform plan -out=tfplan -input=false
+
+      - name: Terraform Apply
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_db_password: ${{ env.SAFE_DB_PASSWORD }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_refresh_token_secret: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          TF_VAR_groq_api_key: ${{ secrets.GROQ_API_KEY }}
+          TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          TF_VAR_gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          TF_VAR_lambda_image_uri: ${{ env.IMAGE_URI }}
+          TF_VAR_enable_cloudfront: ${{ github.event.inputs.enable_cloudfront }}
+          TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
+          TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
+          TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+        run: terraform apply tfplan
+
+      # ── Capture Terraform outputs ─────────────────────────────────────────────
+      - name: Read Terraform outputs
+        id: tf
+        working-directory: ./terraform
+        run: |
+          echo "api_url=$(terraform output -raw api_endpoint | sed 's|/$||')" >> $GITHUB_OUTPUT
+          echo "s3_bucket=$(terraform output -raw s3_bucket_name)"      >> $GITHUB_OUTPUT
+          echo "cf_domain=$(terraform output -raw cloudfront_domain)"   >> $GITHUB_OUTPUT
+          echo "cf_id=$(terraform output -raw cloudfront_id)"           >> $GITHUB_OUTPUT
+          echo "frontend_url=$(terraform output -raw frontend_url)"     >> $GITHUB_OUTPUT
+          echo "ws_url=$(terraform output -raw websocket_endpoint)"     >> $GITHUB_OUTPUT
+          echo "name_servers=$(terraform output -json name_servers 2>/dev/null || echo '[]')" >> $GITHUB_OUTPUT
+
+      # ── Compute effective API URL for frontend ────────────────────────────────
+      # When CloudFront is enabled, the frontend routes /api/* through CloudFront
+      # (same-origin) rather than directly hitting API Gateway. This avoids CORS
+      # entirely for same-origin requests and enables caching at the edge.
+      # Priority: custom domain > CloudFront domain > raw API Gateway URL.
+      - name: Compute effective API URL
+        run: |
+          DOMAIN="${{ github.event.inputs.custom_domain }}"
+          CF="${{ github.event.inputs.enable_cloudfront }}"
+          if [ -n "$DOMAIN" ] && [ "$CF" = "true" ]; then
+            echo "EFFECTIVE_API_URL=https://${DOMAIN}" >> $GITHUB_ENV
+          elif [ "$CF" = "true" ]; then
+            echo "EFFECTIVE_API_URL=https://${{ steps.tf.outputs.cf_domain }}" >> $GITHUB_ENV
+          else
+            echo "EFFECTIVE_API_URL=${{ steps.tf.outputs.api_url }}" >> $GITHUB_ENV
+          fi
+
+      # ── Step 6: Build and deploy frontend ────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend (Next.js static export)
+        working-directory: ./frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ env.EFFECTIVE_API_URL }}
+          NEXT_PUBLIC_APP_URL: ${{ steps.tf.outputs.frontend_url }}
+          NEXT_PUBLIC_VOICE_WS_URL: ${{ steps.tf.outputs.ws_url }}
+          NEXT_OUTPUT: export
+        run: npm run build
+
+      # FIX: The second `aws s3 sync` MUST use `--exclude "*"` before `--include "*.html"`.
+      # Without `--exclude "*"`, the AWS CLI treats `--include` as additive and syncs
+      # ALL files again — overwriting the immutable cache headers set in pass 1.
+      - name: Sync frontend to S3
+        run: |
+          set -euo pipefail
+          BUCKET="${{ steps.tf.outputs.s3_bucket }}"
+
+          # Pass 1: immutable assets (JS, CSS, fonts, images) — long-lived cache
+          aws s3 sync frontend/out/ "s3://${BUCKET}/" \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*.html" \
+            --region "${{ env.AWS_REGION }}"
+
+          # Pass 2: HTML files only — always revalidate
+          # --exclude "*" MUST come before --include "*.html" to scope the filter
+          aws s3 sync frontend/out/ "s3://${BUCKET}/" \
+            --cache-control "no-cache, no-store, must-revalidate" \
+            --exclude "*" \
+            --include "*.html" \
+            --region "${{ env.AWS_REGION }}"
+
+          # Pass 3: Extension-less copies for clean URL routing.
+          # Next.js App Router static export generates flat `login.html` files.
+          # S3 website hosting only serves /login.html for the exact key "login.html",
+          # NOT for the URL "/login". Copy each route HTML as an extension-less key
+          # so S3 serves /login, /dashboard, etc. directly without CloudFront.
+          # index.html and 404.html are excluded (served by S3 website config already).
+          while IFS= read -r key; do
+            route="${key%.html}"
+            aws s3 cp "s3://${BUCKET}/${key}" "s3://${BUCKET}/${route}" \
+              --content-type "text/html; charset=utf-8" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --metadata-directive REPLACE \
+              --region "${{ env.AWS_REGION }}"
+          done < <(aws s3 ls "s3://${BUCKET}/" --recursive --region "${{ env.AWS_REGION }}" \
+            | awk '/\.html$/ {print $4}' \
+            | grep -v -E '^(index|404|_not-found)\.html$')
+
+      # ── Step 7: Invalidate CloudFront (skipped when CF is disabled) ──────────
+      - name: Invalidate CloudFront
+        if: ${{ steps.tf.outputs.cf_id != '' }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.tf.outputs.cf_id }}" \
+            --paths "/*"
+
+      # ── Step 8: Smoke test — verify the API is live ───────────────────────────
+      # Polls /api/health up to 6 minutes to allow Lambda cold-start + DB init.
+      # Initial 60s wait avoids hammering the Lambda while it initialises
+      # (NestJS + updateSchema + seed can take 30-45s on first cold start).
+      # 20s poll interval keeps concurrent invocations below 2 so the reserved
+      # concurrency of 4 is never saturated by health-check traffic alone.
+      - name: API smoke test
+        run: |
+          set -euo pipefail
+          API="${{ steps.tf.outputs.api_url }}"
+          echo "Waiting 60s for Lambda cold-start + DB initialisation ..."
+          sleep 60
+          echo "Polling ${API}/api/health ..."
+          for i in $(seq 1 18); do
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 15 --max-time 45 \
+              "${API}/api/health" || echo "000")
+            echo "  Attempt $i/18 — HTTP ${HTTP}"
+            if [ "$HTTP" = "200" ]; then
+              echo "  API is live"
+              break
+            fi
+            if [ "$i" = "18" ]; then
+              echo "ERROR: API did not return 200 after 18 attempts (~6 min total)"
+              echo "Check CloudWatch Logs: /aws/lambda/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-api"
+              exit 1
+            fi
+            sleep 20
+          done
+
+      # ── Summary ───────────────────────────────────────────────────────────────
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend   | ${{ steps.tf.outputs.frontend_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API        | ${{ steps.tf.outputs.api_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| WebSocket  | ${{ steps.tf.outputs.ws_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| S3 Bucket  | ${{ steps.tf.outputs.s3_bucket }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image      | ${{ env.IMAGE_URI }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Custom domain + nameserver instructions
+          DOMAIN="${{ github.event.inputs.custom_domain }}"
+          NS='${{ steps.tf.outputs.name_servers }}'
+          if [ -n "$DOMAIN" ] && [ "$NS" != "[]" ] && [ -n "$NS" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Custom Domain: ${DOMAIN}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Update your registrar's nameservers to:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "${NS}" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "> DNS propagation takes 5–60 minutes after updating the registrar." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Cost notes:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Aurora Serverless v2: ~\$43/mo (0.5 ACU min)" >> $GITHUB_STEP_SUMMARY
+          echo "- NAT Gateway: ~\$32/mo — destroy with:" >> $GITHUB_STEP_SUMMARY
+          echo "  \`terraform destroy -target='module.vpc.aws_nat_gateway.main' -target='module.vpc.aws_eip.nat'\`" >> $GITHUB_STEP_SUMMARY
