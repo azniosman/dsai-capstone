@@ -214,7 +214,11 @@ fi
 echo ""
 echo "========================================================"
 echo "  ✓ Deployment complete!"
-[[ -n "${CF_DOMAIN}" ]] && echo "  Frontend: https://${CF_DOMAIN}" || echo "  Frontend: s3://${S3_BUCKET}"
+if [[ -n "${CF_DOMAIN}" ]]; then
+  echo "  Frontend: https://${CF_DOMAIN}"
+else
+  echo "  Frontend: s3://${S3_BUCKET}"
+fi
 echo "  API:      ${API_URL}"
 echo "  EventBridge schedules: ${SCHEDULE_COUNT} active"
 echo "========================================================"
