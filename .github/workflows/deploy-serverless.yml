@@ -1044,7 +1044,7 @@ jobs:
             --paths "/*"
 
       # ── Step 8: Smoke test — verify the API is live ───────────────────────────
-      # Polls /api/health up to 6 minutes to allow Lambda cold-start + DB init.
+      # Polls /internal/health up to 6 minutes to allow Lambda cold-start + DB init.
       # Initial 60s wait avoids hammering the Lambda while it initialises
       # (NestJS + updateSchema + seed can take 30-45s on first cold start).
       # 20s poll interval keeps concurrent invocations below 2 so the reserved
@@ -1055,11 +1055,11 @@ jobs:
           API="${{ steps.tf.outputs.api_url }}"
           echo "Waiting 60s for Lambda cold-start + DB initialisation ..."
           sleep 60
-          echo "Polling ${API}/api/health ..."
+          echo "Polling ${API}/internal/health ..."
           for i in $(seq 1 18); do
             HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
               --connect-timeout 15 --max-time 45 \
-              "${API}/api/health" || echo "000")
+              "${API}/internal/health" || echo "000")
             echo "  Attempt $i/18 — HTTP ${HTTP}"
             if [ "$HTTP" = "200" ]; then
               echo "  API is live"
