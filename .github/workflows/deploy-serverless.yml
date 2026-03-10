@@ -69,6 +69,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # Capture AWS account ID for use in resource naming
+      - name: Capture AWS Account ID
+        run: |
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          echo "AWS_ACCOUNT_ID=${ACCOUNT}" >> $GITHUB_ENV
+
       # Aurora master password forbids: '/', '@', '"', space
       # base64 output (from openssl rand -base64) may contain '/' — strip it.
       - name: Sanitize DB password for Aurora compatibility
@@ -935,6 +941,7 @@ jobs:
           TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
           TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
           TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+          TF_VAR_aws_account_id: ${{ env.AWS_ACCOUNT_ID }}
         run: terraform apply tfplan
 
       # ── Capture Terraform outputs ─────────────────────────────────────────────

@@ -15,6 +15,13 @@
 #   terraform destroy -target module.vpc.aws_nat_gateway.main
 # =============================================================================
 
+# Auto-detect AWS account ID if not provided
+data "aws_caller_identity" "current" {}
+
+locals {
+  account_id = var.aws_account_id != "" ? var.aws_account_id : data.aws_caller_identity.current.account_id
+}
+
 # 1. VPC — public + private subnets across 2 AZs, single NAT Gateway
 module "vpc" {
   source = "./modules/vpc"
@@ -37,12 +44,14 @@ module "security_groups" {
 
 # 2b. S3 Uploads bucket — resume PDFs and voice Transcribe staging
 # Referenced in the IAM policy and needed by resume-upload + voice Lambdas.
+# Include account ID in bucket name to ensure global uniqueness (S3 bucket names
+# are shared across all AWS accounts).
 resource "random_id" "uploads_suffix" {
   byte_length = 4
 }
 
 resource "aws_s3_bucket" "uploads" {
-  bucket        = "${var.project_name}-${var.environment}-uploads-${random_id.uploads_suffix.hex}"
+  bucket        = "${var.project_name}-${var.environment}-uploads-${random_id.uploads_suffix.hex}-${local.account_id}"
   force_destroy = true
 
   tags = { Name = "${var.project_name}-${var.environment}-uploads" }

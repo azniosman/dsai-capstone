@@ -4,6 +4,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "aws_account_id" {
+  description = "AWS Account ID (auto-detected if not set)"
+  type        = string
+  default     = ""
+}
+
 variable "project_name" {
   description = "Project name used for resource naming (lowercase, no spaces)"
   type        = string
