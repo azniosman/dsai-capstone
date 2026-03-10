@@ -69,6 +69,36 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # ── Preflight checks ─────────────────────────────────────────────────────
+      - name: Preflight checks
+        if: ${{ github.event.inputs.skip_terraform != 'true' }}
+        run: |
+          P="${{ env.PROJECT_NAME }}"
+          E="${{ env.ENVIRONMENT }}"
+          echo "=== Preflight checks for $E environment ==="
+          
+          # Check VPC quota
+          VPC_QUOTA=$(aws ec2 describe-account-attributes \
+            --attribute-names vpc --query 'AccountAttributes[0].AttributeValues[0].AttributeValue' \
+            --output text 2>/dev/null || echo "5")
+          VPC_COUNT=$(aws ec2 describe-vpcs \
+            --query 'Vpcs[].VpcId' --output text 2>/dev/null | wc -w | tr -d ' ')
+          echo "  VPC quota: $VPC_QUOTA, current VPCs: $VPC_COUNT"
+          if [ "$VPC_COUNT" -ge "$VPC_QUOTA" ]; then
+            echo "  ERROR: VPC limit reached ($VPC_COUNT/$VPC_QUOTA). Please delete orphaned VPCs first."
+            exit 1
+          fi
+          
+          # Check if uploads bucket already exists (should be cleaned up first)
+          UPLOADS_BUCKET="${P}-${E}-uploads"
+          if aws s3api head-bucket --bucket "$UPLOADS_BUCKET" 2>/dev/null; then
+            echo "  ERROR: Uploads bucket $UPLOADS_BUCKET already exists."
+            echo "  Please run the workflow with skip_terraform=false first to clean up."
+            exit 1
+          fi
+          
+          echo "  Preflight checks passed"
+
       # Aurora master password forbids: '/', '@', '"', space
       # base64 output (from openssl rand -base64) may contain '/' — strip it.
       - name: Sanitize DB password for Aurora compatibility
@@ -313,6 +343,83 @@ jobs:
           E="${{ env.ENVIRONMENT }}"
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 
+          echo "=== Step 0: Pre-cleanup - delete any orphaned VPCs (to avoid VPC limit) ==="
+          # First, check VPC quota to avoid surprises
+          VPC_QUOTA=$(aws ec2 describe-account-attributes \
+            --attribute-names vpc --query 'AccountAttributes[0].AttributeValues[0].AttributeValue' \
+            --output text 2>/dev/null || echo "5")
+          VPC_COUNT=$(aws ec2 describe-vpcs \
+            --query 'Vpcs[].VpcId' --output text 2>/dev/null | wc -w | tr -d ' ')
+          echo "  VPC quota: $VPC_QUOTA, current VPCs: $VPC_COUNT"
+          if [ "$VPC_COUNT" -ge "$VPC_QUOTA" ]; then
+            echo "  WARNING: VPC limit reached ($VPC_COUNT/$VPC_QUOTA). Proceeding with cleanup..."
+          fi
+          
+          # List all VPCs in the account and delete any that are not needed
+          # This handles cases where previous deployments failed mid-cleanup
+          for VPC_ID in $(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${P}-*-vpc" \
+            --query 'Vpcs[].VpcId' --output text 2>/dev/null | tr '\t' '\n'); do
+            [ -z "$VPC_ID" ] || [ "$VPC_ID" = "None" ] && continue
+            
+            # Verify VPC has correct tags before deletion
+            VPC_NAME=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" \
+              --query 'Vpcs[0].Tags[?Key==`Name`].Value[0]' --output text 2>/dev/null)
+            
+            # Only delete VPCs that match the pattern ${P}-*-vpc (not ${P}-${E}-vpc which is handled in Step 5)
+            if [[ "$VPC_NAME" =~ ^${P}-.*-vpc$ ]] && [[ "$VPC_NAME" != "${P}-${E}-vpc" ]]; then
+              echo "  Deleting orphaned VPC: $VPC_ID ($VPC_NAME)"
+
+              # Get and delete any attached internet gateways
+              for IGW in $(aws ec2 describe-internet-gateways \
+                --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+                --query 'InternetGateways[].InternetGatewayId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 detach-internet-gateway \
+                  --internet-gateway-id "$IGW" --vpc-id "$VPC_ID" 2>/dev/null || true
+                aws ec2 delete-internet-gateway \
+                  --internet-gateway-id "$IGW" 2>/dev/null || true
+              done
+
+              # Delete route tables (non-main)
+              for RT in $(aws ec2 describe-route-tables \
+                --filters "Name=vpc-id,Values=$VPC_ID" \
+                --query 'RouteTables[?Associations[0].Main != `true`].RouteTableId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 delete-route-table --route-table-id "$RT" 2>/dev/null || true
+              done
+
+              # Delete subnets
+              for SUBNET in $(aws ec2 describe-subnets \
+                --filters "Name=vpc-id,Values=$VPC_ID" \
+                --query 'Subnets[].SubnetId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 delete-subnet --subnet-id "$SUBNET" 2>/dev/null || true
+              done
+
+              # Delete security groups (non-default)
+              for SG in $(aws ec2 describe-security-groups \
+                --filters "Name=vpc-id,Values=$VPC_ID" \
+                --query 'SecurityGroups[?GroupName != `default`].GroupId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 delete-security-group --group-id "$SG" 2>/dev/null || true
+              done
+
+              # Delete NAT gateways (and their EIPs)
+              for NAT in $(aws ec2 describe-nat-gateways \
+                --filter "Name=vpc-id,Values=$VPC_ID" \
+                --query 'NatGateways[].NatGatewayId' \
+                --output text 2>/dev/null | tr '\t' '\n'); do
+                aws ec2 delete-nat-gateway --nat-gateway-id "$NAT" 2>/dev/null || true
+              done
+
+              # Delete VPC (must be empty at this point)
+              aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>/dev/null || true
+              echo "  Deleted orphaned VPC: $VPC_ID"
+            fi
+          done
+          echo "  Pre-cleanup VPC check complete"
+
           echo "=== Step 1: Remove non-ECR modules from Terraform state ==="
           # module.iam is intentionally kept in state so Terraform updates roles
           # in place rather than trying to create them (avoids 409 EntityAlreadyExists
@@ -549,9 +656,34 @@ jobs:
 
           echo "=== Step 10: Empty + delete uploads S3 bucket (if it exists) ==="
           UPLOADS_BUCKET="${P}-${E}-uploads"
-          aws s3 rm "s3://${UPLOADS_BUCKET}" --recursive 2>/dev/null || true
-          aws s3api delete-bucket --bucket "${UPLOADS_BUCKET}" \
-            --region "${{ env.AWS_REGION }}" 2>/dev/null || true
+          # Safety check: only proceed if bucket exists AND has correct tags
+          # This prevents accidentally deleting buckets from other sources
+          if aws s3api head-bucket --bucket "$UPLOADS_BUCKET" 2>/dev/null; then
+            echo "  Bucket $UPLOADS_BUCKET exists, verifying tags..."
+            # Verify bucket has the expected tag: Name=${P}-${E}-uploads
+            BUCKET_TAGS=$(aws s3api get-bucket-tagging --bucket "$UPLOADS_BUCKET" 2>/dev/null)
+            EXPECTED_TAG="\"Key\":\"Name\",\"Value\":\"${P}-${E}-uploads\""
+            if echo "$BUCKET_TAGS" | grep -q "$EXPECTED_TAG"; then
+              echo "  Bucket tags verified, proceeding with deletion..."
+              # Remove bucket policy if it exists (can block deletion)
+              aws s3api delete-bucket-policy --bucket "$UPLOADS_BUCKET" 2>/dev/null || true
+              # Remove any encryption configuration
+              aws s3api delete-bucket-encryption --bucket "$UPLOADS_BUCKET" 2>/dev/null || true
+              # Remove public access block
+              aws s3api delete-public-access-block --bucket "$UPLOADS_BUCKET" 2>/dev/null || true
+              # Empty the bucket (including all versions if versioning was enabled)
+              aws s3 rm "s3://${UPLOADS_BUCKET}" --recursive --include "*" 2>/dev/null || true
+              # Delete the bucket
+              aws s3api delete-bucket --bucket "$UPLOADS_BUCKET" \
+                --region "${{ env.AWS_REGION }}" 2>/dev/null || true
+              echo "  Bucket $UPLOADS_BUCKET deleted"
+            else
+              echo "  WARNING: Bucket $UPLOADS_BUCKET exists but has unexpected tags. Skipping deletion."
+              echo "  This may indicate a bucket from another source. Manual intervention required."
+            fi
+          else
+            echo "  Bucket $UPLOADS_BUCKET does not exist"
+          fi
 
           echo "=== Step 11: Clear CNAME aliases from any existing CloudFront distributions ==="
           # CloudFront distributions with CNAME aliases (e.g. sklbr.co) must have those
