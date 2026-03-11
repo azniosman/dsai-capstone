@@ -20,6 +20,7 @@ import {
   type ChatMessage,
   type CareerIntelligence,
 } from "@/lib/api";
+import { useModalStore } from "@/store/modalStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ export default function CopilotChatPage() {
   const [isExtracting, setIsExtracting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const openModal = useModalStore((state) => state.openModal);
 
   useEffect(() => {
     const id = Number(localStorage.getItem("profileId")) || undefined;
@@ -608,6 +610,16 @@ export default function CopilotChatPage() {
                           : "Click ANALYZE_PROFILE to extract your career intelligence."
                         : "Upload a resume to unlock full Copilot capabilities."}
                     </p>
+                    
+                    {!profileId && (
+                      <button
+                        onClick={() => openModal("resumeUpload")}
+                        className="mt-6 flex items-center justify-center gap-2 border border-primary/40 bg-primary/10 px-5 py-2.5 hover:bg-primary/20 transition-all font-mono text-[10px] text-primary uppercase tracking-widest mx-auto shadow-[0_0_15px_rgba(37,157,244,0.15)]"
+                      >
+                        <FileText className="h-4 w-4" />
+                        UPLOAD_RESUME
+                      </button>
+                    )}
                   </div>
                 </div>
 
