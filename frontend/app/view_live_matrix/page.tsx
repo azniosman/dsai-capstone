@@ -31,10 +31,10 @@ export default function ViewLiveMatrixPage() {
         ]);
 
         if (isMounted) {
-          setMatrixData(matrixRes.data.data);
-          setDataset(matrixRes.data.dataset);
-          setDiffs(diffRes.data);
-          setTrends(trendRes.data);
+          setMatrixData(matrixRes.data?.data ?? []);
+          setDataset(matrixRes.data?.dataset ?? null);
+          setDiffs(Array.isArray(diffRes.data) ? diffRes.data : []);
+          setTrends(Array.isArray(trendRes.data) ? trendRes.data : []);
         }
       } catch (err: unknown) {
         if (isMounted) {

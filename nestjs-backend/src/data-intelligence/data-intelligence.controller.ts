@@ -5,7 +5,7 @@ import { LiveMatrixData } from '../entities/live-matrix-data.entity';
 import { Dataset, DatasetStatus } from '../entities/dataset.entity';
 import { DatasetDiff } from '../entities/dataset-diff.entity';
 
-@Controller('api')
+@Controller()
 export class DataIntelligenceController {
   constructor(private readonly em: EntityManager) {}
 
