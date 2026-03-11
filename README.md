@@ -4,8 +4,8 @@
 
 SkillBridge is a serverless, full-stack AI platform that helps SCTP learners and mid-career professionals navigate Singapore's evolving tech job market. It combines a six-phase hybrid Retrieval-Augmented Generation (RAG) pipeline, multi-provider LLM orchestration, and an interactive AI career coach — all grounded in real SkillsFuture course data, SSG/WSG salary benchmarks, and live market intelligence.
 
-![Orchestrating](misc/images/orchestrating.png)
-![Overview](misc/images/aioverview.png)
+![Orchestrating](misc/images/SkillBridge_Orchestration.png)
+![Overview](misc/images/aioverview_new.png)
 
 **Enterprise Roadmap:** See [Enterprise-Technical_Roadmap.md](Enterprise-Technical_Roadmap.md)
 
