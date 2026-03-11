@@ -28,6 +28,7 @@ export default function ResumePreviewModal() {
         years_experience: (modalData?.experience_years as number) || 0,
         is_career_switcher: false,
         skills: skillsArr,
+        resume_text: modalData?.resume_text as string | undefined,
       };
 
       const profile = await profileApi.create(payload);
