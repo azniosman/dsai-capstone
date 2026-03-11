@@ -175,7 +175,7 @@ export class IntelligenceController {
     const tenantId = req.user ? req.user.tenant.id : 1;
     return this.copilotService.copilotChat(
       payload.profile_id,
-      payload.messages,
+      payload.messages as any[],
       tenantId,
     );
   }

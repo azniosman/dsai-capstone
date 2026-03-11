@@ -3,7 +3,11 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { JobRole } from '@app/entities/job-role.entity';
-import { ChatRequestDto, RecommendRequestDto } from './dto/intelligence.dto';
+import {
+  ChatRequestDto,
+  RecommendRequestDto,
+  ChatMessage,
+} from './dto/intelligence.dto';
 import { LlmService, providerLabel } from './llm.service';
 import { ResumeParser } from '../common/utils/resume-parser.util';
 import { DomainService } from '../domain/domain.service';
@@ -120,9 +124,12 @@ export class IntelligenceService {
       ctx,
       'User Query',
       // eslint-disable-next-line @typescript-eslint/require-await
-      async () => lastUserMsg?.content,
+      async () => lastUserMsg?.content || '',
       {
-        metadata: { role: 'user', msg_length: lastUserMsg?.content.length },
+        metadata: {
+          role: 'user',
+          msg_length: lastUserMsg?.content?.length || 0,
+        },
       },
     );
 
@@ -169,7 +176,7 @@ export class IntelligenceService {
           ctx,
           'Document Retrieval',
           async () => {
-            return this.ragService.query(lastUserMsg.content, tenantId, {
+            return this.ragService.query(lastUserMsg?.content || '', tenantId, {
               topK: 3,
               threshold: 0.5,
               profileId,
@@ -212,7 +219,13 @@ export class IntelligenceService {
         ctx,
         'LLM Engine',
         async () => {
-          return this.llmService.chat(payload.messages, systemPrompt);
+          const useTools = !!profileId; // Enable tools if we have a profile to work with
+          return this.llmService.chat(
+            payload.messages as any[], // Casting to any then back to ChatMessage[] in LlmService
+            systemPrompt,
+            useTools,
+            { tenantId, profileId },
+          );
         },
         { maxRetries: 3 },
       )) || 'I am currently overloaded with requests. Please try again soon.';
@@ -469,7 +482,7 @@ export class IntelligenceService {
     dto: {
       profile_id?: number;
       job_title: string;
-      messages: Array<{ role: string; content: string }>;
+      messages: ChatMessage[];
     },
     tenantId: number,
   ): Promise<{ reply: string; engine: string }> {
@@ -492,7 +505,7 @@ export class IntelligenceService {
         .find((m) => m.role === 'user');
       if (lastUserMsg) {
         const chunks = await this.ragService.query(
-          lastUserMsg.content,
+          lastUserMsg.content || '',
           tenantId,
           {
             topK: 2,
@@ -512,10 +525,7 @@ export class IntelligenceService {
       profileContext +
       ragContext;
 
-    const reply = await this.llmService.chat(
-      dto.messages as Array<{ role: string; content: string }>,
-      systemPrompt,
-    );
+    const reply = await this.llmService.chat(dto.messages as any[], systemPrompt);
     return {
       reply,
       engine: providerLabel(this.llmService.getLastUsedProvider()),

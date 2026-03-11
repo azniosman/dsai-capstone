@@ -57,50 +57,52 @@ export class GeminiProvider implements LlmProvider {
 
   /**
    * Sends a multi-turn conversation to the Gemini API and returns the
-   * model's text reply.
-   *
-   * For single-message requests the method falls back to `generateContent`
-   * to avoid an empty-history edge case.
+   * model's response.
    *
    * @param messages - Conversation history.
    * @param systemPrompt - System-level instruction.
-   * @returns The model's text response.
+   * @param _tools - Optional list of tools (currently unsupported in this provider).
+   * @returns The model's ChatMessage.
    */
   async generate(
     messages: ChatMessage[],
     systemPrompt: string,
-  ): Promise<string> {
+    _tools?: any[],
+  ): Promise<ChatMessage> {
     if (!this.geminiClient) {
       throw new Error('Gemini client not available');
     }
 
+    let replyText = '';
+
     if (messages.length === 1) {
       // Single-turn: use generateContent with system instruction prepended.
       const prompt = `${systemPrompt}\n\n${messages[0]?.content ?? ''}`;
-      // The following lines from the user's edit appear to be incomplete or incorrect in this context.
-      // They are commented out to maintain syntactical correctness of the file.
-      // const rawBody = await response.text();
-      // const body = JSON.parse(rawBody);string;
       const result = await this.geminiClient.generateContent(prompt);
-      return result.response.text() as string;
+      replyText = result.response.text() as string;
+    } else {
+      const history = messages.slice(0, -1).map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content || '' }],
+      }));
+
+      const lastMessage = messages[messages.length - 1];
+
+      const chat = this.geminiClient.startChat({
+        history,
+        systemInstruction: {
+          role: 'system',
+          parts: [{ text: systemPrompt }],
+        },
+      });
+
+      const result = await chat.sendMessage(lastMessage?.content ?? '');
+      replyText = result.response.text() as string;
     }
 
-    const history = messages.slice(0, -1).map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-
-    const lastMessage = messages[messages.length - 1];
-
-    const chat = this.geminiClient.startChat({
-      history,
-      systemInstruction: {
-        role: 'system',
-        parts: [{ text: systemPrompt }],
-      },
-    });
-
-    const result = await chat.sendMessage(lastMessage?.content ?? '');
-    return result.response.text() as string;
+    return {
+      role: 'assistant',
+      content: replyText,
+    };
   }
 }

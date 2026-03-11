@@ -11,24 +11,29 @@ import { JobRole } from '@app/entities/job-role.entity';
 import { RagModule } from '../rag/rag.module';
 import { SystemTerminalService } from './system-terminal.service';
 import { SystemDocument } from '../entities/system-document.entity';
+import { CareerToolsService } from './career-tools.service';
+import { DomainModule } from '../domain/domain.module';
 
 @Module({
   imports: [
     ConfigModule,
     MikroOrmModule.forFeature([UserProfile, JobRole, SystemDocument]),
     RagModule,
+    DomainModule,
   ],
   controllers: [IntelligenceController, UploadController],
   providers: [
     IntelligenceService,
     LlmService,
     CopilotService,
+    CareerToolsService,
     SystemTerminalService,
   ],
   exports: [
     IntelligenceService,
     LlmService,
     CopilotService,
+    CareerToolsService,
     SystemTerminalService,
   ],
 })
