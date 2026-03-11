@@ -63,3 +63,6 @@ CLAUDE.md
 
 # Stitch
 stitch_*
+
+# Nuke logs
+scripts/*.log

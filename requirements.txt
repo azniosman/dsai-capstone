@@ -33,3 +33,5 @@ requests-aws4auth==1.2.3
 mangum==0.17.0
 # Feature: Vector DB
 pgvector==0.2.4
+# Feature: Cloud nuke dashboard
+rich>=13.0.0
