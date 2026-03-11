@@ -552,7 +552,7 @@ function LoginForm() {
               <div className="flex flex-col gap-3">
                 <a
                   className="flex items-center justify-between group py-2 border-b border-primary/5"
-                  href="#"
+                  href="dashboard"
                 >
                   <span className="font-mono text-[11px] text-primary/70 group-hover:text-primary transition-colors">
                     SKLBR_SYNC

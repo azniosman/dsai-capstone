@@ -45,9 +45,9 @@ export const useProfileBuilderStore = create<ProfileBuilderState>((set) => ({
   personalInfo: { ...defaultPersonalInfo },
   skills: [],
 
-  nextStep: () => set((state) => ({ step: Math.min(state.step + 1, 4) })),
+  nextStep: () => set((state) => ({ step: Math.min(state.step + 1, 2) })),
   prevStep: () => set((state) => ({ step: Math.max(state.step - 1, 1) })),
-  setStep: (step: number) => set({ step: Math.max(1, Math.min(step, 4)) }),
+  setStep: (step: number) => set({ step: Math.max(1, Math.min(step, 2)) }),
 
   setResume: (file) => set({ resumeFile: file }),
   setParsedResume: (data) => set({ parsedResume: data }),

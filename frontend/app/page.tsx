@@ -106,7 +106,7 @@ export default function LandingPage() {
               REGION: SG-CENTRAL
             </div>
             <div className="tactical-label text-neutral-600">
-              SERVER: AP-SOUTHEAST-1
+              SERVER: US-EAST-1
             </div>
           </div>
         </div>
