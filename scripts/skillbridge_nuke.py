@@ -305,34 +305,32 @@ def _delete_vpc(ec2, vpc_id: str, region: str, session: boto3.Session | None = N
             except ClientError:
                 pass
 
-    # ----- Network interfaces (dangling) -----------------------------------
-    enis = ec2.describe_network_interfaces(
-        Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]
-    ).get("NetworkInterfaces", [])
-    for eni in enis:
-        if eni["Status"] == "available":  # only detach-able
-            try:
-                ec2.delete_network_interface(NetworkInterfaceId=eni["NetworkInterfaceId"])
-                rail_log(f"Deleted dangling ENI {eni['NetworkInterfaceId']}")
-            except ClientError:
-                pass
-
-    # ----- Subnets ---------------------------------------------------------
-    for sub_id in subnet_ids:
-        _retry_ec2(ec2.delete_subnet, SubnetId=sub_id)
-
-    # ----- Non-main route tables -------------------------------------------
-    for rt in ec2.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])["RouteTables"]:
-        if not any(a.get("Main", False) for a in rt.get("Associations", [])):
-            _retry_ec2(ec2.delete_route_table, RouteTableId=rt["RouteTableId"])
-
     # ----- Internet Gateways -----------------------------------------------
     for igw in ec2.describe_internet_gateways(
         Filters=[{"Name": "attachment.vpc-id", "Values": [vpc_id]}]
     )["InternetGateways"]:
         igw_id = igw["InternetGatewayId"]
-        ec2.detach_internet_gateway(InternetGatewayId=igw_id, VpcId=vpc_id)
+        try:
+            ec2.detach_internet_gateway(InternetGatewayId=igw_id, VpcId=vpc_id)
+        except ClientError:
+            pass
         _retry_ec2(ec2.delete_internet_gateway, InternetGatewayId=igw_id)
+
+    # ----- Non-main route tables -------------------------------------------
+    # Disassociate explicit subnet associations first, then delete
+    for rt in ec2.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])["RouteTables"]:
+        is_main = any(a.get("Main", False) for a in rt.get("Associations", []))
+        if is_main:
+            continue
+        for assoc in rt.get("Associations", []):
+            if not assoc.get("Main", False) and assoc.get("RouteTableAssociationId"):
+                try:
+                    ec2.disassociate_route_table(
+                        AssociationId=assoc["RouteTableAssociationId"]
+                    )
+                except ClientError:
+                    pass
+        _retry_ec2(ec2.delete_route_table, RouteTableId=rt["RouteTableId"])
 
     # ----- Non-default security groups -------------------------------------
     # Revoke ingress/egress rules first to break cross-SG references
@@ -355,6 +353,25 @@ def _delete_vpc(ec2, vpc_id: str, region: str, session: boto3.Session | None = N
                 pass
     for sg in sgs:
         _retry_ec2(ec2.delete_security_group, GroupId=sg["GroupId"])
+
+    # ----- Network interfaces (dangling) -----------------------------------
+    # Delete any "available" ENIs, then wait for in-use ones (e.g. Lambda
+    # Hyperplane ENIs) to be released by AWS before attempting subnet deletion.
+    enis = ec2.describe_network_interfaces(
+        Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]
+    ).get("NetworkInterfaces", [])
+    for eni in enis:
+        if eni["Status"] == "available":
+            try:
+                ec2.delete_network_interface(NetworkInterfaceId=eni["NetworkInterfaceId"])
+                rail_log(f"Deleted dangling ENI {eni['NetworkInterfaceId']}")
+            except ClientError:
+                pass
+    _wait_enis_cleared(ec2, vpc_id)
+
+    # ----- Subnets ---------------------------------------------------------
+    for sub_id in subnet_ids:
+        _retry_ec2(ec2.delete_subnet, SubnetId=sub_id)
 
     # ----- VPC itself ------------------------------------------------------
     _retry_ec2(ec2.delete_vpc, VpcId=vpc_id)
@@ -658,19 +675,57 @@ def _cleanup_vpc_endpoints(ec2, vpc_id: str) -> None:
         rail_log(f"[yellow]VPC endpoints: {exc}[/yellow]")
 
 
-def _retry_ec2(fn: Callable, /, **kwargs) -> None:
-    """Simple retry wrapper for individual EC2 calls."""
-    for attempt in range(3):
+def _retry_ec2(fn: Callable, /, **kwargs) -> bool:
+    """Retry wrapper for individual EC2 calls.
+
+    Returns True on success, False if all retries exhausted due to
+    DependencyViolation.  Re-raises non-DependencyViolation errors.
+    """
+    max_attempts = 5
+    for attempt in range(max_attempts):
         try:
             fn(**kwargs)
-            return
+            return True
         except ClientError as exc:
             code = exc.response["Error"].get("Code", "")
-            if code == "DependencyViolation" and attempt < 2:
-                rail_log(f"[yellow]Dependency wait ({attempt+1}/3)…[/yellow]")
-                time.sleep(3 * (attempt + 1))
+            if code == "DependencyViolation" and attempt < max_attempts - 1:
+                delay = 5 * (2 ** attempt)  # 5, 10, 20, 40, 80s
+                rail_log(f"[yellow]Dependency wait ({attempt+1}/{max_attempts}), retry in {delay}s…[/yellow]")
+                time.sleep(delay)
+            elif code == "DependencyViolation":
+                rail_log(f"[red]DependencyViolation persisted after {max_attempts} attempts: {kwargs}[/red]")
+                return False
             else:
                 raise
+    return False
+
+
+def _wait_enis_cleared(ec2, vpc_id: str, timeout: int = 300) -> None:
+    """Poll until all ENIs in *vpc_id* are gone.
+
+    Lambda Hyperplane ENIs can take 10-20+ minutes to release after function
+    deletion.  This blocks until they disappear or *timeout* is reached.
+    """
+    start = time.monotonic()
+    while time.monotonic() - start < timeout:
+        enis = ec2.describe_network_interfaces(
+            Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]
+        ).get("NetworkInterfaces", [])
+        if not enis:
+            return
+        elapsed = int(time.monotonic() - start)
+        rail_log(
+            f"[yellow]Waiting for {len(enis)} ENI(s) to release "
+            f"({elapsed}s/{timeout}s)…[/yellow]"
+        )
+        time.sleep(10)
+    # Log remaining ENIs but don't abort — subnet deletion will retry
+    enis = ec2.describe_network_interfaces(
+        Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]
+    ).get("NetworkInterfaces", [])
+    if enis:
+        ids = [e["NetworkInterfaceId"] for e in enis]
+        rail_log(f"[yellow]ENIs still present after {timeout}s: {ids}[/yellow]")
 
 
 def _wait_nat_deleted(ec2, nat_id: str, timeout: int = 120) -> None:
@@ -819,29 +874,36 @@ def main(argv: list[str] | None = None) -> None:
     ddb_task = progress.add_task("DynamoDB", total=100)
     vpc_task = progress.add_task("VPC", total=100)
 
-    # Parallel cleanup with Rich Live dashboard
+    # Two-phase cleanup with Rich Live dashboard.
+    # Phase 1 (parallel): S3, Lambda, DynamoDB — must finish before VPC so
+    # that VPC-attached Lambda ENIs start releasing.
+    # Phase 2 (after phase 1): VPC — deletes networking resources in the
+    # correct dependency order.
     with Live(
         build_dashboard(progress, args.environment, args.region, account_id),
         console=console,
         refresh_per_second=4,
     ) as live:
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            futures = {
+        # --- Phase 1: non-VPC resources (parallel) -------------------------
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            phase1 = {
                 pool.submit(cleanup_s3, ctx, progress, s3_task): "S3",
                 pool.submit(cleanup_lambda, ctx, progress, lam_task): "Lambda",
                 pool.submit(cleanup_dynamodb, ctx, progress, ddb_task): "DynamoDB",
-                pool.submit(cleanup_vpc, ctx, progress, vpc_task): "VPC",
             }
 
-            while not all(f.done() for f in futures):
+            while not all(f.done() for f in phase1):
                 live.update(build_dashboard(progress, args.environment, args.region, account_id))
                 time.sleep(0.25)
 
-            # Surface any exceptions
-            for future, name in futures.items():
+            for future, name in phase1.items():
                 exc = future.exception()
                 if exc:
                     rail_log(f"[red]{name} cleanup failed: {exc}[/red]")
+
+        # --- Phase 2: VPC (sequential, after Lambda ENIs start releasing) --
+        rail_log("Phase 1 complete — starting VPC cleanup")
+        cleanup_vpc(ctx, progress, vpc_task)
 
         live.update(build_dashboard(progress, args.environment, args.region, account_id))
 
