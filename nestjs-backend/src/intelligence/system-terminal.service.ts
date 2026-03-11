@@ -111,14 +111,17 @@ Answer the user's question using ONLY the provided context sources below.`;
     const searchStart = Date.now();
     const conn = this.em.getConnection();
     const queryStr = `
-      SELECT file_path, content, 1 - (embedding <=> $1::vector) as similarity
+      SELECT file_path, content, 1 - (embedding <=> ?::vector) as similarity
       FROM system_documents
-      ORDER BY embedding <=> $1::vector
+      ORDER BY embedding <=> ?::vector
       LIMIT 5
     `;
     let results: any[] = [];
     try {
-      results = await conn.execute(queryStr, [JSON.stringify(queryVector)]);
+      results = await conn.execute(queryStr, [
+        JSON.stringify(queryVector),
+        JSON.stringify(queryVector),
+      ]);
     } catch (err) {
       this.logger.warn(
         'system_documents query failed — table may not be seeded yet',
