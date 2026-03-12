@@ -24,20 +24,23 @@ import {
   Terminal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WhatIfAnalysis, WhatIfTrigger } from "@/components/ui/what-if-analysis";
 
 function HexRadar({
   axes,
   current,
   target,
+  gaps,
 }: {
   axes: string[];
   current: number[];
   target: number[];
+  gaps?: Array<{ skill: string; gap_severity: string; user_level: number; required_level: string | number }>;
 }) {
   const cx = 200;
   const cy = 200;
   const maxR = 180;
-  const n = axes.length || 4; // Fallback to 4 for the demo shape if no axes
+  const n = axes.length || 4;
 
   const angleAt = (i: number) => (Math.PI * 2 * i) / n - Math.PI / 2;
 
@@ -56,6 +59,9 @@ function HexRadar({
   };
 
   const gridLevels = [0.25, 0.5, 0.75, 1.0];
+
+  // Find critical gaps (high severity)
+  const criticalGaps = gaps?.filter(g => g.gap_severity === "high") || [];
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -113,7 +119,7 @@ function HexRadar({
           className="text-slate-custom-200 dark:text-slate-custom-700"
         />
 
-        {/* Target Benchmark (Simulated shape from original code if no data, else calculated) */}
+        {/* Target Benchmark */}
         {target.length > 0 ? (
           <path
             d={toPath(target)}
@@ -130,7 +136,7 @@ function HexRadar({
           ></polygon>
         )}
 
-        {/* Current Candidate Shape */}
+        {/* Current Candidate Shape with animation */}
         <motion.path
           d={
             current.length > 0
@@ -145,6 +151,45 @@ function HexRadar({
           transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
           style={{ transformOrigin: "200px 200px" }}
         />
+
+        {/* Pulsing Gap Indicators for Critical Gaps */}
+        {criticalGaps.map((gap, i) => {
+          const gapIndex = axes.findIndex(a => a === gap.skill);
+          if (gapIndex === -1) return null;
+          
+          const angle = angleAt(gapIndex);
+          const x = cx + Math.cos(angle) * (maxR + 35);
+          const y = cy + Math.sin(angle) * (maxR + 35);
+          
+          return (
+            <g key={gap.skill}>
+              {/* Outer pulse ring */}
+              <circle cx={x} cy={y} r={12} fill="none" stroke="#ef4444" strokeWidth="2" opacity="0.6">
+                <animate
+                  attributeName="r"
+                  values="8;16;8"
+                  dur="1.5s"
+                  repeatCount="indefinite"
+                />
+                <animate
+                  attributeName="opacity"
+                  values="0.8;0.2;0.8"
+                  dur="1.5s"
+                  repeatCount="indefinite"
+                />
+              </circle>
+              {/* Inner dot */}
+              <circle cx={x} cy={y} r={6} fill="#ef4444">
+                <animate
+                  attributeName="opacity"
+                  values="1;0.6;1"
+                  dur="1.5s"
+                  repeatCount="indefinite"
+                />
+              </circle>
+            </g>
+          );
+        })}
 
         {axes.length > 0 ? (
           axes.map((label, i) => {
@@ -216,6 +261,7 @@ export default function SkillGapPage() {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState(0);
   const [randomStats, setRandomStats] = useState({ growth1: 0, growth2: 0 });
+  const [showWhatIf, setShowWhatIf] = useState(false);
 
   useEffect(() => {
     // Generate dynamic random values within the main component block not a hook
@@ -313,50 +359,56 @@ export default function SkillGapPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden h-[calc(100vh-var(--spacing-16))] -m-12 bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
-      <header className="h-16 border-b border-slate-custom-200 dark:border-slate-custom-800 bg-white dark:bg-slate-custom-900 px-6 flex items-center justify-between z-10 shrink-0">
+    <div className="flex flex-1 flex-col overflow-hidden h-[calc(100vh-var(--spacing-16))] -m-12 bg-background font-mono text-foreground">
+      <header className="h-16 border-b border-primary/20 bg-card px-6 flex items-center justify-between z-10 shrink-0">
         <div className="flex items-center gap-4">
+          <div className="bg-primary/10 border border-primary p-1.5 text-primary shadow-[0_0_8px_rgba(37,157,244,0.4)]">
+            <Radar className="w-4 h-4" />
+          </div>
           <div className="flex flex-col">
-            <div className="flex items-center gap-2 text-[10px] text-slate-custom-400 font-bold uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
               <span>Talent Intelligence</span>
               <ChevronRight className="text-[12px] w-4 h-4" />
               <span>Candidate Profiling</span>
             </div>
-            <h1 className="text-lg font-bold">Skill Gap & Roadmap Analytics</h1>
+            <h1 className="text-lg font-bold uppercase tracking-widest text-foreground">
+              Skill Gap & Roadmap Analytics
+            </h1>
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex bg-background-dark/50 border border-primary/30 p-0.5 relative z-10 mr-4">
+          <div className="flex bg-background/50 border border-primary/30 p-0.5 relative z-10 mr-4">
             {gaps.map((g, i) => (
               <button
                 key={i}
                 onClick={() => setSelectedRole(i)}
                 className={cn(
-                  "px-4 py-1.5 text-[10px] font-mono font-bold uppercase tracking-widest transition-colors",
+                  "px-4 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider transition-colors rounded-none",
                   selectedRole === i
                     ? "bg-primary/20 text-primary border border-primary/50 shadow-[0_0_10px_rgba(37,157,244,0.2)]"
-                    : "text-slate-500 hover:text-primary border border-transparent",
+                    : "text-muted-foreground hover:text-primary border border-transparent",
                 )}
               >
                 {g.role_title}
               </button>
             ))}
           </div>
-          <button className="clay-btn">
-            <Download className="w-3.5 h-3.5" /> Export Dataset
-          </button>
+          <Button variant="outline" className="rounded-none border-primary/30 text-primary hover:bg-primary/10 text-[10px] uppercase tracking-wider h-9">
+            <Download className="w-3.5 h-3.5" /> Export
+          </Button>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Top Metric Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-slate-custom-900 border border-slate-custom-200 dark:border-slate-custom-800 p-4 rounded-lg shadow-sm">
-            <p className="text-[10px] font-bold text-slate-custom-500 uppercase">
+          <div className="bg-card border border-primary/20 p-4 rounded-none relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Profile Match Score
             </p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-black text-primary">
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-bold font-mono text-primary drop-shadow-[0_0_8px_rgba(37,157,244,0.4)]">
                 {Math.round((activeGap?.match_score || 0) * 100)}%
               </span>
               <span className="text-[10px] font-bold text-green-600 flex items-center gap-1">
@@ -364,7 +416,7 @@ export default function SkillGapPage() {
                 {randomStats.growth1}%
               </span>
             </div>
-            <div className="w-full bg-slate-custom-100 h-1 mt-3 rounded-full overflow-hidden">
+            <div className="w-full bg-muted/50 h-1 mt-3 rounded-none overflow-hidden">
               <div
                 className="bg-primary h-full"
                 style={{
@@ -374,12 +426,13 @@ export default function SkillGapPage() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-custom-900 border border-slate-custom-200 dark:border-slate-custom-800 p-4 rounded-lg shadow-sm">
-            <p className="text-[10px] font-bold text-slate-custom-500 uppercase">
+          <div className="bg-card border border-primary/20 p-4 rounded-none relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Critical Gaps Identified
             </p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-black">
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-bold font-mono text-foreground">
                 {activeGap?.gaps.filter((g) => g.gap_severity === "high")
                   .length || 0}
               </span>
@@ -388,19 +441,20 @@ export default function SkillGapPage() {
                 High Risk
               </span>
             </div>
-            <p className="text-[10px] text-slate-custom-400 mt-2 truncate">
+            <p className="text-[10px] text-muted-foreground mt-2 truncate tracking-wider">
               Targeting {activeGap?.role_title}
             </p>
           </div>
 
-          <div className="bg-white dark:bg-slate-custom-900 border border-slate-custom-200 dark:border-slate-custom-800 p-4 rounded-lg shadow-sm">
-            <p className="text-[10px] font-bold text-slate-custom-500 uppercase">
+          <div className="bg-card border border-primary/20 p-4 rounded-none relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Est. Time to Target
             </p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-black text-slate-custom-800 dark:text-slate-custom-100">
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-bold font-mono text-foreground">
                 {Math.max(1, Math.round((activeGap?.gaps.length || 0) * 1.5))}
-                <span className="text-sm font-medium text-slate-custom-500">
+                <span className="text-sm font-medium text-muted-foreground">
                   mo
                 </span>
               </span>
@@ -408,17 +462,18 @@ export default function SkillGapPage() {
                 -15 days
               </span>
             </div>
-            <p className="text-[10px] text-slate-custom-400 mt-2">
+            <p className="text-[10px] text-muted-foreground mt-2 tracking-wider">
               Based on avg. upskilling velocity
             </p>
           </div>
 
-          <div className="bg-white dark:bg-slate-custom-900 border border-slate-custom-200 dark:border-slate-custom-800 p-4 rounded-lg shadow-sm">
-            <p className="text-[10px] font-bold text-slate-custom-500 uppercase">
+          <div className="bg-card border border-primary/20 p-4 rounded-none relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Market Demand Index
             </p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-black text-orange-500 uppercase">
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-bold font-mono text-orange-500 uppercase">
                 High
               </span>
               <span className="text-[10px] font-bold text-green-600 flex items-center gap-1">
@@ -426,14 +481,15 @@ export default function SkillGapPage() {
                 {randomStats.growth2}%
               </span>
             </div>
-            <p className="text-[10px] text-slate-custom-400 mt-2">
+            <p className="text-[10px] text-muted-foreground mt-2 tracking-wider">
               MOM & SkillsFuture SG verified data
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white dark:bg-slate-custom-900 border border-slate-custom-200 dark:border-slate-custom-800 rounded-lg p-6 shadow-sm flex flex-col relative overflow-hidden">
+          <div className="lg:col-span-2 bg-card border border-primary/20 rounded-none p-6 shadow-sm flex flex-col relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
             <div className="flex items-center justify-between mb-6 z-10">
               <h3 className="text-sm font-bold flex items-center gap-2">
                 <Radar className="text-primary w-5 h-5" /> Skills Competency
@@ -445,7 +501,7 @@ export default function SkillGapPage() {
                   Candidate
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-slate-custom-300"></span>{" "}
+                  <span className="size-2 rounded-full bg-muted-foreground"></span>{" "}
                   Industry Benchmark
                 </div>
               </div>
@@ -456,7 +512,7 @@ export default function SkillGapPage() {
                 className="absolute inset-0 radar-grid opacity-10"
                 style={{
                   backgroundImage:
-                    "radial-gradient(circle, #cfd7e7 1px, transparent 1px)",
+                    "radial-gradient(circle, var(--border) 1px, transparent 1px)",
                 }}
               ></div>
 
@@ -464,16 +520,17 @@ export default function SkillGapPage() {
                 axes={radarData.axes}
                 current={radarData.current}
                 target={radarData.target}
+                gaps={activeGap?.gaps}
               />
 
               {/* Tooltip Example */}
               {activeGap?.gaps[0] && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/4 -translate-y-1/2 bg-white dark:bg-slate-custom-800 border border-slate-custom-200 dark:border-slate-custom-700 p-2 rounded shadow-lg pointer-events-none z-20 hidden md:block">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/4 -translate-y-1/2 bg-card border border-border p-2 rounded shadow-lg pointer-events-none z-20 hidden md:block">
                   <p className="text-[10px] font-bold text-primary mb-1">
                     {activeGap.gaps[0].skill} Node
                   </p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[9px]">
-                    <span className="text-slate-custom-500">
+                    <span className="text-muted-foreground">
                       <span className="font-bold">
                         {activeGap.gaps[0].user_level
                           ? (activeGap.gaps[0].user_level * 5).toFixed(1)
@@ -481,7 +538,7 @@ export default function SkillGapPage() {
                         /5
                       </span>
                     </span>
-                    <span className="text-slate-custom-500">Required:</span>{" "}
+                    <span className="text-muted-foreground">Required:</span>{" "}
                     <span className="font-bold">
                       {activeGap.gaps[0].required_level
                         ? (
@@ -490,7 +547,7 @@ export default function SkillGapPage() {
                         : 0}
                       /5
                     </span>
-                    <span className="text-slate-custom-500">Scarcity:</span>{" "}
+                    <span className="text-muted-foreground">Scarcity:</span>{" "}
                     <span className="font-bold text-orange-500">Critical</span>
                   </div>
                 </div>
@@ -498,11 +555,12 @@ export default function SkillGapPage() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-custom-900 border border-slate-custom-200 dark:border-slate-custom-800 rounded-lg p-6 shadow-sm flex flex-col">
+          <div className="bg-card border border-primary/20 rounded-none p-6 shadow-sm flex flex-col relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
             <h3 className="text-sm font-bold flex items-center gap-2 mb-6">
               <Route className="text-primary w-5 h-5" /> Pathfinder Roadmap
             </h3>
-            <div className="flex-1 relative pl-6 border-l-2 border-slate-custom-100 dark:border-slate-custom-800 space-y-8 overflow-y-auto">
+            <div className="flex-1 relative pl-6 border-l-2 border-primary/20 space-y-8 overflow-y-auto">
               {(activeGap?.gaps.slice(0, 3) || []).map((g, i) => (
                 <div key={i} className="relative">
                   <div
@@ -511,8 +569,8 @@ export default function SkillGapPage() {
                       i === 0
                         ? "bg-primary ring-4 ring-primary/20"
                         : i === 1
-                          ? "border-2 border-primary bg-white dark:bg-slate-custom-900"
-                          : "border-2 border-slate-custom-200 dark:border-slate-custom-700 bg-white dark:bg-slate-custom-900",
+                          ? "border-2 border-primary bg-background"
+                          : "border-2 border-border/30 bg-background",
                     )}
                   >
                     {i === 0 && (
@@ -523,7 +581,7 @@ export default function SkillGapPage() {
                     <span
                       className={cn(
                         "text-[9px] font-bold uppercase tracking-widest",
-                        i === 0 ? "text-primary" : "text-slate-custom-400",
+                        i === 0 ? "text-primary" : "text-muted-foreground",
                       )}
                     >
                       Phase 0{i + 1}: {g.skill}
@@ -531,13 +589,13 @@ export default function SkillGapPage() {
                     <h4 className="text-xs font-bold truncate">
                       Bridging {g.skill} Gap
                     </h4>
-                    <p className="text-[10px] text-slate-custom-500">
+                    <p className="text-[10px] text-muted-foreground">
                       Required competency node for {activeGap.role_title}{" "}
                       target.
                     </p>
                     <div className="mt-2 flex items-center gap-2">
                       {i === 0 ? (
-                        <div className="bg-slate-custom-100 dark:bg-slate-custom-800 px-2 py-0.5 rounded text-[9px] font-medium">
+                        <div className="bg-muted px-2 py-0.5 rounded text-[9px] font-medium">
                           85% Completed
                         </div>
                       ) : i === 1 ? (
@@ -560,7 +618,7 @@ export default function SkillGapPage() {
                 </div>
               ))}
               {(!activeGap?.gaps || activeGap.gaps.length === 0) && (
-                <div className="text-xs text-slate-custom-400 italic">
+                <div className="text-xs text-muted-foreground italic">
                   No roadmap steps found.
                 </div>
               )}
@@ -574,8 +632,9 @@ export default function SkillGapPage() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-custom-900 border border-slate-custom-200 dark:border-slate-custom-800 rounded-lg shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-custom-100 dark:border-slate-custom-800 flex items-center justify-between">
+        <div className="bg-card border border-primary/20 rounded-none shadow-sm overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
+          <div className="px-6 py-4 border-b border-primary/20 flex items-center justify-between">
             <h3 className="text-sm font-bold flex items-center gap-2">
               <Archive className="text-red-500 w-5 h-5" /> Missing Competency
               Nodes
@@ -584,7 +643,7 @@ export default function SkillGapPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-custom-50 dark:bg-slate-custom-800/50 text-[10px] font-bold text-slate-custom-400 uppercase tracking-widest">
+                <tr className="bg-muted/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   <th className="px-6 py-3">Skill Node</th>
                   <th className="px-6 py-3">Current Gap</th>
                   <th className="px-6 py-3 text-center">Severity</th>
@@ -592,13 +651,13 @@ export default function SkillGapPage() {
                   <th className="px-6 py-3">Action</th>
                 </tr>
               </thead>
-              <tbody className="text-xs divide-y divide-slate-custom-100 dark:divide-slate-custom-800">
+              <tbody className="text-xs divide-y divide-primary/10">
                 {/* Placeholder for when no gaps are found */}
                 {(!activeGap?.gaps || activeGap.gaps.length === 0) && (
                   <tr>
                     <td
                       colSpan={5}
-                      className="px-6 py-4 text-center text-slate-custom-400 italic"
+                      className="px-6 py-4 text-center text-muted-foreground italic"
                     >
                       We&apos;ve analyzed your profile against your target role
                       of &quot;Senior ML Engineer&quot; and identified key areas
@@ -610,24 +669,24 @@ export default function SkillGapPage() {
                 {(activeGap?.gaps || []).map((g, i) => {
                   const severityClass =
                     g.gap_severity === "high"
-                      ? "text-red-500 bg-red-100 dark:bg-red-900/30 dark:text-red-400"
+                      ? "text-red-500 bg-red-900/30 dark:bg-red-900/30 dark:text-red-400"
                       : g.gap_severity === "medium"
-                        ? "text-orange-500 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400"
-                        : "text-blue-500 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400";
+                        ? "text-orange-500 bg-orange-900/30 dark:bg-orange-900/30 dark:text-orange-400"
+                        : "text-blue-500 bg-blue-900/30 dark:bg-blue-900/30 dark:text-blue-400";
 
                   return (
                     <tr
                       key={i}
-                      className="hover:bg-slate-custom-50 dark:hover:bg-slate-custom-800/50 transition-colors"
+                      className="hover:bg-muted/20 transition-colors"
                     >
-                      <td className="px-6 py-4 border-r border-slate-custom-100 dark:border-slate-custom-800 whitespace-nowrap">
+                      <td className="px-6 py-4 border-r border-primary/10 whitespace-nowrap">
                         <div className="flex flex-col">
                           <span className="font-bold">{g.skill}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 border-r border-slate-custom-100 dark:border-slate-custom-800 w-[200px]">
+                      <td className="px-6 py-4 border-r border-primary/10 w-[200px]">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-slate-custom-100 dark:bg-slate-custom-800 rounded-full overflow-hidden">
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                             <div
                               className={cn(
                                 "h-full",
@@ -652,7 +711,7 @@ export default function SkillGapPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 border-r border-slate-custom-100 dark:border-slate-custom-800 text-center whitespace-nowrap">
+                      <td className="px-6 py-4 border-r border-primary/10 text-center whitespace-nowrap">
                         <span
                           className={cn(
                             "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase",
@@ -662,7 +721,7 @@ export default function SkillGapPage() {
                           {g.gap_severity}
                         </span>
                       </td>
-                      <td className="px-6 py-4 border-r border-slate-custom-100 dark:border-slate-custom-800 whitespace-nowrap">
+                      <td className="px-6 py-4 border-r border-primary/10 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <TrendingUp className="text-green-500 text-sm w-4 h-4" />
                           <span className="font-medium">High</span>
@@ -684,17 +743,18 @@ export default function SkillGapPage() {
           </div>
         </div>
 
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex gap-4 items-start shrink-0">
-          <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+        <div className="bg-primary/5 border border-primary/20 rounded-none p-4 flex gap-4 items-start shrink-0 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
+          <div className="size-8 rounded-none bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
             <Lightbulb className="w-5 h-5" />
           </div>
           <div className="space-y-1">
-            <h4 className="text-sm font-bold text-primary">
+            <h4 className="text-sm font-bold text-primary uppercase tracking-wider">
               Strategic AI Insight
             </h4>
-            <p className="text-xs text-slate-custom-600 dark:text-slate-custom-400 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed tracking-wider">
               The candidate&apos;s profile is highly aligned with{" "}
-              <span className="font-bold text-slate-custom-800 dark:text-slate-custom-200">
+              <span className="font-bold text-foreground">
                 {activeGap?.role_title}
               </span>{" "}
               requirements at {Math.round((activeGap?.match_score || 0) * 100)}
@@ -707,6 +767,22 @@ export default function SkillGapPage() {
             </p>
           </div>
         </div>
+
+        {/* What-If Analysis Trigger */}
+        {activeGap && (
+          <WhatIfTrigger onClick={() => setShowWhatIf(true)} />
+        )}
+
+        {/* What-If Analysis Modal */}
+        {activeGap && (
+          <WhatIfAnalysis
+            isOpen={showWhatIf}
+            onClose={() => setShowWhatIf(false)}
+            currentMatchScore={Math.round((activeGap.match_score || 0) * 100)}
+            missingSkills={activeGap.gaps || []}
+            roleTitle={activeGap.role_title}
+          />
+        )}
       </div>
     </div>
   );

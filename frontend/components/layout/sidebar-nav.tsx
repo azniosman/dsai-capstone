@@ -86,7 +86,7 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen flex flex-col bg-background-dark border-r border-primary/20 transition-all duration-200 ease-in-out font-mono",
+        "fixed left-0 top-0 z-40 h-screen flex flex-col bg-background border-r border-primary/20 transition-all duration-200 ease-in-out font-mono",
         collapsed ? "w-16" : "w-72",
       )}
     >
@@ -99,17 +99,20 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
       >
         <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary opacity-50"></div>
         <div className="flex items-center gap-3">
-          <div className="size-6 border border-primary bg-primary/10 flex items-center justify-center text-primary shrink-0 shadow-[0_0_8px_rgba(37,157,244,0.4)]">
+          <div className="size-6 border border-primary bg-primary/10 flex items-center justify-center text-primary shrink-0 shadow-[0_0_8px_rgba(37,157,244,0.4)] dark:shadow-[0_0_8px_rgba(37,157,244,0.4)]">
             <Command className="size-3.5" />
           </div>
           {!collapsed && (
-            <h1 className="text-sm font-bold tracking-widest uppercase text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+            <h1 className="text-sm font-bold tracking-widest uppercase text-foreground drop-shadow-sm">
               {tenantConfig.name || "SkillBridge"}
             </h1>
           )}
         </div>
         {!collapsed && (
-          <p className="text-[10px] uppercase tracking-widest text-primary/60 mt-2 flex items-center gap-2">
+          <p className={cn(
+            "text-[10px] uppercase tracking-widest mt-2 flex items-center gap-2",
+            theme === "dark" ? "text-primary/60" : "text-primary/80",
+          )}>
             <span className="w-1.5 h-1.5 bg-primary/40 block"></span>
             Intelligence Platform
           </p>
@@ -140,8 +143,8 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
                       ? "justify-center py-4 border-b border-background/20"
                       : "gap-3 px-8 py-4 border-b border-primary/5",
                     isActive
-                      ? "bg-primary/10 text-primary border-primary shadow-[inset_4px_0_0_0_rgba(37,157,244,1)]"
-                      : "text-slate-400 border-transparent hover:bg-primary/5 hover:text-slate-200 hover:border-primary/50",
+                      ? "bg-primary/10 text-primary border-primary shadow-[inset_4px_0_0_0_rgba(37,157,244,1)] dark:shadow-[inset_4px_0_0_0_rgba(37,157,244,1)]"
+                      : "text-muted-foreground border-transparent hover:bg-primary/5 hover:text-foreground hover:border-primary/50",
                   )}
                 >
                   <item.icon
@@ -180,8 +183,8 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
                       ? "justify-center py-4 border-b border-background/20"
                       : "gap-3 px-8 py-4 border-b border-primary/5",
                     isActive
-                      ? "bg-primary/10 text-primary border-primary shadow-[inset_4px_0_0_0_rgba(37,157,244,1)]"
-                      : "text-slate-400 border-transparent hover:bg-primary/5 hover:text-slate-200 hover:border-primary/50",
+                      ? "bg-primary/10 text-primary border-primary shadow-[inset_4px_0_0_0_rgba(37,157,244,1)] dark:shadow-[inset_4px_0_0_0_rgba(37,157,244,1)]"
+                      : "text-muted-foreground border-transparent hover:bg-primary/5 hover:text-foreground hover:border-primary/50",
                   )}
                 >
                   <item.icon
@@ -202,7 +205,7 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
       {/* Bottom Profile Section */}
       <div
         className={cn(
-          "mt-auto border-t border-primary/20 shrink-0 bg-background-dark/50 relative",
+          "mt-auto border-t border-primary/20 shrink-0 bg-background/50 relative",
           collapsed ? "p-4" : "p-8",
         )}
       >
@@ -222,7 +225,10 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <span className="block text-xs font-bold uppercase tracking-widest text-slate-200 truncate">
+              <span className={cn(
+                "block text-xs font-bold uppercase tracking-widest truncate",
+                theme === "dark" ? "text-slate-200" : "text-slate-800",
+              )}>
                 {userName || "User Profile"}
               </span>
               <span className="text-[10px] tracking-wider text-primary/60">
@@ -236,12 +242,15 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
           <>
             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest mb-2 text-primary/80">
               <span>Sync Index</span>
-              <span className="text-primary drop-shadow-[0_0_3px_rgba(37,157,244,0.8)]">
+              <span className={cn(
+                "text-primary",
+                theme === "dark" ? "drop-shadow-[0_0_3px_rgba(37,157,244,0.8)]" : "",
+              )}>
                 Active
               </span>
             </div>
             <div className="h-px bg-primary/20 w-full relative mb-6">
-              <div className="absolute inset-y-0 left-0 bg-primary w-full shadow-[0_0_5px_rgba(37,157,244,0.5)] transition-all duration-1000"></div>
+              <div className="absolute inset-y-0 left-0 bg-primary w-full shadow-[0_0_5px_rgba(37,157,244,0.5)] dark:shadow-[0_0_5px_rgba(37,157,244,0.5)] transition-all duration-1000"></div>
             </div>
           </>
         )}
@@ -253,8 +262,9 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             title="Toggle theme"
             className={cn(
-              "flex items-center w-full text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-primary transition-colors duration-150 p-2 hover:bg-primary/5",
+              "flex items-center w-full text-[10px] font-bold uppercase tracking-wider transition-colors duration-150 p-2 hover:bg-primary/5",
               collapsed ? "justify-center" : "gap-3",
+              theme === "dark" ? "text-slate-400 hover:text-primary" : "text-slate-600 hover:text-primary",
             )}
           >
             <span className="relative h-4 w-4 shrink-0">

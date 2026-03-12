@@ -9,6 +9,7 @@ import { HeroSection } from "@/components/sections/landing/hero-section";
 import { FeaturesSection } from "@/components/sections/landing/features-section";
 import { MarqueeSection } from "@/components/sections/landing/marquee-section";
 import { FooterSection } from "@/components/sections/landing/footer-section";
+import { DemoChatWidget } from "@/components/landing/demo-chat-widget";
 import ViewLiveMatrixPage from "@/app/view_live_matrix/page";
 
 export default function LandingPage() {
@@ -138,6 +139,9 @@ export default function LandingPage() {
             </div>
           )}
         </AnimatePresence>
+
+        {/* Demo Chat Widget */}
+        <DemoChatWidget />
       </div>
     </div>
   );

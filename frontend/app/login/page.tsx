@@ -197,23 +197,8 @@ function LoginForm() {
 
   if (token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background-dark font-display text-slate-100 selection:bg-primary/30 relative overflow-hidden">
-        <style>{`
-          .cyber-grid {
-            background-image: linear-gradient(to right, rgba(37, 157, 244, 0.05) 1px, transparent 1px),
-                              linear-gradient(to bottom, rgba(37, 157, 244, 0.05) 1px, transparent 1px);
-            background-size: 40px 40px;
-          }
-          .scanline {
-            background: linear-gradient(to bottom, transparent 50%, rgba(37, 157, 244, 0.02) 50%);
-            background-size: 100% 4px;
-          }
-          .frosted {
-            backdrop-filter: blur(12px);
-            background: rgba(11, 14, 20, 0.8);
-          }
-        `}</style>
-        <div className="absolute inset-0 cyber-grid scanline" />
+      <div className="min-h-screen flex items-center justify-center bg-background font-display text-foreground selection:bg-primary/30 relative overflow-hidden">
+        <div className="absolute inset-0 cyber-grid opacity-20" />
 
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -236,7 +221,7 @@ function LoginForm() {
               <h1 className="text-2xl font-bold uppercase tracking-tighter">
                 Connection <br /> Established
               </h1>
-              <p className="font-mono text-xs text-slate-500">
+              <p className="font-mono text-xs text-muted-foreground">
                 ID: {userName || "SYS.ADMIN"}
               </p>
             </div>
@@ -262,24 +247,8 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 selection:bg-primary/30 relative overflow-hidden">
-      <style>{`
-        .cyber-grid {
-          background-image: linear-gradient(to right, rgba(37, 157, 244, 0.05) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(37, 157, 244, 0.05) 1px, transparent 1px);
-          background-size: 40px 40px;
-        }
-        .scanline {
-          background: linear-gradient(to bottom, transparent 50%, rgba(37, 157, 244, 0.02) 50%);
-          background-size: 100% 4px;
-        }
-        .frosted {
-          backdrop-filter: blur(12px);
-          background: rgba(11, 14, 20, 0.8);
-        }
-      `}</style>
-
-      <div className="absolute inset-0 cyber-grid scanline" />
+    <div className="min-h-screen flex bg-background font-display text-foreground selection:bg-primary/30 relative overflow-hidden">
+      <div className="absolute inset-0 cyber-grid opacity-20" />
 
       {/* Header Status Bar Decor */}
       <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-center border-b border-primary/10 z-20">
@@ -314,7 +283,7 @@ function LoginForm() {
                 strokeWidth={1.5}
               />
             </div>
-            <h1 className="text-2xl font-bold tracking-tighter text-center uppercase leading-none text-slate-100">
+            <h1 className="text-2xl font-bold tracking-tighter text-center uppercase leading-none text-foreground">
               Secure Connection
               <br />
               <span className="text-primary">** SKLBR **</span>
@@ -337,13 +306,13 @@ function LoginForm() {
               <TabsList className="flex w-full bg-transparent border-b border-primary/10 rounded-none p-0 mb-6">
                 <TabsTrigger
                   value="login"
-                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500 data-[state=active]:text-primary data-[state=active]:shadow-[0_2px_10px_rgba(37,157,244,0.1)] transition-all"
+                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground data-[state=active]:text-primary data-[state=active]:shadow-[0_2px_10px_rgba(37,157,244,0.1)] transition-all"
                 >
                   AUTH_REQ
                 </TabsTrigger>
                 <TabsTrigger
                   value="register"
-                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500 data-[state=active]:text-primary data-[state=active]:shadow-[0_2px_10px_rgba(37,157,244,0.1)] transition-all"
+                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground data-[state=active]:text-primary data-[state=active]:shadow-[0_2px_10px_rgba(37,157,244,0.1)] transition-all"
                 >
                   INIT_AUTH
                 </TabsTrigger>
@@ -383,7 +352,7 @@ function LoginForm() {
                           type="email"
                           placeholder="sys.admin@sklbr.co"
                           {...loginForm.register("email")}
-                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary placeholder:text-primary/20 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all h-10 font-mono text-xs"
+                          className="rounded-none border-primary/20 bg-muted/30 text-primary placeholder:text-primary/20 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all h-10 font-mono text-xs"
                         />
                         {loginForm.formState.errors.email && (
                           <p className="text-[9px] font-mono text-accent-coral uppercase mt-1 absolute -bottom-4">
@@ -402,7 +371,7 @@ function LoginForm() {
                           id="password"
                           type="password"
                           {...loginForm.register("password")}
-                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all h-10 font-mono text-lg tracking-[0.2em]"
+                          className="rounded-none border-primary/20 bg-muted/30 text-primary focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all h-10 font-mono text-lg tracking-[0.2em]"
                         />
                         {loginForm.formState.errors.password && (
                           <p className="text-[9px] font-mono text-accent-coral uppercase mt-1 absolute -bottom-4">
@@ -446,7 +415,7 @@ function LoginForm() {
                           id="name"
                           placeholder="Your Name"
                           {...registerForm.register("name")}
-                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary placeholder:text-primary/20 focus:border-primary h-10 font-mono text-xs"
+                          className="rounded-none border-primary/20 bg-muted/30 text-primary placeholder:text-primary/20 focus:border-primary h-10 font-mono text-xs"
                         />
                         {registerForm.formState.errors.name && (
                           <p className="text-[9px] font-mono text-accent-coral uppercase absolute right-0 top-0">
@@ -466,7 +435,7 @@ function LoginForm() {
                           type="email"
                           placeholder="agent@sklbr.co"
                           {...registerForm.register("email")}
-                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary placeholder:text-primary/20 focus:border-primary h-10 font-mono text-xs"
+                          className="rounded-none border-primary/20 bg-muted/30 text-primary placeholder:text-primary/20 focus:border-primary h-10 font-mono text-xs"
                         />
                         {registerForm.formState.errors.email && (
                           <p className="text-[9px] font-mono text-accent-coral uppercase absolute right-0 top-0">
@@ -485,7 +454,7 @@ function LoginForm() {
                           id="reg-password"
                           type="password"
                           {...registerForm.register("password")}
-                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary focus:border-primary h-10 font-mono tracking-[0.2em]"
+                          className="rounded-none border-primary/20 bg-muted/30 text-primary focus:border-primary h-10 font-mono tracking-[0.2em]"
                         />
                         {registerForm.formState.errors.password && (
                           <p className="text-[8px] font-mono text-accent-coral uppercase absolute right-0 top-0">
@@ -504,7 +473,7 @@ function LoginForm() {
                           id="reg-confirm"
                           type="password"
                           {...registerForm.register("password_confirm")}
-                          className="rounded-none border-primary/20 bg-slate-950/50 text-primary focus:border-primary h-10 font-mono tracking-[0.2em]"
+                          className="rounded-none border-primary/20 bg-muted/30 text-primary focus:border-primary h-10 font-mono tracking-[0.2em]"
                         />
                         {registerForm.formState.errors.password_confirm && (
                           <p className="text-[8px] font-mono text-accent-coral uppercase absolute right-0 top-0">
@@ -579,7 +548,7 @@ function LoginForm() {
 
       {/* Bottom Nav Bar Integration (Mobile primarily) */}
       <div className="fixed bottom-0 left-0 w-full z-50 md:hidden">
-        <div className="flex gap-2 border-t border-primary/20 bg-background-dark/90 backdrop-blur-md px-4 pb-6 pt-2">
+        <div className="flex gap-2 border-t border-primary/20 bg-card/90 backdrop-blur-md px-4 pb-6 pt-2">
           <Link
             className="flex flex-1 flex-col items-center justify-end gap-1 text-primary/40 hover:text-primary transition-colors"
             href="/recommendations"
@@ -617,7 +586,7 @@ export default function Login() {
   return (
     <Suspense
       fallback={
-        <div className="h-screen flex items-center justify-center bg-background-dark font-mono text-xs text-primary animate-pulse tracking-widest uppercase">
+        <div className="h-screen flex items-center justify-center bg-background font-mono text-xs text-primary animate-pulse tracking-widest uppercase">
           INITIALIZING TERMINAL...
         </div>
       }

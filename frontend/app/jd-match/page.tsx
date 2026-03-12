@@ -58,8 +58,8 @@ export default function JDMatchPage() {
   if (!mounted) return null;
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden h-[calc(100vh-theme(spacing.16))] -m-12 font-mono text-slate-100 bg-background-dark">
-      <header className="flex h-16 items-center justify-between border-b border-primary/20 bg-background-dark px-6 shrink-0 relative">
+    <div className="flex flex-1 flex-col overflow-hidden h-[calc(100vh-theme(spacing.16))] -m-12 font-mono text-foreground bg-background">
+      <header className="flex h-16 items-center justify-between border-b border-primary/20 bg-card px-6 shrink-0 relative">
         <div className="absolute top-0 bottom-0 left-0 w-1 bg-primary/40"></div>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
@@ -96,7 +96,7 @@ export default function JDMatchPage() {
 
       <main className="flex-1 flex overflow-hidden">
         {/* Left Sidebar equivalent */}
-        <aside className="w-[320px] border-r border-primary/20 bg-background-dark/50 flex flex-col p-6 shrink-0 overflow-y-auto relative">
+        <aside className="w-[320px] border-r border-primary/20 bg-card/50 flex flex-col p-6 shrink-0 overflow-y-auto relative">
           <div className="absolute top-0 right-0 w-px h-full bg-linear-to-b from-transparent via-primary/20 to-transparent"></div>
           <div className="mb-8 space-y-4">
             <div>
@@ -104,11 +104,11 @@ export default function JDMatchPage() {
                 <span className="w-1 h-1 bg-primary/50 rounded-full"></span>
                 System Overview
               </p>
-              <h1 className="text-lg font-bold uppercase tracking-widest leading-tight text-white mb-2">
+              <h1 className="text-lg font-bold uppercase tracking-widest leading-tight text-foreground mb-2">
                 Ad-Hoc Match Engine
               </h1>
             </div>
-            <p className="text-[10px] text-slate-400 tracking-wider leading-relaxed font-mono">
+            <p className="text-[10px] text-muted-foreground tracking-wider leading-relaxed font-mono">
               Inject custom job descriptions into the matching engine for
               real-time gap analysis and alignment forecasting.
             </p>
@@ -137,16 +137,16 @@ export default function JDMatchPage() {
                   Engine Ready
                 </span>
                 <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="bg-background-dark border border-primary/20 p-2">
-                    <span className="block text-xl font-bold font-mono text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+                  <div className="bg-card border border-primary/20 p-2">
+                    <span className="block text-xl font-bold font-mono text-foreground drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
                       94.2%
                     </span>
                     <span className="text-[9px] uppercase tracking-widest font-bold text-primary/60">
                       Avg Precision
                     </span>
                   </div>
-                  <div className="bg-background-dark border border-primary/20 p-2">
-                    <span className="block text-xl font-bold font-mono text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+                  <div className="bg-card border border-primary/20 p-2">
+                    <span className="block text-xl font-bold font-mono text-foreground drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
                       &lt;1.2s
                     </span>
                     <span className="text-[9px] uppercase tracking-widest font-bold text-primary/60">
@@ -167,14 +167,14 @@ export default function JDMatchPage() {
                 key={i}
                 className="flex gap-3 p-3 hover:bg-primary/5 transition-colors border-l-2 border-transparent hover:border-primary group"
               >
-                <div className="h-8 w-8 shrink-0 bg-background-dark flex items-center justify-center border border-primary/20 group-hover:border-primary/50 transition-colors">
+                <div className="h-8 w-8 shrink-0 bg-card flex items-center justify-center border border-primary/20 group-hover:border-primary/50 transition-colors">
                   <feature.icon className="w-4 h-4 text-primary/60 group-hover:text-primary" />
                 </div>
                 <div>
-                  <h4 className="text-[11px] font-bold tracking-widest uppercase text-slate-300 group-hover:text-white transition-colors">
+                  <h4 className="text-[11px] font-bold tracking-widest uppercase text-foreground group-hover:text-foreground transition-colors">
                     {feature.title}
                   </h4>
-                  <p className="text-[9px] font-mono tracking-wider text-slate-500 mt-1">
+                  <p className="text-[9px] font-mono tracking-wider text-muted-foreground mt-1">
                     {feature.description}
                   </p>
                 </div>
@@ -184,16 +184,16 @@ export default function JDMatchPage() {
         </aside>
 
         {/* Main Interface Area */}
-        <section className="flex-1 flex flex-col items-center justify-center p-8 bg-background-dark relative overflow-hidden">
+        <section className="flex-1 flex flex-col items-center justify-center p-8 bg-background relative overflow-hidden">
           <div className="absolute inset-0 cyber-grid opacity-20"></div>
           {/* Center Call to action visual */}
-          <div className="max-w-md w-full text-center space-y-8 relative z-10 p-12 border border-primary/20 bg-background-dark/80 backdrop-blur-sm">
+          <div className="max-w-md w-full text-center space-y-8 relative z-10 p-12 border border-primary/20 bg-card/80 backdrop-blur-sm">
             <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary"></div>
             <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-primary"></div>
 
             <div className="relative mx-auto w-32 h-32 flex items-center justify-center">
               <div className="absolute inset-0 bg-primary/10 rounded-full blur-[30px] shadow-[0_0_50px_rgba(37,157,244,0.2)]"></div>
-              <div className="w-20 h-20 bg-background-dark flex items-center justify-center border border-primary/30 relative z-10 shadow-[0_0_15px_rgba(37,157,244,0.15)]">
+              <div className="w-20 h-20 bg-card flex items-center justify-center border border-primary/30 relative z-10 shadow-[0_0_15px_rgba(37,157,244,0.15)]">
                 <ScanLine className="w-8 h-8 text-primary drop-shadow-[0_0_8px_rgba(37,157,244,0.8)]" />
               </div>
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full border border-primary/20 rounded-full animate-[spin_10s_linear_infinite]"></div>
@@ -201,10 +201,10 @@ export default function JDMatchPage() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-sm font-bold tracking-widest uppercase text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+              <h3 className="text-sm font-bold tracking-widest uppercase text-foreground drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
                 Input Job Description
               </h3>
-              <p className="text-[11px] font-mono tracking-wider text-slate-400 max-w-sm mx-auto leading-relaxed">
+              <p className="text-[11px] font-mono tracking-wider text-muted-foreground max-w-sm mx-auto leading-relaxed">
                 Paste a target JD to analyze your alignment and generate an
                 immediate gap-bridging roadmap.
               </p>

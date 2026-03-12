@@ -125,23 +125,11 @@ export default function AccountSettings() {
     );
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 selection:bg-primary/30 overflow-x-hidden">
-      <style>{`
-        .cyber-grid {
-          background-image: linear-gradient(to right, rgba(37, 157, 244, 0.05) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(37, 157, 244, 0.05) 1px, transparent 1px);
-          background-size: 20px 20px;
-        }
-        .scanline {
-          background: linear-gradient(to bottom, transparent 50%, rgba(37, 157, 244, 0.02) 50%);
-          background-size: 100% 4px;
-        }
-      `}</style>
-
-      <div className="absolute inset-0 cyber-grid scanline pointer-events-none z-0"></div>
+    <div className="relative flex min-h-screen flex-col bg-background font-display text-foreground selection:bg-primary/30 overflow-x-hidden">
+      <div className="absolute inset-0 cyber-grid opacity-20 pointer-events-none z-0"></div>
 
       {/* Header */}
-      <header className="relative z-10 flex items-center bg-background-dark/80 backdrop-blur-md border-b border-primary/20 p-4 justify-between sticky top-0">
+      <header className="relative z-10 flex items-center bg-card/80 backdrop-blur-md border-b border-primary/20 p-4 justify-between sticky top-0">
         <Link
           href="/dashboard"
           className="text-primary flex size-10 shrink-0 items-center justify-center hover:bg-primary/10 transition-colors"
@@ -173,13 +161,13 @@ export default function AccountSettings() {
           <TabsList className="flex flex-wrap h-auto bg-transparent border-b border-primary/10 w-full justify-start rounded-none mb-10 overflow-x-auto gap-2 sm:gap-4 no-scrollbar">
             <TabsTrigger
               value="profile"
-              className="shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent px-4 pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-slate-500 data-[state=active]:text-primary transition-all font-mono"
+              className="shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent px-4 pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground data-[state=active]:text-primary transition-all font-mono"
             >
               ENTITY_PROFILE
             </TabsTrigger>
             <TabsTrigger
               value="security"
-              className="shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent px-4 pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-slate-500 data-[state=active]:text-primary transition-all font-mono"
+              className="shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary bg-transparent px-4 pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground data-[state=active]:text-primary transition-all font-mono"
             >
               SECURITY_ENCLAVE
             </TabsTrigger>
@@ -206,12 +194,12 @@ export default function AccountSettings() {
 
                   <form
                     onSubmit={handleAccountUpdate}
-                    className="space-y-6 bg-(--card-dark) p-6 border border-primary/10"
+                    className="space-y-6 bg-card p-6 border border-primary/10"
                   >
                     <div className="space-y-2">
                       <Label
                         htmlFor="name"
-                        className="block text-[10px] font-bold text-slate-400 font-mono tracking-widest uppercase"
+                        className="block text-[10px] font-bold text-muted-foreground font-mono tracking-widest uppercase"
                       >
                         NODE_DESIGNATION
                       </Label>
@@ -222,13 +210,13 @@ export default function AccountSettings() {
                         onChange={(e) =>
                           setAccount({ ...account, name: e.target.value })
                         }
-                        className="w-full bg-slate-900 border border-primary/20 text-primary p-3 focus:border-primary focus:ring-1 focus:ring-primary rounded-none font-mono text-sm uppercase transition-colors"
+                        className="w-full bg-muted/30 border border-primary/20 text-primary p-3 focus:border-primary focus:ring-1 focus:ring-primary rounded-none font-mono text-sm uppercase transition-colors"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label
                         htmlFor="email"
-                        className="block text-[10px] font-bold text-slate-400 font-mono tracking-widest uppercase"
+                        className="block text-[10px] font-bold text-muted-foreground font-mono tracking-widest uppercase"
                       >
                         PRIMARY_COMMS
                       </Label>
@@ -240,7 +228,7 @@ export default function AccountSettings() {
                         onChange={(e) =>
                           setAccount({ ...account, email: e.target.value })
                         }
-                        className="w-full bg-slate-900 border border-primary/20 text-primary p-3 focus:border-primary focus:ring-1 focus:ring-primary rounded-none font-mono text-sm uppercase transition-colors"
+                        className="w-full bg-muted/30 border border-primary/20 text-primary p-3 focus:border-primary focus:ring-1 focus:ring-primary rounded-none font-mono text-sm uppercase transition-colors"
                       />
                     </div>
                     <Button

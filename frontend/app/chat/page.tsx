@@ -21,6 +21,7 @@ import {
   type CareerIntelligence,
 } from "@/lib/api";
 import { useModalStore } from "@/store/modalStore";
+import { RAGContextPanel, type RetrievedChunk } from "@/components/ui/rag-context-panel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,7 @@ interface Message {
   time: string;
   isLoading?: boolean;
   isStructured?: boolean;
+  chunks?: RetrievedChunk[];
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -702,6 +704,10 @@ export default function CopilotChatPage() {
                       )}
                     </div>
                   </div>
+                  {/* RAG Context Panel */}
+                  {msg.chunks && msg.chunks.length > 0 && (
+                    <RAGContextPanel chunks={msg.chunks} />
+                  )}
                 </>
               ) : (
                 <>
