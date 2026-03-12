@@ -79,8 +79,19 @@ export function DemoChatWidget() {
     setIsLoading(true);
 
     try {
+      // Build messages array for API (exclude welcome message)
+      const apiMessages = messages
+        .filter(m => m.id !== 'welcome')
+        .map(m => ({
+          role: m.role,
+          content: m.content,
+        }));
+      
+      // Add the new user message
+      apiMessages.push({ role: 'user' as const, content: content.trim() });
+
       const response = await api.post("/api/chat", {
-        message: content.trim(),
+        messages: apiMessages,
       });
 
       const aiMessage: ChatMessage = {
@@ -93,6 +104,7 @@ export function DemoChatWidget() {
 
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
+      console.error('Chat error:', error);
       const errorMessage: ChatMessage = {
         id: `error-${Date.now()}`,
         role: "ai",
