@@ -3,6 +3,7 @@ import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { TenantProvider } from "@/contexts/tenant-context";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { DemoModeProvider } from "@/contexts/demo-mode";
 import ErrorBoundary from "@/components/layout/error-boundary";
 import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
@@ -45,17 +46,19 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          <QueryProvider>
-            <AuthProvider>
-              <TenantProvider>
-                <ErrorBoundary>
-                  <AppShell>{children}</AppShell>
-                  <ModalProvider />
-                  <Toaster />
-                </ErrorBoundary>
-              </TenantProvider>
-            </AuthProvider>
-          </QueryProvider>
+          <DemoModeProvider>
+            <QueryProvider>
+              <AuthProvider>
+                <TenantProvider>
+                  <ErrorBoundary>
+                    <AppShell>{children}</AppShell>
+                    <ModalProvider />
+                    <Toaster />
+                  </ErrorBoundary>
+                </TenantProvider>
+              </AuthProvider>
+            </QueryProvider>
+          </DemoModeProvider>
         </ThemeProvider>
       </body>
     </html>

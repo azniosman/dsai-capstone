@@ -225,7 +225,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                       <div className="text-3xl font-bold font-mono text-primary drop-shadow-[0_0_8px_rgba(37,157,244,0.4)]">
-                        {(topRec.score * 100).toFixed(0)}%
+                        {(topRec.match_score * 100).toFixed(0)}%
                       </div>
                       <div className="text-[9px] text-muted-foreground uppercase tracking-widest mt-1">
                         Match Score

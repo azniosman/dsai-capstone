@@ -24,6 +24,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useTenant } from "@/contexts/tenant-context";
+import { useDemoMode } from "@/contexts/demo-mode";
 import api from "@/lib/api-client";
 
 const CORE_NAV = [
@@ -55,6 +56,7 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { tenantConfig } = useTenant();
+  const { isDemoMode, toggleDemoMode, loadDemoProfile } = useDemoMode();
 
   const userName =
     typeof window !== "undefined" ? localStorage.getItem("userName") : null;
@@ -81,6 +83,13 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
     }
     localStorage.clear();
     router.push("/login");
+  };
+
+  const handleDemoModeToggle = async () => {
+    if (!isDemoMode) {
+      await loadDemoProfile();
+    }
+    toggleDemoMode();
   };
 
   return (
@@ -116,6 +125,13 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
             <span className="w-1.5 h-1.5 bg-primary/40 block"></span>
             Intelligence Platform
           </p>
+        )}
+        {/* Demo Mode Badge */}
+        {isDemoMode && !collapsed && (
+          <div className="mt-3 px-3 py-1.5 bg-primary/10 border border-primary/30 rounded text-[9px] font-bold text-primary uppercase tracking-wider flex items-center gap-2">
+            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></span>
+            Demo Mode Active
+          </div>
         )}
       </div>
 
@@ -273,6 +289,33 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
             </span>
             {!collapsed && (
               <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+            )}
+          </button>
+
+          {/* Demo Mode Toggle */}
+          <button
+            onClick={handleDemoModeToggle}
+            title="Toggle demo mode"
+            className={cn(
+              "flex items-center w-full text-[10px] font-bold uppercase tracking-wider transition-colors duration-150 p-2 hover:bg-primary/5",
+              collapsed ? "justify-center" : "gap-3",
+              isDemoMode ? "text-primary" : "text-slate-400 hover:text-primary",
+            )}
+          >
+            <span className="relative h-4 w-4 shrink-0">
+              {isDemoMode ? (
+                <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 6v6l4 2" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                </svg>
+              )}
+            </span>
+            {!collapsed && (
+              <span>{isDemoMode ? "Exit Demo" : "Demo Mode"}</span>
             )}
           </button>
 
