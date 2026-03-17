@@ -3,27 +3,26 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
-  TrendingUp,
-  BrainCircuit,
-  Database,
-  Briefcase,
-  ChevronRight,
   Share2,
-  Waves,
-  ArrowUp,
-  ArrowDown,
-  Users,
-  GraduationCap,
-  Plus,
-  Minus,
+  Award,
+  Target,
+  Zap,
+  Briefcase,
+  Database,
+  Cpu,
+  TrendingUp,
+  Activity,
   Layers,
-  FlaskConical,
-  Trophy,
-  Scale,
 } from "lucide-react";
 import api from "@/lib/api-client";
 import { motion, Variants } from "framer-motion";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import SkillChip from "@/components/ui/skill-chip";
+import { SkillRadar } from "@/components/ui/skill-radar";
+import SkeletonCard from "@/components/ui/skeleton-card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -44,11 +43,11 @@ const itemVariants: Variants = {
   },
 };
 
-const satelliteCoords = [
-  { cx: "40%", cy: "30%" },
-  { cx: "60%", cy: "40%" },
-  { cx: "35%", cy: "65%" },
-  { cx: "65%", cy: "70%" },
+const METRIC_ICONS = [
+  { icon: Layers, label: "Total Skills", key: "skills_count" as const },
+  { icon: Activity, label: "Career Readiness", key: "career_readiness" as const, isPercent: true },
+  { icon: Briefcase, label: "Opportunities", key: "recommendations_count" as const },
+  { icon: Database, label: "Skill Gaps", key: "gaps_identified" as const, isNegative: true },
 ];
 
 export default function Dashboard() {
@@ -58,7 +57,7 @@ export default function Dashboard() {
     router.push("/login");
   }
 
-  const { data: summary } = useQuery({
+  const { data: summary, isLoading: isLoadingSummary } = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: async () => {
       const res = await api.get("/api/dashboard/summary");
@@ -69,694 +68,326 @@ export default function Dashboard() {
     },
   });
 
-  const { data: topRec } = useQuery({
+  const { data: recommendationsData, isLoading: isLoadingRecs } = useQuery({
     queryKey: ["dashboard-recommendations", summary?.profile_id],
     enabled: !!summary?.profile_id,
     queryFn: async () => {
       const res = await api.post("/api/recommend", {
         profile_id: summary.profile_id,
       });
-      const recs = res.data?.recommendations || [];
-      return recs.length > 0 ? recs[0] : null;
+      return res.data;
     },
   });
 
-  const skillsToShow: string[] = topRec?.matched_skills?.slice(0, 4) || [
-    "Python",
-    "PyTorch",
-    "MLOps",
-    "SQL",
-  ];
-  const topRoleTitle: string = topRec?.title || "Senior Data Scientist";
+  const topRecs = recommendationsData?.recommendations || [];
+  const topRec = topRecs.length > 0 ? topRecs[0] : null;
+
+  if (isLoadingSummary) {
+    return (
+      <div className="flex flex-1 overflow-hidden h-screen bg-background p-6 pt-16 font-mono">
+        <main className="flex-1 flex flex-col space-y-6">
+          <Skeleton className="h-12 w-1/3 bg-muted/30" />
+          <div className="grid grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-32 bg-card border border-primary/20" />
+            ))}
+          </div>
+          <SkeletonCard count={2} />
+        </main>
+      </div>
+    );
+  }
+
+  const userSkills: string[] = summary?.skills || [];
+  const name = summary?.name || "User";
 
   return (
-    <div className="flex flex-1 overflow-hidden h-screen -m-12 bg-background-dark font-display text-slate-100 p-6 pt-16">
-      <main className="flex-1 flex flex-col overflow-hidden text-slate-100">
+    <div className="flex flex-1 overflow-y-auto h-screen bg-background font-mono -m-12 p-12">
+      <main className="flex-1 flex flex-col max-w-7xl mx-auto space-y-8">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-background-dark border-b border-primary/20 p-4 flex items-center justify-between pb-6"
+          className="flex items-center justify-between border-b border-primary/20 pb-6"
         >
-          <div>
-            <div className="flex items-center gap-2 text-[10px] text-primary/60 mb-1 font-mono uppercase tracking-widest">
-              <span>Projects</span> <ChevronRight className="w-3.5 h-3.5" />
-              <span>Singapore</span> <ChevronRight className="w-3.5 h-3.5" />
-              <span className="text-primary">Executive Summary</span>
-            </div>
-            <h2 className="text-xl font-bold tracking-tight text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]">
-              SINGAPORE TECH INSIGHTS
-            </h2>
-          </div>
           <div className="flex items-center gap-4">
-            <div className="flex bg-background-dark/50 border border-primary/30 p-0.5 relative z-10">
-              <button className="px-4 py-1.5 text-[10px] font-mono font-bold uppercase tracking-widest bg-primary/20 text-primary border border-primary/50 shadow-[0_0_10px_rgba(37,157,244,0.2)]">
-                Grid View
-              </button>
-              <button className="px-4 py-1.5 text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 hover:text-primary transition-colors">
-                Flow View
-              </button>
+            <div className="bg-primary/10 border border-primary p-2 text-primary shadow-[0_0_8px_rgba(37,157,244,0.4)]">
+              <Cpu className="w-5 h-5" />
             </div>
-            <button className="px-4 py-1.5 border border-primary/30 text-[10px] font-mono font-bold uppercase tracking-widest bg-background-dark text-primary flex items-center gap-2 hover:bg-primary/10 transition-colors">
+            <div>
+              <h2 className="text-lg font-bold tracking-widest uppercase text-foreground">
+                Entity Dashboard
+              </h2>
+              <p className="text-[10px] text-muted-foreground tracking-wider mt-1">
+                Welcome back, {name}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="rounded-none border-primary/30 text-primary hover:bg-primary/10 text-[10px] uppercase tracking-widest h-10 px-4"
+            >
               <Share2 className="w-3.5 h-3.5" />
               Export
-            </button>
+            </Button>
+            <Button
+              onClick={() => router.push("/recommendations")}
+              className="rounded-none bg-primary/10 border border-primary text-primary hover:bg-primary hover:text-background-dark text-[10px] uppercase tracking-widest h-10 px-4 shadow-[0_0_10px_rgba(37,157,244,0.2)]"
+            >
+              <Target className="w-3.5 h-3.5" />
+              View All
+            </Button>
           </div>
         </motion.div>
 
+        {/* Metric Cards */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="flex-1 overflow-y-auto pt-6 space-y-4 data-grid cyber-grid pr-4"
-          style={
-            { "--grid-color": "rgba(37,157,244,0.05)" } as React.CSSProperties
-          }
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
         >
-          <div className="grid grid-cols-4 gap-4">
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4 }}
-              className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm"
-            >
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors"></div>
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors"></div>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-mono font-bold text-primary/70 uppercase tracking-widest">
-                  Market Liquidity
-                </span>
-                <Waves className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
-              </div>
-              <div className="flex items-baseline gap-2">
-                <AnimatedCounter
-                  value={84.2}
-                  decimals={1}
-                  className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]"
-                />
-                <span className="text-[10px] text-primary font-bold bg-primary/10 px-1 border border-primary/20 flex items-center gap-1 font-mono">
-                  <ArrowUp className="w-3 h-3" />
-                  2.4%
-                </span>
-              </div>
-              <div className="w-full bg-background-dark/80 h-1 mt-4 overflow-hidden border border-primary/20">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: "84%" }}
-                  transition={{ duration: 1.5, ease: "easeOut" }}
-                  className="bg-primary h-full shadow-[0_0_8px_rgba(37,157,244,0.8)]"
-                ></motion.div>
-              </div>
-            </motion.div>
+          {METRIC_ICONS.map((metric, i) => {
+            const Icon = metric.icon;
+            const value = summary?.[metric.key] || 0;
+            return (
+              <motion.div key={i} variants={itemVariants}>
+                <div className="bg-card border border-primary/20 p-4 relative overflow-hidden group hover:border-primary/40 transition-all">
+                  <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
+                  <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/30"></div>
+                  
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">
+                      {metric.label}
+                    </span>
+                    <div className="bg-primary/10 border border-primary/20 p-1.5">
+                      <Icon className="w-3.5 h-3.5 text-primary/70" />
+                    </div>
+                  </div>
+                  
+                  <div className="text-2xl font-bold font-mono text-foreground drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+                    {metric.isPercent ? (
+                      <>
+                        <AnimatedCounter value={value} decimals={1} />
+                        <span className="text-lg text-primary">%</span>
+                      </>
+                    ) : metric.isNegative ? (
+                      <span className="text-destructive">
+                        <AnimatedCounter value={value} />
+                      </span>
+                    ) : (
+                      <AnimatedCounter value={value} />
+                    )}
+                  </div>
+                  
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_5px_rgba(37,157,244,0.8)]"></div>
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
+                      {metric.isNegative ? "Requires attention" : "Live data"}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </motion.div>
 
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4 }}
-              className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm"
-            >
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors"></div>
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors"></div>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-mono font-bold text-primary/70 uppercase tracking-widest">
-                  Skill Demand Index
-                </span>
-                <TrendingUp className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
+        {/* Main Content Grid */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
+          {/* Left Column - Top Recommendation */}
+          <div className="lg:col-span-2 space-y-6">
+            <motion.div variants={itemVariants}>
+              <div className="flex items-center gap-2 mb-4">
+                <Target className="w-4 h-4 text-primary" />
+                <h3 className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">
+                  Top Recommendation
+                </h3>
               </div>
-              <div className="flex items-baseline gap-2">
-                <AnimatedCounter
-                  value={128.5}
-                  decimals={1}
-                  className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]"
-                />
-                <span className="text-[10px] text-accent-coral font-bold bg-accent-coral/10 px-1 border border-accent-coral/20 flex items-center gap-1 font-mono animate-pulse">
-                  <ArrowDown className="w-3 h-3" />
-                  1.2%
-                </span>
-              </div>
-              <div className="w-full bg-background-dark/80 h-1 mt-4 overflow-hidden border border-primary/20">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: "65%" }}
-                  transition={{ duration: 1.5, ease: "easeOut", delay: 0.1 }}
-                  className="bg-accent-coral h-full shadow-[0_0_8px_rgba(239,68,68,0.8)]"
-                ></motion.div>
-              </div>
-            </motion.div>
 
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4 }}
-              className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm"
-            >
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors"></div>
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors"></div>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-mono font-bold text-primary/70 uppercase tracking-widest">
-                  Total Talent Pool
-                </span>
-                <Users className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
-              </div>
-              <div className="flex items-baseline gap-2">
-                <AnimatedCounter
-                  value={42400}
-                  className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]"
-                />
-                <span className="text-[10px] text-primary font-bold bg-primary/10 px-1 border border-primary/20 flex items-center gap-1 font-mono">
-                  <ArrowUp className="w-3 h-3" />
-                  5.8%
-                </span>
-              </div>
-              <div className="flex gap-1 mt-4">
-                <motion.div
-                  initial={{ scaleY: 0 }}
-                  animate={{ scaleY: 1 }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                  className="w-1/4 h-1 bg-primary origin-left shadow-[0_0_8px_rgba(37,157,244,0.8)]"
-                ></motion.div>
-                <motion.div
-                  initial={{ scaleY: 0 }}
-                  animate={{ scaleY: 1 }}
-                  transition={{ duration: 0.5, delay: 0.3 }}
-                  className="w-1/4 h-1 bg-primary origin-left shadow-[0_0_8px_rgba(37,157,244,0.8)]"
-                ></motion.div>
-                <div className="w-1/4 h-1 bg-primary/20"></div>
-                <div className="w-1/4 h-1 bg-primary/10"></div>
-              </div>
-            </motion.div>
+              {isLoadingRecs ? (
+                <SkeletonCard count={1} />
+              ) : topRec ? (
+                <div className="bg-card border border-primary/20 p-6 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-[50px] pointer-events-none"></div>
+                  
+                  <div className="flex items-start justify-between mb-6 relative z-10">
+                    <div>
+                      <h4 className="text-lg font-bold text-primary tracking-tight">{topRec.title}</h4>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">
+                        {topRec.category}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold font-mono text-primary drop-shadow-[0_0_8px_rgba(37,157,244,0.4)]">
+                        {(topRec.match_score * 100).toFixed(0)}%
+                      </div>
+                      <div className="text-[9px] text-muted-foreground uppercase tracking-widest mt-1">
+                        Match Score
+                      </div>
+                    </div>
+                  </div>
 
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4 }}
-              className="bg-background-dark/60 border border-primary/30 p-4 hover:border-primary hover:shadow-[0_0_15px_rgba(37,157,244,0.3)] transition-all relative group backdrop-blur-sm"
-            >
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors"></div>
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors"></div>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-mono font-bold text-primary/70 uppercase tracking-widest">
-                  Avg. Upskilling Rate
-                </span>
-                <GraduationCap className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
-              </div>
-              <div className="flex items-baseline gap-2">
-                <AnimatedCounter
-                  value={14.7}
-                  decimals={1}
-                  suffix="%"
-                  className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]"
-                />
-                <span className="text-[10px] text-slate-400 font-bold bg-slate-800/50 px-1 border border-slate-700 flex items-center font-mono">
-                  STABLE
-                </span>
-              </div>
-              <div className="w-full bg-background-dark/80 h-1 mt-4 overflow-hidden border border-primary/20">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: "14%" }}
-                  transition={{ duration: 1.5, ease: "easeOut", delay: 0.3 }}
-                  className="bg-slate-400 h-full"
-                ></motion.div>
-              </div>
+                  {topRec.metrics && (
+                    <SkillRadar
+                      data={topRec.metrics.skill_gaps?.map((gap: { skill: string; profile_level: number; required_level: number; }) => ({
+                        subject: gap.skill,
+                        current: gap.profile_level * 100,
+                        required: gap.required_level * 100,
+                        fullMark: 100
+                      })) || []}
+                      roleName={topRec.title}
+                      metrics={topRec.metrics}
+                    />
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4 mt-6">
+                    <div>
+                      <div className="text-[9px] font-bold text-primary/50 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <span className="w-1 h-1 bg-primary/50 rounded-full"></span>
+                        Matched Skills
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {topRec.matched_skills?.slice(0, 6).map((skill: string) => (
+                          <SkillChip key={skill} skill={skill} severity="none" />
+                        ))}
+                        {topRec.matched_skills?.length > 6 && (
+                          <Badge variant="outline" className="rounded-none border-primary/30 text-primary text-[9px] uppercase tracking-wider">
+                            +{topRec.matched_skills.length - 6}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    {topRec.missing_skills?.length > 0 && (
+                      <div>
+                        <div className="text-[9px] font-bold text-accent-coral/50 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <span className="w-1 h-1 bg-accent-coral/50 rounded-full"></span>
+                          Skills to Learn
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {topRec.missing_skills.slice(0, 6).map((skill: string) => (
+                            <SkillChip key={skill} skill={skill} severity="high" />
+                          ))}
+                          {topRec.missing_skills.length > 6 && (
+                            <Badge variant="outline" className="rounded-none border-accent-coral/30 text-accent-coral text-[9px] uppercase tracking-wider">
+                              +{topRec.missing_skills.length - 6}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-card/50 border border-primary/20 p-12 text-center relative">
+                  <div className="absolute inset-0 cyber-grid opacity-10"></div>
+                  <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <h4 className="text-sm font-bold text-foreground uppercase tracking-widest">No Recommendations</h4>
+                  <p className="text-[10px] text-muted-foreground mt-2 tracking-wider">
+                    Update your profile to see tailored opportunities
+                  </p>
+                  <Button
+                    onClick={() => router.push("/profile")}
+                    className="mt-6 rounded-none bg-primary/10 border border-primary text-primary hover:bg-primary hover:text-background-dark text-[10px] uppercase tracking-widest"
+                  >
+                    Update Profile
+                  </Button>
+                </div>
+              )}
             </motion.div>
           </div>
 
-          <motion.div
-            variants={itemVariants}
-            className="grid grid-cols-3 gap-6 h-[400px]"
-          >
-            <div className="col-span-2 bg-background-dark/60 backdrop-blur-sm border border-primary/30 flex flex-col overflow-hidden relative group">
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors z-10"></div>
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors z-10"></div>
-              <div className="p-4 border-b border-primary/20 flex items-center justify-between">
-                <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary">
-                  Talent Graph: Role-to-Skill Connectivity
-                </h3>
+          {/* Right Column - Profile Summary */}
+          <div className="space-y-6">
+            {/* Skills */}
+            <motion.div variants={itemVariants}>
+              <div className="bg-card border border-primary/20 p-4 relative">
+                <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/30"></div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Layers className="w-4 h-4 text-primary" />
+                  <h4 className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">
+                    Your Skills
+                  </h4>
+                </div>
+                {userSkills.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {userSkills.map((skill) => (
+                      <SkillChip key={skill} skill={skill} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-[10px] text-muted-foreground uppercase tracking-wider border border-dashed border-primary/20">
+                    No skills added
+                  </div>
+                )}
               </div>
-              <div className="flex-1 relative bg-background-dark overflow-hidden flex items-center justify-center">
-                <svg className="w-full h-full opacity-60">
-                  <pattern
-                    height="40"
-                    id="grid-pattern-graph"
-                    patternUnits="userSpaceOnUse"
-                    width="40"
-                    x="0"
-                    y="0"
+            </motion.div>
+
+            {/* Profile Details */}
+            <motion.div variants={itemVariants}>
+              <div className="bg-card border border-primary/20 p-4 relative">
+                <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/30"></div>
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  <h4 className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">
+                    Profile Details
+                  </h4>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-primary/10">
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Experience</span>
+                    <span className="text-sm font-bold text-foreground font-mono">{summary?.years_experience || 0} Years</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-primary/10">
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Education</span>
+                    <span className="text-sm font-bold text-foreground font-mono">{summary?.education || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Career Switcher</span>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${summary?.is_career_switcher ? "bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]" : "bg-muted-foreground"}`}></div>
+                      <span className="text-sm font-bold text-foreground font-mono">{summary?.is_career_switcher ? "Yes" : "No"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Quick Actions */}
+            <motion.div variants={itemVariants}>
+              <div className="bg-card/50 border border-primary/20 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Activity className="w-4 h-4 text-primary" />
+                  <h4 className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">
+                    Quick Actions
+                  </h4>
+                </div>
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => router.push("/skill-gap")}
+                    className="w-full rounded-none bg-transparent border border-primary/30 text-primary hover:bg-primary/10 text-[10px] uppercase tracking-widest h-9 justify-start"
                   >
-                    <path
-                      d="M 40 0 L 0 0 0 40"
-                      fill="none"
-                      stroke="rgba(37,157,244,0.05)"
-                      strokeWidth="1"
-                    />
-                  </pattern>
-                  <rect
-                    fill="url(#grid-pattern-graph)"
-                    height="100%"
-                    width="100%"
-                  ></rect>
-                  <circle
-                    cx="50%"
-                    cy="50%"
-                    fill="none"
-                    r="80"
-                    stroke="#259df4"
-                    strokeDasharray="4"
-                    strokeWidth="1"
-                    opacity="0.5"
-                  ></circle>
-                  <circle
-                    cx="50%"
-                    cy="50%"
-                    fill="none"
-                    r="140"
-                    stroke="#259df4"
-                    strokeDasharray="8"
-                    strokeWidth="0.5"
-                    opacity="0.3"
-                  ></circle>
-                  <g className="nodes">
-                    <circle
-                      cx="50%"
-                      cy="50%"
-                      fill="#259df4"
-                      r="6"
-                      style={{
-                        filter: "drop-shadow(0 0 8px rgba(37,157,244,0.8))",
-                      }}
-                    ></circle>
-                    {skillsToShow.map((skill, index) => {
-                      const coord =
-                        satelliteCoords[index % satelliteCoords.length];
-                      return (
-                        <motion.g
-                          key={`node-${index}`}
-                          initial={{ opacity: 0, scale: 0 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{
-                            delay: 0.5 + index * 0.1,
-                            type: "spring",
-                          }}
-                        >
-                          <motion.circle
-                            animate={{
-                              scale: [1, 1.3, 1],
-                              opacity: [0.8, 1, 0.8],
-                            }}
-                            transition={{
-                              duration: 2,
-                              repeat: Infinity,
-                              repeatType: "reverse",
-                              delay: index * 0.2,
-                            }}
-                            cx={coord.cx}
-                            cy={coord.cy}
-                            fill="#259df4"
-                            r="4"
-                            opacity="0.8"
-                            style={{
-                              transformOrigin: `${coord.cx} ${coord.cy}`,
-                            }}
-                          ></motion.circle>
-                          <line
-                            stroke="#259df4"
-                            strokeWidth="1"
-                            x1="50%"
-                            x2={coord.cx}
-                            y1="50%"
-                            y2={coord.cy}
-                            opacity="0.6"
-                          ></line>
-                          <text
-                            x={coord.cx}
-                            y={coord.cy}
-                            dy="-10"
-                            dx={index % 2 === 0 ? "-20" : "10"}
-                            fill="#259df4"
-                            fontSize="8"
-                            fontFamily="monospace"
-                            className="uppercase tracking-widest opacity-80"
-                          >
-                            {skill}
-                          </text>
-                        </motion.g>
-                      );
-                    })}
-                  </g>
-                </svg>
-                <div className="absolute inset-0 flex flex-col p-4 pointer-events-none">
-                  <div className="mt-auto bg-background-dark/90 backdrop-blur-md border border-primary/40 p-3 w-max self-end pointer-events-auto relative max-w-[200px]">
-                    <div className="absolute top-0 right-0 w-1.5 h-1.5 border-t border-r border-primary"></div>
-                    <div className="absolute bottom-0 left-0 w-1.5 h-1.5 border-b border-l border-primary"></div>
-                    <div className="text-[9px] font-mono font-bold text-primary/60 uppercase tracking-widest mb-2 border-b border-primary/20 pb-1">
-                      TOP MATCHED ROLE
-                    </div>
-                    <div className="text-sm font-bold text-white drop-shadow-[0_0_8px_rgba(37,157,244,0.6)] truncate">
-                      {topRoleTitle}
-                    </div>
-                    <div className="flex gap-2 mt-2 font-mono flex-wrap">
-                      {skillsToShow.map((skill) => (
-                        <span
-                          key={skill}
-                          className="text-[9px] px-1 bg-primary/20 text-primary border border-primary/30 uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="absolute top-4 left-4 flex flex-col gap-1 pointer-events-auto">
-                  <div className="bg-background-dark/80 border border-primary/30 p-1 flex flex-col gap-1 backdrop-blur-sm">
-                    <button className="w-6 h-6 flex items-center justify-center hover:bg-primary/20 text-primary transition-colors">
-                      <Plus className="w-4 h-4" />
-                    </button>
-                    <button className="w-6 h-6 flex items-center justify-center hover:bg-primary/20 text-primary transition-colors">
-                      <Minus className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <button className="bg-background-dark/80 backdrop-blur-sm border border-primary/30 w-8 h-8 mt-2 flex items-center justify-center hover:bg-primary/20 text-primary transition-colors">
-                    <Layers className="w-4 h-4" />
-                  </button>
+                    <TrendingUp className="w-3.5 h-3.5 mr-2" />
+                    Skill Gap Analysis
+                  </Button>
+                  <Button
+                    onClick={() => router.push("/roadmap")}
+                    className="w-full rounded-none bg-transparent border border-primary/30 text-primary hover:bg-primary/10 text-[10px] uppercase tracking-widest h-9 justify-start"
+                  >
+                    <Layers className="w-3.5 h-3.5 mr-2" />
+                    Learning Path
+                  </Button>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-background-dark/60 backdrop-blur-sm border border-primary/30 flex flex-col overflow-hidden relative group">
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors z-10"></div>
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors z-10"></div>
-              <div className="p-4 border-b border-primary/20 flex items-center justify-between">
-                <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary">
-                  High-Demand Skills
-                </h3>
-                <span className="text-[10px] font-mono text-slate-custom-400">
-                  N=2,482
-                </span>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                <table className="w-full text-xs text-left text-slate-300 border-white/5">
-                  <thead className="bg-background-dark/80 backdrop-blur-md sticky top-0 border-b border-primary/20 text-slate-400">
-                    <tr>
-                      <th className="px-3 py-2 font-bold uppercase text-[9px] tracking-widest">
-                        Skill
-                      </th>
-                      <th className="px-3 py-2 font-bold uppercase text-[9px] text-right tracking-widest">
-                        Trend
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
-                      <td className="px-3 py-2 font-medium">Generative AI</td>
-                      <td className="px-3 py-2 text-right text-primary font-mono drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]">
-                        +142%
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
-                      <td className="px-3 py-2 font-medium">Cloud Security</td>
-                      <td className="px-3 py-2 text-right text-primary font-mono drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]">
-                        +45%
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
-                      <td className="px-3 py-2 font-medium">
-                        Rust Engineering
-                      </td>
-                      <td className="px-3 py-2 text-right text-primary font-mono drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]">
-                        +28%
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
-                      <td className="px-3 py-2 font-medium">
-                        FinOps Analytics
-                      </td>
-                      <td className="px-3 py-2 text-right text-slate-400 font-mono">
-                        +4%
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
-                      <td className="px-3 py-2 font-medium">Blockchain Hubs</td>
-                      <td className="px-3 py-2 text-right text-accent-coral font-mono drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]">
-                        -12%
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
-                      <td className="px-3 py-2 font-medium">React Native</td>
-                      <td className="px-3 py-2 text-right text-slate-400 font-mono">
-                        --
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-primary/5 cursor-pointer transition-colors">
-                      <td className="px-3 py-2 font-medium">MLOps Lifecycle</td>
-                      <td className="px-3 py-2 text-right text-primary font-mono drop-shadow-[0_0_5px_rgba(37,157,244,0.5)]">
-                        +62%
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </motion.div>
-
-          <div className="grid grid-cols-2 gap-6 pt-4 border-t border-primary/20 mt-4">
-            <div className="bg-background-dark/60 backdrop-blur-sm border border-primary/30 flex flex-col min-h-[300px] relative group h-full">
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors z-10"></div>
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors z-10"></div>
-              <div className="p-4 border-b border-primary/20 flex items-center justify-between">
-                <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary">
-                  Tech Density: Singapore Central
-                </h3>
-                <div className="flex gap-2">
-                  <span className="text-[9px] font-mono bg-primary/10 border border-primary/30 px-2 py-1 uppercase tracking-widest text-primary">
-                    Level: Planning Area
-                  </span>
-                </div>
-              </div>
-              <div className="flex-1 bg-background-dark flex items-center justify-center overflow-hidden relative group-hover:shadow-[inset_0_0_20px_rgba(37,157,244,0.1)] transition-all">
-                <div
-                  className="w-full h-full opacity-60 mix-blend-screen bg-cover bg-center"
-                  style={{
-                    backgroundImage:
-                      "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBgfMMCj4mkpic7ODI3B7XK9lkBkX3bm7s1ZMn45z_0Wmww96cM1B2wA-EkNdKwmCrejq7T4V02MzHUkhy2CSuboRLVjguS5P-4naWUmXVxKzMh-vYJNENg3tf7fkdXC8etglTPhTDv3REcl8hluAfIGQVQuyVT90dBJZjrH8lvriEQaxGr-STlAU9WmFUmcgHpsmZHlYmXpEI9ms_rxdRMVIDLKse6V9__MNwEtZDsQjQ8vqrY_ibt8H9QO7Dn7MrZUQREQMhIIu4')",
-                  }}
-                />
-                <div className="absolute inset-0 bg-primary/5 pointer-events-none mix-blend-overlay"></div>
-                <div
-                  className="absolute inset-0 pointer-events-none data-grid cyber-grid"
-                  style={
-                    {
-                      "--grid-color": "rgba(37,157,244,0.1)",
-                    } as React.CSSProperties
-                  }
-                ></div>
-                <div className="absolute inset-0 pointer-events-none">
-                  <div className="absolute top-1/2 left-1/2 -translate-x-12 -translate-y-4 w-12 h-12 bg-primary/20 rounded-full border border-primary shadow-[0_0_15px_rgba(37,157,244,0.5)] animate-ping opacity-75"></div>
-                  <div className="absolute top-1/3 left-1/4 w-8 h-8 bg-primary/30 rounded-full border border-primary shadow-[0_0_10px_rgba(37,157,244,0.8)]"></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-background-dark/80 backdrop-blur-md border border-primary/30 flex flex-col min-h-[300px] relative group h-full">
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-primary/50 group-hover:border-primary transition-colors z-10"></div>
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-primary/50 group-hover:border-primary transition-colors z-10"></div>
-              <div className="p-4 border-b border-primary/20 flex items-center justify-between">
-                <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary">
-                  Live Skills Update
-                </h3>
-                <button className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary/70 hover:text-primary transition-colors">
-                  [ View Logs ]
-                </button>
-              </div>
-              <div className="flex-1 p-4 space-y-4 font-mono text-[10px] overflow-y-auto cyber-panel">
-                <div className="flex gap-4 border-l border-primary/20 pl-3 relative">
-                  <div className="absolute -left-[3px] top-1.5 w-1.5 h-1.5 bg-primary/50"></div>
-                  <span className="text-primary/50 shrink-0 w-16">
-                    14:22:01
-                  </span>
-                  <span className="text-slate-300 leading-relaxed uppercase tracking-wider">
-                    <p className="text-secondary-foreground text-xs font-semibold leading-relaxed">
-                      &quot;Design is not just what it looks like and feels
-                      like. Design is how it works.&quot;
-                    </p>
-                  </span>
-                </div>
-                <div className="flex gap-4 border-l border-primary/20 pl-3 relative">
-                  <div className="absolute -left-[3px] top-1.5 w-1.5 h-1.5 bg-primary/50"></div>
-                  <span className="text-primary/50 shrink-0 w-16">
-                    14:21:45
-                  </span>
-                  <span className="text-slate-300 leading-relaxed uppercase tracking-wider">
-                    <span className="text-green-400 font-bold mr-2">
-                      [Skillup]
-                    </span>{" "}
-                    +42 users in <span className="text-white">Jurong East</span>{" "}
-                    certified in Kubernetes
-                  </span>
-                </div>
-                <div className="flex gap-4 border-l border-accent-coral/20 pl-3 relative">
-                  <div className="absolute -left-[3px] top-1.5 w-1.5 h-1.5 bg-accent-coral animate-pulse"></div>
-                  <span className="text-accent-coral/50 shrink-0 w-16">
-                    14:18:22
-                  </span>
-                  <span className="text-slate-300 leading-relaxed uppercase tracking-wider">
-                    <span className="text-accent-coral font-bold mr-2">
-                      [Alert]
-                    </span>{" "}
-                    AI/ML role liquidity decreased by 0.5% in Changi Hub
-                  </span>
-                </div>
-                <div className="flex gap-4 border-l border-primary/20 pl-3 relative">
-                  <div className="absolute -left-[3px] top-1.5 w-1.5 h-1.5 bg-primary/50"></div>
-                  <span className="text-primary/50 shrink-0 w-16">
-                    14:15:09
-                  </span>
-                  <span className="text-slate-300 leading-relaxed uppercase tracking-wider">
-                    <span className="text-primary font-bold mr-2">
-                      [Ontology]
-                    </span>{" "}
-                    New node relationship established:{" "}
-                    <span className="text-white">DataEng -&gt; Snowflake</span>
-                  </span>
-                </div>
-                <div className="flex gap-4 border-l border-primary/20 pl-3 relative mix-blend-luminosity opacity-70">
-                  <div className="absolute -left-[3px] top-1.5 w-1.5 h-1.5 bg-slate-500"></div>
-                  <span className="text-slate-500 shrink-0 w-16">14:12:44</span>
-                  <span className="text-slate-400 leading-relaxed uppercase tracking-wider">
-                    <span className="text-slate-500 font-bold mr-2">
-                      [System]
-                    </span>{" "}
-                    Crawling local job portals (MyCareersFuture, LinkedIn)...
-                  </span>
-                </div>
-                <div className="flex gap-4 border-l border-primary/20 pl-3 relative">
-                  <div className="absolute -left-[3px] top-1.5 w-1.5 h-1.5 bg-primary/50"></div>
-                  <span className="text-primary/50 shrink-0 w-16">
-                    14:10:01
-                  </span>
-                  <span className="text-slate-300 leading-relaxed uppercase tracking-wider">
-                    <span className="text-primary font-bold mr-2">
-                      [Hiring]
-                    </span>{" "}
-                    Skillbridge SG opened fresh associate track (200 slots)
-                  </span>
-                </div>
-              </div>
-            </div>
+            </motion.div>
           </div>
         </motion.div>
       </main>
-
-      <motion.aside
-        initial={{ x: 50, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="w-80 border-l border-primary/20 bg-background-dark flex flex-col shrink-0 text-slate-100 overflow-y-auto h-full relative"
-      >
-        <div className="absolute left-0 top-0 bottom-0 w-px bg-linear-to-b from-primary/0 via-primary/30 to-primary/0"></div>
-        <div className="p-6 border-b border-primary/20">
-          <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary/60 mb-6 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 bg-primary/40"></span> Object Details
-          </h3>
-          <div className="flex items-center gap-4 mb-8 p-3 bg-primary/5 border border-primary/20">
-            <div className="w-12 h-12 bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0 text-primary drop-shadow-[0_0_8px_rgba(37,157,244,0.6)]">
-              <FlaskConical className="w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-white uppercase tracking-wider">
-                Generative AI
-              </h4>
-              <p className="text-[9px] font-mono text-primary/60 uppercase tracking-widest mt-1">
-                ID // SK-90210
-              </p>
-            </div>
-          </div>
-          <div className="space-y-6">
-            <div>
-              <label className="text-[9px] font-mono font-bold text-primary/60 uppercase tracking-widest block border-b border-primary/10 pb-1">
-                Growth Velocity
-              </label>
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-sm font-mono font-bold text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
-                  9.2 / 10.0
-                </span>
-                <span className="text-[9px] font-mono font-bold text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 uppercase tracking-widest">
-                  Exponential
-                </span>
-              </div>
-            </div>
-            <div>
-              <label className="text-[9px] font-mono font-bold text-primary/60 uppercase tracking-widest block border-b border-primary/10 pb-1">
-                Core Ecosystems
-              </label>
-              <div className="flex flex-col gap-2 mt-3 font-mono">
-                <span className="text-[9px] px-2 py-1.5 bg-background-dark border border-primary/20 uppercase tracking-widest text-slate-300 hover:border-primary/50 transition-colors w-full border-l-[3px] border-l-primary/60">
-                  Financial Services
-                </span>
-                <span className="text-[9px] px-2 py-1.5 bg-background-dark border border-primary/20 uppercase tracking-widest text-slate-300 hover:border-primary/50 transition-colors w-full border-l-[3px] border-l-primary/60">
-                  Public Sector
-                </span>
-                <span className="text-[9px] px-2 py-1.5 bg-background-dark border border-primary/20 uppercase tracking-widest text-slate-300 hover:border-primary/50 transition-colors w-full border-l-[3px] border-l-primary/60">
-                  e-Commerce
-                </span>
-              </div>
-            </div>
-            <div className="pt-2">
-              <label className="text-[9px] font-mono font-bold text-primary/60 uppercase tracking-widest block border-b border-primary/10 pb-1">
-                Description
-              </label>
-              <p className="text-[10px] font-mono text-slate-400 leading-relaxed mt-3 uppercase tracking-wider">
-                Primary transformative skill group for 2024. Heavily linked to
-                Python and Transformer architectures. High scarcity in
-                mid-senior levels within Singapore.
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="p-6 flex-1">
-          <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-primary/60 mb-6 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 bg-primary/40"></span> Related Entities
-          </h3>
-          <div className="space-y-2 font-mono">
-            <motion.div
-              whileHover={{ x: 4, backgroundColor: "rgba(37, 157, 244, 0.15)" }}
-              className="p-3 border border-primary/20 bg-primary/5 cursor-pointer flex items-center justify-between transition-all group"
-            >
-              <span className="text-[10px] uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors">
-                Large Language Models
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-primary/50 group-hover:text-primary transition-colors" />
-            </motion.div>
-            <motion.div
-              whileHover={{ x: 4, backgroundColor: "rgba(37, 157, 244, 0.15)" }}
-              className="p-3 border border-primary/20 bg-primary/5 cursor-pointer flex items-center justify-between transition-all group"
-            >
-              <span className="text-[10px] uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors">
-                Vector Databases
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-primary/50 group-hover:text-primary transition-colors" />
-            </motion.div>
-            <motion.div
-              whileHover={{ x: 4, backgroundColor: "rgba(37, 157, 244, 0.15)" }}
-              className="p-3 border border-primary/20 bg-primary/5 cursor-pointer flex items-center justify-between transition-all group"
-            >
-              <span className="text-[10px] uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors">
-                Prompt Engineering
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-primary/50 group-hover:text-primary transition-colors" />
-            </motion.div>
-            <motion.div
-              whileHover={{ x: 4, backgroundColor: "rgba(37, 157, 244, 0.15)" }}
-              className="p-3 border border-primary/20 bg-primary/5 cursor-pointer flex items-center justify-between transition-all group"
-            >
-              <span className="text-[10px] uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors">
-                GPU Orchestration
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-primary/50 group-hover:text-primary transition-colors" />
-            </motion.div>
-          </div>
-        </div>
-        <div className="p-6 bg-background-dark/95 border-t border-primary/20 shrink-0">
-          <button className="w-full py-3 border border-primary/50 bg-primary/10 text-primary text-[10px] font-mono font-bold rounded-none hover:bg-primary hover:text-background-dark transition-all uppercase tracking-widest shadow-[0_0_10px_rgba(37,157,244,0.2)]">
-            Open in Ontology Graph
-          </button>
-        </div>
-      </motion.aside>
     </div>
   );
 }

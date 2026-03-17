@@ -31,10 +31,10 @@ export default function ViewLiveMatrixPage() {
         ]);
 
         if (isMounted) {
-          setMatrixData(matrixRes.data.data);
-          setDataset(matrixRes.data.dataset);
-          setDiffs(diffRes.data);
-          setTrends(trendRes.data);
+          setMatrixData(matrixRes.data?.data ?? []);
+          setDataset(matrixRes.data?.dataset ?? null);
+          setDiffs(Array.isArray(diffRes.data) ? diffRes.data : []);
+          setTrends(Array.isArray(trendRes.data) ? trendRes.data : []);
         }
       } catch (err: unknown) {
         if (isMounted) {
@@ -92,6 +92,16 @@ export default function ViewLiveMatrixPage() {
                 SYSTEM_ERROR
               </span>
               {error}
+            </div>
+          </div>
+        ) : matrixData.length === 0 && !isLoading ? (
+          <div className="glass-panel p-6 border-yellow-500/50 text-yellow-400 font-mono text-sm max-w-2xl flex items-start gap-4">
+            <Database className="w-5 h-5 shrink-0" />
+            <div className="flex flex-col gap-1">
+              <span className="uppercase tracking-widest text-xs opacity-70">
+                NO_DATA_AVAILABLE
+              </span>
+              The intelligence dataset has not been ingested yet. Run the dataset sync pipeline or wait for the automated daily sync.
             </div>
           </div>
         ) : (

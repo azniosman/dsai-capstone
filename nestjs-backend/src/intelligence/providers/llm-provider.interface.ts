@@ -4,7 +4,20 @@
  */
 
 /** Represents a single message in a multi-turn conversation. */
-export type ChatMessage = { role: string; content: string };
+export type ChatMessage = {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: Array<{
+    id: string;
+    type: 'function';
+    function: {
+      name: string;
+      arguments: string;
+    };
+  }>;
+};
 
 /**
  * Enumeration of supported LLM provider names.
@@ -12,6 +25,13 @@ export type ChatMessage = { role: string; content: string };
  * and `TERTIARY_LLM` environment variables.
  */
 export type LlmProviderName = 'groq' | 'claude' | 'gemini';
+
+/** Definition of a tool the LLM can call. */
+export interface LlmToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+}
 
 /**
  * Contract that every LLM provider must implement.
@@ -27,14 +47,14 @@ export interface LlmProvider {
    *
    * @param messages - Ordered list of conversation turns.
    * @param systemPrompt - Instruction text prepended as a system message.
-   * @returns The provider's text response.
-   * @throws Any SDK-level error — the router handles retry and fallback.
+   * @param tools - Optional list of tools the LLM can call.
+   * @returns The provider's text response or tool call requests.
    */
-  generate(messages: ChatMessage[], systemPrompt: string): Promise<string>;
+  generate(
+    messages: ChatMessage[],
+    systemPrompt: string,
+    tools?: LlmToolDefinition[],
+  ): Promise<ChatMessage>;
 
-  /**
-   * Returns `true` when the provider is properly configured and ready to
-   * handle requests. The router skips providers that return `false`.
-   */
   isAvailable(): boolean;
 }

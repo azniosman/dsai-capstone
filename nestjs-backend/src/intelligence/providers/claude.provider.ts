@@ -63,23 +63,25 @@ export class ClaudeProvider implements LlmProvider {
 
   /**
    * Sends a multi-turn conversation to the Anthropic Claude API and returns
-   * the assistant's text reply.
+   * the assistant's response.
    *
    * @param messages - Conversation history.
    * @param systemPrompt - System-level instruction.
-   * @returns The assistant's text response.
+   * @param _tools - Optional list of tools (currently unsupported in this provider).
+   * @returns The assistant's ChatMessage.
    */
   async generate(
     messages: ChatMessage[],
     systemPrompt: string,
-  ): Promise<string> {
+    _tools?: any[],
+  ): Promise<ChatMessage> {
     if (!this.client) {
       throw new Error('Claude API client not available');
     }
 
     const anthropicMessages = messages.map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
+      role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+      content: m.content || '',
     }));
 
     const response = await this.client.messages.create({
@@ -90,9 +92,14 @@ export class ClaudeProvider implements LlmProvider {
     });
 
     const firstBlock = response.content[0];
-    if (!firstBlock || firstBlock.type !== 'text') {
-      return '';
-    }
-    return firstBlock.text as string;
+    const text =
+      firstBlock && firstBlock.type === 'text'
+        ? (firstBlock.text as string)
+        : '';
+
+    return {
+      role: 'assistant',
+      content: text,
+    };
   }
 }

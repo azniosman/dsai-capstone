@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { LlmService } from './llm.service';
 import { LogBusService } from '@app/common/log-bus.service';
+import { ClsService } from 'nestjs-cls';
 
 // ── Provider mocks ────────────────────────────────────────────────────────────
 
@@ -155,6 +156,15 @@ describe('LlmService', () => {
         {
           provide: LogBusService,
           useValue: { emit: jest.fn(), getRecent: jest.fn() },
+        },
+        {
+          provide: ClsService,
+          useValue: {
+            set: jest.fn(),
+            get: jest.fn(),
+            run: jest.fn((fn) => fn()),
+            wrap: jest.fn((fn) => fn),
+          },
         },
       ],
     }).compile();

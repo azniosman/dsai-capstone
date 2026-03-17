@@ -1,6 +1,6 @@
 import { Entity, PrimaryKey, Property, Index } from '@mikro-orm/core';
 import { randomUUID } from 'crypto';
-import { LogEntryType } from './log-bus.service';
+import type { LogEntryType } from './log-bus.service';
 
 @Entity()
 export class SystemLog {

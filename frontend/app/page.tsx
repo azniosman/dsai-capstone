@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Terminal } from "lucide-react";
+import { Terminal, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { HeroSection } from "@/components/sections/landing/hero-section";
 import { FeaturesSection } from "@/components/sections/landing/features-section";
 import { MarqueeSection } from "@/components/sections/landing/marquee-section";
 import { FooterSection } from "@/components/sections/landing/footer-section";
+import { DemoChatWidget } from "@/components/landing/demo-chat-widget";
+import ViewLiveMatrixPage from "@/app/view_live_matrix/page";
 
 export default function LandingPage() {
   const router = useRouter();
+  const [showMatrixModal, setShowMatrixModal] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -62,12 +66,12 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-6">
-            <Link
-              href="/login"
+            <button
+              onClick={() => setShowMatrixModal(true)}
               className="bg-[#00f2f2] text-black px-6 h-12 flex items-center font-black uppercase text-xs tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(0,242,242,0.2)]"
             >
-              SKLBR_LOGIN
-            </Link>
+              VIEW_LIVE_MATRIX
+            </button>
           </div>
         </header>
 
@@ -98,18 +102,46 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-8 hidden sm:flex">
+          <div className="hidden sm:flex items-center gap-8">
             <div className="tactical-label text-neutral-600">
               REGION: SG-CENTRAL
             </div>
             <div className="tactical-label text-neutral-600">
-              SERVER: AP-SOUTHEAST-1
+              SERVER: US-EAST-1
             </div>
           </div>
         </div>
 
         {/* Dynamic Scanline Overlay */}
-        <div className="fixed inset-0 pointer-events-none z-[100] opacity-[0.015] scanline" />
+        <div className="fixed inset-0 pointer-events-none z-100 opacity-[0.015] scanline" />
+
+        {/* Live Matrix Modal Overlay */}
+        <AnimatePresence>
+          {showMatrixModal && (
+            <div className="fixed inset-0 z-110 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                transition={{ duration: 0.3 }}
+                className="relative w-full max-w-[1400px] h-[90vh] bg-background border border-[#00f2f2]/30 rounded-xl overflow-hidden shadow-[0_0_50px_rgba(0,242,242,0.15)] flex flex-col"
+              >
+                <button
+                  onClick={() => setShowMatrixModal(false)}
+                  className="absolute top-4 right-4 z-120 p-2 bg-black/50 hover:bg-[#00f2f2]/20 text-muted-foreground hover:text-[#00f2f2] border border-white/10 hover:border-[#00f2f2]/50 rounded-full backdrop-blur-md transition-all group"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="flex-1 w-full h-full overflow-y-auto">
+                  <ViewLiveMatrixPage />
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Demo Chat Widget */}
+        <DemoChatWidget />
       </div>
     </div>
   );

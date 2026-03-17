@@ -194,6 +194,7 @@ export interface ResumeUploadResult {
   skills: string[];
   experience_years?: number;
   raw_text_preview?: string;
+  resume_text?: string;
   // Fields from full implementation
   profile_id?: number;
   readiness_score?: number;
@@ -279,6 +280,7 @@ export const profileApi = {
     email?: string;
     phone?: string;
     location?: string;
+    resume_text?: string;
   }) => api.post<Profile>("/api/profile", payload).then((r) => r.data),
 
   /** Get the profile linked to the current user */

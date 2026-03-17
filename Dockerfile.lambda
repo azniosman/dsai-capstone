@@ -4,28 +4,34 @@
 #
 # Strategy
 # --------
-# Stage 1  (nestjs-build): compile the NestJS backend to dist/ using a
-#   full Node.js 20 image so native npm / tsc toolchain is available.
+# Stage 1  (nestjs-build): Alpine — compile TypeScript to dist/.  Only the
+#           compiled JS is used from this stage; node_modules are NOT carried
+#           forward (native addons compiled for musl crash on glibc).
 #
-# Stage 2  (lambda-runtime): Python 3.12 Lambda base image (AL2023) with Node.js
-#   installed so we can:
-#     a) run the compiled NestJS server as a sub-process (via
-#        lambda_handler.py), AND
-#     b) serve pure-Python automation handlers (lambdas/automation/*.py)
-#        via CMD override without any extra image.
+# Stage 2  (deps-glibc): Debian slim (glibc) — install production-only
+#           node_modules so native addons (bcrypt, onnxruntime-node) are
+#           compiled against the same libc family as the Lambda runtime.
+#
+# Stage 3  (model-download): Debian slim (glibc) — pre-download the ONNX
+#           embedding model so Lambda cold starts never need internet access.
+#
+# Stage 4  (lambda-runtime): Python 3.12 Lambda base image (AL2023 / glibc)
+#           with Node.js 20, glibc-built node_modules, baked-in ONNX model,
+#           and Python automation handlers.
 #
 # Build context: project root
 #   docker build --platform linux/amd64 --provenance=false \
 #     -f Dockerfile.lambda -t <ecr-uri>:latest .
 # =============================================================================
 
-# ── Stage 1: compile NestJS ──────────────────────────────────────────────────
+# ── Stage 1: compile NestJS (Alpine — TypeScript only) ───────────────────────
+# Native addons from this stage are NOT used in later stages.
 
 FROM node:20-alpine AS nestjs-build
 
 WORKDIR /build
 
-# Install dependencies first (Docker layer caching)
+# Install ALL dependencies (dev + prod) for tsc compilation
 COPY nestjs-backend/package.json nestjs-backend/package-lock.json ./
 RUN npm ci --legacy-peer-deps
 
@@ -33,19 +39,40 @@ RUN npm ci --legacy-peer-deps
 COPY nestjs-backend/ .
 RUN npm run build
 
-# Remove devDependencies to keep the copied node_modules lean
-RUN npm prune --omit=dev --legacy-peer-deps
+
+# ── Stage 2: production node_modules on glibc ────────────────────────────────
+# Native addons (bcrypt, onnxruntime-node) MUST be compiled on the same libc
+# as the runtime.  node:20-slim uses Debian/glibc — compatible with AL2023.
+
+FROM node:20-slim AS deps-glibc
+
+WORKDIR /app
+
+COPY nestjs-backend/package.json nestjs-backend/package-lock.json ./
+RUN npm ci --omit=dev --legacy-peer-deps
 
 
-# ── Stage 2: Lambda runtime ──────────────────────────────────────────────────
+# ── Stage 3: pre-download ONNX embedding model ──────────────────────────────
+# Bakes Xenova/bge-small-en-v1.5 into the image so EmbeddingService works
+# without internet access (no NAT Gateway required at Lambda runtime).
 
-# Python 3.12 uses Amazon Linux 2023 as the base, which ships with dnf and
-# a full standard toolset (tar, curl, etc.).  Node.js 18 LTS is available in
-# the AL2023 default repos and fully supports NestJS 10+.
-# (Python 3.11 uses a stripped AL2 image that lacks tar; 3.12 fixes this.)
+FROM node:20-slim AS model-download
+
+WORKDIR /app
+
+COPY --from=deps-glibc /app/node_modules ./node_modules
+COPY nestjs-backend/scripts/download-model.cjs ./scripts/download-model.cjs
+RUN node scripts/download-model.cjs
+
+
+# ── Stage 4: Lambda runtime ──────────────────────────────────────────────────
+
 FROM public.ecr.aws/lambda/python:3.12
 
-RUN dnf install -y nodejs \
+# Install Node.js 20 from NodeSource (AL2023 default repos only have Node 18).
+# No build tools needed — native addons are pre-compiled in the deps-glibc stage.
+RUN curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - \
+    && dnf install -y nodejs \
     && dnf clean all \
     && node --version \
     && npm --version
@@ -60,10 +87,13 @@ RUN pip install --no-cache-dir requests
 COPY lambdas/ ${LAMBDA_TASK_ROOT}/lambdas/
 
 # ── NestJS compiled app ───────────────────────────────────────────────────────
-# Placed under nestjs/ so lambda_handler.py can locate them via a relative path.
+# dist/ from nestjs-build (JS only), node_modules from deps-glibc (glibc native addons).
 COPY --from=nestjs-build /build/dist         ${LAMBDA_TASK_ROOT}/nestjs/dist/
-COPY --from=nestjs-build /build/node_modules ${LAMBDA_TASK_ROOT}/nestjs/node_modules/
+COPY --from=deps-glibc   /app/node_modules   ${LAMBDA_TASK_ROOT}/nestjs/node_modules/
 COPY --from=nestjs-build /build/package.json ${LAMBDA_TASK_ROOT}/nestjs/package.json
+
+# ── Baked-in ONNX embedding model ─────────────────────────────────────────────
+COPY --from=model-download /app/.cache/huggingface ${LAMBDA_TASK_ROOT}/nestjs/.cache/huggingface
 
 # ── Seed data (JSON files read by DatabaseSeeder on cold start) ───────────────
 COPY data/ ${LAMBDA_TASK_ROOT}/data/

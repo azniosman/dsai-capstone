@@ -69,6 +69,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # Capture AWS account ID for use in resource naming
+      - name: Capture AWS Account ID
+        run: |
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          echo "AWS_ACCOUNT_ID=${ACCOUNT}" >> $GITHUB_ENV
+
       # Aurora master password forbids: '/', '@', '"', space
       # base64 output (from openssl rand -base64) may contain '/' — strip it.
       - name: Sanitize DB password for Aurora compatibility
@@ -102,6 +108,17 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+
+      # ── Cleanup orphaned VPCs (runs before preflight checks) ──────────────────
+      # This step deletes orphaned VPCs from previous failed deployments to avoid
+      # hitting the VPC quota limit. It runs for both skip_terraform paths.
+      - name: Cleanup orphaned VPCs
+        env:
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          bash .github/workflows/delete_orphaned_vpcs.sh
 
       # ── Terraform fmt check (catches formatting errors before any apply) ──────
       - name: Terraform fmt check
@@ -548,10 +565,17 @@ jobs:
             --force-delete-without-recovery 2>/dev/null || true
 
           echo "=== Step 10: Empty + delete uploads S3 bucket (if it exists) ==="
-          UPLOADS_BUCKET="${P}-${E}-uploads"
-          aws s3 rm "s3://${UPLOADS_BUCKET}" --recursive 2>/dev/null || true
-          aws s3api delete-bucket --bucket "${UPLOADS_BUCKET}" \
-            --region "${{ env.AWS_REGION }}" 2>/dev/null || true
+          # Bucket name is now dynamic: skillbridge-{env}-uploads-{random}-{account_id}
+          # List all buckets with the uploads prefix and delete them
+          BUCKETS=$(aws s3api list-buckets --query 'Buckets[?contains(Name, `-uploads-`)].Name' --output text 2>/dev/null || true)
+          for BUCKET in $BUCKETS; do
+            if [[ "$BUCKET" =~ ^${P}-${E}-uploads-[a-f0-9]{8}-[0-9]{12}$ ]]; then
+              echo "  Deleting uploads bucket: $BUCKET"
+              aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+              aws s3api delete-bucket --bucket "${BUCKET}" \
+                --region "${{ env.AWS_REGION }}" 2>/dev/null || true
+            fi
+          done
 
           echo "=== Step 11: Clear CNAME aliases from any existing CloudFront distributions ==="
           # CloudFront distributions with CNAME aliases (e.g. sklbr.co) must have those
@@ -928,6 +952,7 @@ jobs:
           TF_VAR_enable_custom_domain: ${{ github.event.inputs.enable_custom_domain }}
           TF_VAR_custom_domain: ${{ github.event.inputs.custom_domain }}
           TF_VAR_internal_automation_token: ${{ secrets.INTERNAL_AUTOMATION_TOKEN }}
+          TF_VAR_aws_account_id: ${{ env.AWS_ACCOUNT_ID }}
         run: terraform apply tfplan
 
       # ── Capture Terraform outputs ─────────────────────────────────────────────
@@ -1030,7 +1055,7 @@ jobs:
             --paths "/*"
 
       # ── Step 8: Smoke test — verify the API is live ───────────────────────────
-      # Polls /api/health up to 6 minutes to allow Lambda cold-start + DB init.
+      # Polls /internal/health up to 6 minutes to allow Lambda cold-start + DB init.
       # Initial 60s wait avoids hammering the Lambda while it initialises
       # (NestJS + updateSchema + seed can take 30-45s on first cold start).
       # 20s poll interval keeps concurrent invocations below 2 so the reserved
@@ -1041,11 +1066,11 @@ jobs:
           API="${{ steps.tf.outputs.api_url }}"
           echo "Waiting 60s for Lambda cold-start + DB initialisation ..."
           sleep 60
-          echo "Polling ${API}/api/health ..."
+          echo "Polling ${API}/internal/health ..."
           for i in $(seq 1 18); do
             HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
               --connect-timeout 15 --max-time 45 \
-              "${API}/api/health" || echo "000")
+              "${API}/internal/health" || echo "000")
             echo "  Attempt $i/18 — HTTP ${HTTP}"
             if [ "$HTTP" = "200" ]; then
               echo "  API is live"

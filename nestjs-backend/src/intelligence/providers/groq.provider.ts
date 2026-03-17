@@ -66,41 +66,53 @@ export class GroqProvider implements LlmProvider {
 
   /**
    * Sends a multi-turn conversation to the Groq API and returns the
-   * assistant's text reply.
-   *
-   * The system prompt is prepended as a `system` role message, which Groq
-   * handles identically to OpenAI's Chat Completions API.
+   * assistant's response (text or tool calls).
    *
    * @param messages     - Conversation history.
    * @param systemPrompt - System-level instruction.
-   * @returns The assistant's text response.
+   * @param tools        - Optional list of tool definitions.
+   * @returns The assistant's ChatMessage.
    */
   async generate(
     messages: ChatMessage[],
     systemPrompt: string,
-  ): Promise<string> {
+    tools?: any[],
+  ): Promise<ChatMessage> {
     if (!this.client) {
       throw new Error('Groq client not available');
     }
 
-    const groqMessages: {
-      role: 'system' | 'user' | 'assistant';
-      content: string;
-    }[] = [
+    const groqMessages: any[] = [
       { role: 'system', content: systemPrompt },
-      ...messages.map((m) => ({
-        role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
-        content: m.content,
-      })),
+      ...messages.map((m) => {
+        const msg: any = { role: m.role, content: m.content };
+        if (m.name) msg.name = m.name;
+        if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+        if (m.tool_calls) msg.tool_calls = m.tool_calls;
+        return msg;
+      }),
     ];
 
     const completion = await this.client.chat.completions.create({
       model: this.modelId,
       messages: groqMessages,
+      tools: tools?.map((t) => ({
+        type: 'function',
+        function: {
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters,
+        },
+      })),
       temperature: this.temperature,
       max_tokens: this.maxTokens,
     });
 
-    return completion.choices[0]?.message?.content ?? '';
+    const choice = completion.choices[0]?.message;
+    return {
+      role: 'assistant',
+      content: choice?.content ?? null,
+      tool_calls: choice?.tool_calls,
+    };
   }
 }

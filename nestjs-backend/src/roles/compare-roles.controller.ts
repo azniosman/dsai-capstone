@@ -2,7 +2,7 @@ import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { CompareRolesDto } from './dto/compare-roles.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
-import { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
+import type { OptionalAuthenticatedRequest } from '../types/auth-request.interface';
 
 @Controller('compare-roles')
 export class CompareRolesController {

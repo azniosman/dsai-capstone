@@ -39,6 +39,10 @@ import { emitEMF } from '@app/common/utils/metrics.util';
 import { LogBusService } from '@app/common/log-bus.service';
 import { EmbeddingService } from './embedding.service';
 import { CrossEncoderService } from './cross-encoder.service';
+import {
+  ExecutionTraceService,
+  TraceType,
+} from '@app/production-assurance/execution-trace.service';
 
 /** A retrieved chunk with its similarity score. */
 export interface RetrievedChunk {
@@ -98,6 +102,7 @@ export class RagService {
     private readonly embeddingService: EmbeddingService,
     private readonly crossEncoderService: CrossEncoderService,
     private readonly logBus: LogBusService,
+    private readonly executionTrace: ExecutionTraceService,
   ) {}
 
   // ─── Ingestion ─────────────────────────────────────────────────────────────
@@ -210,54 +215,108 @@ export class RagService {
     tenantId: number,
     opts: QueryOptions = {},
   ): Promise<RetrievedChunk[]> {
+    const traceId = await this.executionTrace.startTrace(
+      'RAG Query',
+      TraceType.RAG_PIPELINE,
+      'rag-service',
+      { queryText, tenantId, opts },
+    );
+
     const { topK = 3, threshold = 0.5, profileId } = opts;
     const t0 = Date.now();
 
-    this.logBus.emit({
-      type: 'RAG',
-      component: 'RagService',
-      message: `Hybrid RAG query started (tenant=${tenantId} topK=${topK})`,
-      meta: { tenantId, topK, threshold, profileId: profileId ?? 'anon' },
-    });
-
-    const queryEmbedding = await this.embeddingService.embed(queryText);
-    if (queryEmbedding.length === 0) {
-      this.logger.warn('RAG query skipped — embedding service unavailable');
+    try {
       this.logBus.emit({
-        type: 'WARN',
-        component: 'EmbeddingService',
-        message: 'RAG query skipped — embedding service unavailable',
+        type: 'RAG',
+        component: 'RagService',
+        message: `Hybrid RAG query started (tenant=${tenantId} topK=${topK})`,
+        meta: { tenantId, topK, threshold, profileId: profileId ?? 'anon' },
       });
-      this.emitQueryMetrics(Date.now() - t0, []);
-      return [];
-    }
 
-    const results = await this.hybridQuery(
-      queryText,
-      queryEmbedding,
-      tenantId,
-      {
+      // Trace: Embedding generation
+      await this.executionTrace.addTraceStep(traceId, {
+        name: 'Embedding Generation',
+        type: TraceType.EMBEDDING,
+        input: { queryText },
+      });
+
+      const queryEmbedding = await this.embeddingService.embed(queryText);
+
+      await this.executionTrace.addTraceStep(traceId, {
+        name: 'Embedding Complete',
+        type: TraceType.EMBEDDING,
+        input: { queryText },
+        output: { dimensions: queryEmbedding.length },
+      });
+
+      if (queryEmbedding.length === 0) {
+        this.logger.warn('RAG query skipped — embedding service unavailable');
+        this.logBus.emit({
+          type: 'WARN',
+          component: 'EmbeddingService',
+          message: 'RAG query skipped — embedding service unavailable',
+        });
+        this.emitQueryMetrics(Date.now() - t0, []);
+        await this.executionTrace.completeTrace(traceId, {
+          chunks: [],
+          reason: 'embedding_failed',
+        });
+        return [];
+      }
+
+      // Trace: Vector Search
+      await this.executionTrace.addTraceStep(traceId, {
+        name: 'Vector Search',
+        type: TraceType.VECTOR_SEARCH,
+        input: { embeddingDimensions: queryEmbedding.length, topK, threshold },
+      });
+
+      const results = await this.hybridQuery(
+        queryText,
+        queryEmbedding,
+        tenantId,
+        {
+          topK,
+          threshold,
+          profileId,
+        },
+      );
+
+      await this.executionTrace.addTraceStep(traceId, {
+        name: 'Vector Search Complete',
+        type: TraceType.VECTOR_SEARCH,
+        output: { chunksRetrieved: results.length },
+      });
+
+      const latencyMs = Date.now() - t0;
+      this.emitQueryMetrics(latencyMs, results);
+
+      this.logger.log(
+        `RAG query returned ${results.length} chunks (tenant=${tenantId} topK=${topK} threshold=${threshold} latencyMs=${latencyMs})`,
+      );
+
+      this.logBus.emit({
+        type: 'RAG',
+        component: 'RagService',
+        message: `Hybrid RAG query complete: ${results.length} chunks returned (${latencyMs}ms)`,
+        meta: { chunks: results.length, latencyMs, topK, threshold },
+      });
+
+      await this.executionTrace.completeTrace(traceId, {
+        chunks: results.length,
+        latencyMs,
         topK,
         threshold,
-        profileId,
-      },
-    );
+      });
 
-    const latencyMs = Date.now() - t0;
-    this.emitQueryMetrics(latencyMs, results);
-
-    this.logger.log(
-      `RAG query returned ${results.length} chunks (tenant=${tenantId} topK=${topK} threshold=${threshold} latencyMs=${latencyMs})`,
-    );
-
-    this.logBus.emit({
-      type: 'RAG',
-      component: 'RagService',
-      message: `Hybrid RAG query complete: ${results.length} chunks returned (${latencyMs}ms)`,
-      meta: { chunks: results.length, latencyMs, topK, threshold },
-    });
-
-    return results;
+      return results;
+    } catch (error) {
+      await this.executionTrace.failTrace(
+        traceId,
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      throw error;
+    }
   }
 
   /**
@@ -366,14 +425,14 @@ export class RagService {
             dc.content,
             dc.source_type,
             dc.chunk_index,
-            (1 - (dc.embedding <=> $1::vector))::float  AS similarity,
-            ROW_NUMBER() OVER (ORDER BY dc.embedding <=> $1::vector) AS sem_rank
+            (1 - (dc.embedding <=> ?::vector))::float  AS similarity,
+            ROW_NUMBER() OVER (ORDER BY dc.embedding <=> ?::vector) AS sem_rank
           FROM document_chunk dc
-          WHERE dc.tenant_id = $2
+          WHERE dc.tenant_id = ?
             AND dc.embedding IS NOT NULL
-            AND (1 - (dc.embedding <=> $1::vector)) >= $3
-            AND ($8::int IS NULL OR dc.profile_id = $8::int)
-          LIMIT $4
+            AND (1 - (dc.embedding <=> ?::vector)) >= ?
+            AND (?::int IS NULL OR dc.profile_id = ?::int)
+          LIMIT ?
         ),
         keyword AS (
           SELECT
@@ -382,13 +441,13 @@ export class RagService {
             dc.source_type,
             dc.chunk_index,
             ROW_NUMBER() OVER (
-              ORDER BY ts_rank(dc.search_vector, plainto_tsquery('english', $5)) DESC
+              ORDER BY ts_rank(dc.search_vector, plainto_tsquery('english', ?)) DESC
             ) AS kw_rank
           FROM document_chunk dc
-          WHERE dc.tenant_id = $2
-            AND dc.search_vector @@ plainto_tsquery('english', $5)
-            AND ($8::int IS NULL OR dc.profile_id = $8::int)
-          LIMIT $4
+          WHERE dc.tenant_id = ?
+            AND dc.search_vector @@ plainto_tsquery('english', ?)
+            AND (?::int IS NULL OR dc.profile_id = ?::int)
+          LIMIT ?
         ),
         rrf AS (
           SELECT
@@ -398,8 +457,8 @@ export class RagService {
             COALESCE(s.chunk_index, k.chunk_index) AS chunk_index,
             COALESCE(s.similarity,  0.0)::float    AS similarity,
             (
-              COALESCE(1.0 / ($6::float + s.sem_rank::float), 0.0) +
-              COALESCE(1.0 / ($6::float + k.kw_rank::float), 0.0)
+              COALESCE(1.0 / (?::float + s.sem_rank::float), 0.0) +
+              COALESCE(1.0 / (?::float + k.kw_rank::float), 0.0)
             )::float AS rrf_score
           FROM      semantic s
           FULL OUTER JOIN keyword k ON s.id = k.id
@@ -407,17 +466,26 @@ export class RagService {
       SELECT id, content, source_type, chunk_index, similarity, rrf_score
       FROM   rrf
       ORDER  BY rrf_score DESC
-      LIMIT  $7
+      LIMIT  ?
       `,
       [
         vectorLiteral,
+        vectorLiteral,
         tenantId,
+        vectorLiteral,
         threshold,
+        profileId ?? null,
+        profileId ?? null,
         overFetch,
         queryText,
+        tenantId,
+        queryText,
+        profileId ?? null,
+        profileId ?? null,
+        overFetch,
+        RRF_K,
         RRF_K,
         overFetch,
-        profileId ?? null,
       ],
     );
 
@@ -453,16 +521,25 @@ export class RagService {
         dc.content,
         dc.source_type,
         dc.chunk_index,
-        (1 - (dc.embedding <=> $1::vector))::float AS similarity
+        (1 - (dc.embedding <=> ?::vector))::float AS similarity
       FROM document_chunk dc
-      WHERE dc.tenant_id = $2
+      WHERE dc.tenant_id = ?
         AND dc.embedding IS NOT NULL
-        AND (1 - (dc.embedding <=> $1::vector)) >= $3
-        AND ($5::int IS NULL OR dc.profile_id = $5::int)
-      ORDER BY dc.embedding <=> $1::vector
-      LIMIT $4
+        AND (1 - (dc.embedding <=> ?::vector)) >= ?
+        AND (?::int IS NULL OR dc.profile_id = ?::int)
+      ORDER BY dc.embedding <=> ?::vector
+      LIMIT ?
       `,
-      [vectorLiteral, tenantId, threshold, overFetch, profileId ?? null],
+      [
+        vectorLiteral,
+        tenantId,
+        vectorLiteral,
+        threshold,
+        profileId ?? null,
+        profileId ?? null,
+        vectorLiteral,
+        overFetch,
+      ],
     );
 
     return rows.map((r, i) => ({ ...r, rrfScore: 1 / (RRF_K + (i + 1)) }));
@@ -497,8 +574,8 @@ export class RagService {
             chunk_id,
             SUM(CASE WHEN is_positive THEN 1 ELSE -1 END)::int AS net_score
           FROM rag_feedback
-          WHERE chunk_id = ANY($1::int[])
-            AND profile_id = $2
+          WHERE chunk_id = ANY(?::int[])
+            AND profile_id = ?
           GROUP BY chunk_id
           `,
           [chunkIds, profileId],

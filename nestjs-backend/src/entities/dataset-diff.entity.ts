@@ -1,4 +1,12 @@
-import { Entity, PrimaryKey, Property, Enum, ManyToOne, Rel, OptionalProps } from '@mikro-orm/core';
+import {
+  Entity,
+  PrimaryKey,
+  Property,
+  Enum,
+  ManyToOne,
+  OptionalProps,
+} from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import { Dataset } from './dataset.entity';
 
 export enum ChangeType {

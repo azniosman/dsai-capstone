@@ -4,6 +4,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "aws_account_id" {
+  description = "AWS Account ID (auto-detected if not set)"
+  type        = string
+  default     = ""
+}
+
 variable "project_name" {
   description = "Project name used for resource naming (lowercase, no spaces)"
   type        = string
@@ -32,12 +38,22 @@ variable "secret_key" {
   description = "JWT secret key for FastAPI backend (generate: openssl rand -hex 32)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.secret_key) >= 32
+    error_message = "secret_key must be at least 32 characters (generate: openssl rand -hex 32)"
+  }
 }
 
 variable "refresh_token_secret" {
   description = "Separate secret for signing refresh tokens (generate: openssl rand -hex 32)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.refresh_token_secret) >= 32
+    error_message = "refresh_token_secret must be at least 32 characters (generate: openssl rand -hex 32)"
+  }
 }
 
 variable "groq_api_key" {
@@ -137,6 +153,11 @@ variable "internal_automation_token" {
   description = "Shared secret for X-Internal-Token header on internal automation endpoints. Generate: python3 -c \"import secrets; print(secrets.token_hex(32))\""
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.internal_automation_token) >= 32
+    error_message = "internal_automation_token must be at least 32 characters (generate: openssl rand -hex 32)"
+  }
 }
 
 variable "enable_warmup" {

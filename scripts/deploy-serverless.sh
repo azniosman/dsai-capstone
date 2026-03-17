@@ -93,7 +93,7 @@ CF_ID=$(terraform output -raw cloudfront_id 2>/dev/null || echo "")
 WS_URL=$(terraform output -raw websocket_endpoint 2>/dev/null || echo "")
 
 # EventBridge automation resources
-BACKEND_FUNCTION="${PROJECT_NAME}-${ENV}-backend"
+BACKEND_FUNCTION="${PROJECT_NAME}-${ENV}-api"
 WARMUP_FUNCTION="${PROJECT_NAME}-${ENV}-warmup"
 CLEANUP_FUNCTION="${PROJECT_NAME}-${ENV}-cache-cleanup"
 SSG_SYNC_FUNCTION="${PROJECT_NAME}-${ENV}-ssg-sync"
@@ -214,7 +214,11 @@ fi
 echo ""
 echo "========================================================"
 echo "  ✓ Deployment complete!"
-[[ -n "${CF_DOMAIN}" ]] && echo "  Frontend: https://${CF_DOMAIN}" || echo "  Frontend: s3://${S3_BUCKET}"
+if [[ -n "${CF_DOMAIN}" ]]; then
+  echo "  Frontend: https://${CF_DOMAIN}"
+else
+  echo "  Frontend: s3://${S3_BUCKET}"
+fi
 echo "  API:      ${API_URL}"
 echo "  EventBridge schedules: ${SCHEDULE_COUNT} active"
 echo "========================================================"

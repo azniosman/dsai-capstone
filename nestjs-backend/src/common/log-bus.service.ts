@@ -81,23 +81,24 @@ export class LogBusService implements OnModuleInit, OnModuleDestroy {
     this.flushTimer = setInterval(() => this.flush(), 5000);
   }
 
-  async onModuleDestroy() {
+  onModuleDestroy() {
     if (this.flushTimer) clearInterval(this.flushTimer);
-    await this.flush();
+    this.flush();
   }
 
-  private async flush() {
+  private flush(): void {
     if (this.dbQueue.length === 0) return;
 
     // Atomically drain queue
     const batch = this.dbQueue.splice(0, this.dbQueue.length);
-    try {
-      await this.em.fork().insertMany(SystemLog, batch);
-    } catch (err) {
-      this.logger.error(
-        `Failed to flush ${batch.length} logs to PostgreSQL: ${(err as Error).message}`,
-      );
-    }
+    void this.em
+      .fork()
+      .insertMany(SystemLog, batch)
+      .catch((err) => {
+        this.logger.error(
+          `Failed to flush ${batch.length} logs to PostgreSQL: ${(err as Error).message}`,
+        );
+      });
   }
 
   /**

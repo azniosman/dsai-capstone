@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant light (&:is(.light *));
 
 @theme inline {
   --color-background: var(--background);
@@ -98,6 +99,10 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   DARK MODE (Default) - Obsidian Theme
+   ═══════════════════════════════════════════════════════════════════════ */
+
 :root,
 .dark {
   --radius: 0.5rem;
@@ -146,7 +151,7 @@
 
   /* ── Accent Coral (maps to destructive red) ── */
   --accent-coral: #ef4444;
-  
+
   /* ── Tactical Color Pallet ── */
   --tactical-cyan: #00f2f2;
   --tactical-blue: #259df4;
@@ -212,6 +217,123 @@
   --tracking-normal: 0em;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   LIGHT MODE - Arctic Theme
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.light {
+  --radius: 0.5rem;
+
+  /* ── Background: Arctic White ── */
+  --background: #fafafa;
+  --foreground: #09090b;
+
+  /* ── Card: Pure White ── */
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+
+  /* ── Primary: Deep Blue (darker for contrast) ── */
+  --primary: #1e40af;
+  --primary-foreground: #ffffff;
+
+  /* ── Secondary: Light Gray ── */
+  --secondary: #f4f4f5;
+  --secondary-foreground: #09090b;
+
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  /* ── Accent: Deep Purple (darker for contrast) ── */
+  --accent: #7c3aed;
+  --accent-foreground: #ffffff;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  /* ── Borders: Subtle Gray ── */
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #1e40af;
+
+  /* ── Custom Palantir Colors (Light Mode Variants) ── */
+  --soft-coral: #7c3aed; /* Deep Purple */
+  --muted-cyan: #1e40af; /* Deep Blue */
+  --off-white: #f4f4f5; /* Light Gray */
+  --editorial-black: #09090b; /* Foreground Text */
+  --paper: #fafafa; /* Main Background */
+  --background-light: #ffffff;
+  --background-dark: #fafafa;
+
+  /* ── Accent Coral (darker red for contrast) ── */
+  --accent-coral: #dc2626;
+
+  /* ── Tactical Color Palette (Light Mode) ── */
+  --tactical-cyan: #0891b2;
+  --tactical-blue: #1e40af;
+  --tactical-red: #dc2626;
+  --tactical-dim: rgba(0, 0, 0, 0.05);
+
+  /* ── Slate Custom (inverted for light mode) ── */
+  --slate-custom-50: #09090b;
+  --slate-custom-100: #18181b;
+  --slate-custom-200: #27272a;
+  --slate-custom-300: #3f3f46;
+  --slate-custom-400: #52525b;
+  --slate-custom-500: #71717a;
+  --slate-custom-600: #a1a1aa;
+  --slate-custom-700: #d4d4d8;
+  --slate-custom-800: #e4e4e7;
+  --slate-custom-900: #f4f4f5;
+
+  /* ── Charts (adjusted for light background) ── */
+  --chart-1: #1e40af;
+  --chart-2: #7c3aed;
+  --chart-3: #2563eb;
+  --chart-4: #6d28d9;
+  --chart-5: #0891b2;
+
+  /* ── Sidebar ── */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #09090b;
+  --sidebar-primary: #1e40af;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f4f5;
+  --sidebar-accent-foreground: #09090b;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #1e40af;
+
+  --font-sans: "Space Grotesk", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-serif: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --shadow-color: hsl(240 5% 96%);
+  --shadow-opacity: 0.3;
+  --shadow-blur: 12px;
+  --shadow-spread: 0px;
+  --shadow-offset-x: 0px;
+  --shadow-offset-y: 2px;
+  --letter-spacing: 0em;
+  --spacing: 0.25rem;
+  --shadow-2xs: 0px 1px 2px 0px hsl(240 5% 96% / 0.4);
+  --shadow-xs: 0px 1px 3px 0px hsl(240 5% 96% / 0.5);
+  --shadow-sm:
+    0px 1px 4px 0px hsl(240 5% 96% / 0.6), 0px 1px 2px 0px hsl(240 5% 96% / 0.4);
+  --shadow:
+    0px 2px 6px 0px hsl(240 5% 96% / 0.6), 0px 1px 3px 0px hsl(240 5% 96% / 0.4);
+  --shadow-md:
+    0px 4px 10px 0px hsl(240 5% 96% / 0.7), 0px 2px 4px 0px hsl(240 5% 96% / 0.5);
+  --shadow-lg:
+    0px 8px 18px 0px hsl(240 5% 96% / 0.8), 0px 3px 6px 0px hsl(240 5% 96% / 0.6);
+  --shadow-xl:
+    0px 12px 30px 0px hsl(240 5% 96% / 0.85),
+    0px 6px 12px 0px hsl(240 5% 96% / 0.7);
+  --shadow-2xl: 0px 20px 50px 0px hsl(240 5% 96% / 0.9);
+  --tracking-normal: 0em;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -223,16 +345,22 @@
     font-variant-numeric: tabular-nums;
     line-height: 1.65;
     letter-spacing: var(--tracking-normal);
-    background-image:
-      linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
-    background-size: 40px 40px;
   }
 
+  /* Dark mode background grid pattern */
   .dark body {
     background-image:
       linear-gradient(rgba(99, 102, 241, 0.04) 1px, transparent 1px),
       linear-gradient(90deg, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Light mode background grid pattern */
+  .light body {
+    background-image:
+      linear-gradient(rgba(30, 64, 175, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30, 64, 175, 0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
 
   h1 {
@@ -554,11 +682,22 @@
     background: rgba(9, 9, 11, 0.8);
   }
 
+  .light .frosted {
+    backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.85);
+  }
+
   .grid-pattern {
     background-image:
       linear-gradient(to right, rgba(37, 157, 244, 0.05) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(37, 157, 244, 0.05) 1px, transparent 1px);
     background-size: 40px 40px;
+  }
+
+  .light .grid-pattern {
+    background-image:
+      linear-gradient(to right, rgba(30, 64, 175, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(30, 64, 175, 0.08) 1px, transparent 1px);
   }
 
   /* ── Primary glow helpers ── */
@@ -570,6 +709,16 @@
   }
   .glow-primary-lg {
     box-shadow: 0 0 20px rgba(37, 157, 244, 0.5);
+  }
+
+  .light .glow-primary-sm {
+    box-shadow: 0 0 8px rgba(30, 64, 175, 0.4);
+  }
+  .light .glow-primary {
+    box-shadow: 0 0 15px rgba(30, 64, 175, 0.5);
+  }
+  .light .glow-primary-lg {
+    box-shadow: 0 0 20px rgba(30, 64, 175, 0.6);
   }
 
   /* ── Geospatial Utilities ── */

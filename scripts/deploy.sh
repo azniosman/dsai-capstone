@@ -7,20 +7,32 @@ set -e
 
 # Configuration
 PROJECT_ROOT=$(pwd)
-DB_HEALTH_WAIT=30
+DB_HEALTH_WAIT=60
 
 echo "🚀 Starting SkillBridge deployment cycle..."
 
 # 1. Environment Validation
 echo "🔍 Validating environment..."
+
+if [ ! -f ".env" ]; then
+  echo "⚠️  Warning: .env not found at project root. Creating from template if available..."
+  if [ -f ".env.example" ]; then
+    cp .env.example .env
+    echo "✅ Auto-created .env at project root."
+  fi
+fi
+
 if [ ! -f "nestjs-backend/.env" ]; then
   echo "⚠️  Warning: nestjs-backend/.env not found. Creating from template if available..."
-  # You could add logic here to copy from .env.example
+  if [ -f "nestjs-backend/.env.example" ]; then
+    cp nestjs-backend/.env.example nestjs-backend/.env
+    echo "✅ Auto-created nestjs-backend/.env."
+  fi
 fi
 
 # 2. Infrastructure Build
 echo "🏗️  Building and starting core services..."
-docker compose up -d --build
+docker compose up -d --build --remove-orphans
 
 # 3. Database Health Check
 echo "⏳ Waiting for database to be healthy..."

@@ -1,4 +1,5 @@
-import { Entity, PrimaryKey, Property, ManyToOne, Rel } from '@mikro-orm/core';
+import { Entity, PrimaryKey, Property, ManyToOne } from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import { UserProfile } from './user-profile.entity';
 
 @Entity({ tableName: 'profile_snapshots' })

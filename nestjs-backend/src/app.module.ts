@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { ClsModule } from 'nestjs-cls';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { randomUUID } from 'crypto';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -20,10 +21,12 @@ import { SsgModule } from './ssg/ssg.module';
 import { InternalModule } from './internal/internal.module';
 import { RagModule } from './rag/rag.module';
 import { DataIntelligenceModule } from './data-intelligence/data-intelligence.module';
+import { ProductionAssuranceModule } from './production-assurance/production-assurance.module';
 import mikroOrmConfig from './mikro-orm.config';
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
     ClsModule.forRoot({
       global: true,
@@ -48,11 +51,9 @@ import mikroOrmConfig from './mikro-orm.config';
     InternalModule,
     RagModule,
     DataIntelligenceModule,
+    ProductionAssuranceModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
-  ],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

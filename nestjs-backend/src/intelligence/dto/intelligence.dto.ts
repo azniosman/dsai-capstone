@@ -4,15 +4,29 @@ import {
   IsOptional,
   IsArray,
   ValidateNested,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ChatMessage {
-  @IsString()
-  role!: string;
+  @IsIn(['system', 'user', 'assistant', 'tool'])
+  role!: 'system' | 'user' | 'assistant' | 'tool';
 
+  @IsOptional()
   @IsString()
-  content!: string;
+  content?: string | null;
+
+  @IsOptional()
+  @IsString()
+  tool_call_id?: string;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsArray()
+  tool_calls?: any[];
 }
 
 export class ChatRequestDto {

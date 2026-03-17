@@ -16,6 +16,7 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { LlmService, providerLabel } from './llm.service';
+import { ChatMessage as ProviderChatMessage } from './providers/llm-provider.interface';
 import { RagService } from '../rag/rag.service';
 import type { CareerIntelligence, CareerPlan } from './dto/copilot.dto';
 
@@ -108,7 +109,7 @@ export class CopilotService {
    */
   async copilotChat(
     profileId: number | undefined,
-    messages: Array<{ role: string; content: string }>,
+    messages: ProviderChatMessage[],
     tenantId: number,
   ): Promise<{ reply: string; engine: string }> {
     let intelligenceContext = '';
@@ -146,7 +147,7 @@ export class CopilotService {
           .find((m) => m.role === 'user');
         if (lastUserMsg) {
           const chunks = await this.ragService.query(
-            lastUserMsg.content,
+            lastUserMsg.content || '',
             tenantId,
             { topK: 4, threshold: 0.45, profileId },
           );
@@ -168,7 +169,7 @@ export class CopilotService {
       ragContext;
 
     const reply = await this.llmService.chat(
-      messages as Array<{ role: string; content: string }>,
+      messages,
       systemPrompt,
     );
 

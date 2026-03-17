@@ -1,4 +1,11 @@
-import { Entity, PrimaryKey, Property, ManyToOne, Rel, OptionalProps } from '@mikro-orm/core';
+import {
+  Entity,
+  PrimaryKey,
+  Property,
+  ManyToOne,
+  OptionalProps,
+} from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import { Dataset } from './dataset.entity';
 
 @Entity({ tableName: 'live_matrix_data' })

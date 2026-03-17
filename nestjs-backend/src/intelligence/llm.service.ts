@@ -32,6 +32,8 @@ import type {
 import { GroqProvider } from './providers/groq.provider';
 import { ClaudeProvider } from './providers/claude.provider';
 import { GeminiProvider } from './providers/gemini.provider';
+import { CareerToolsService } from './career-tools.service';
+import { LlmTool } from './llm-tool.interface';
 
 /** Re-export for consumers that imported `ChatMessage` from this module. */
 export type { ChatMessage };
@@ -69,6 +71,7 @@ export class LlmService {
     private readonly configService: ConfigService,
     private readonly logBus: LogBusService,
     private readonly cls: ClsService,
+    private readonly careerToolsService: CareerToolsService,
   ) {
     // ── Build individual providers ─────────────────────────────────────────
     const groqApiKey = this.configService.get<string>('GROQ_API_KEY');
@@ -142,7 +145,9 @@ export class LlmService {
    * has no active store.
    */
   getLastUsedProvider(): LlmProviderName | null {
-    return (this.cls.get<LlmProviderName>(CLS_PROVIDER_KEY)) ?? this.lastUsedProvider;
+    return (
+      this.cls.get<LlmProviderName>(CLS_PROVIDER_KEY) ?? this.lastUsedProvider
+    );
   }
 
   /**
@@ -161,7 +166,8 @@ export class LlmService {
     label: string,
     messages: ChatMessage[],
     systemPrompt: string,
-  ): Promise<string> {
+    tools?: LlmTool[],
+  ): Promise<ChatMessage> {
     if (this.providerChain.length === 0) {
       this.logBus.emit({
         type: 'ERROR',
@@ -182,7 +188,11 @@ export class LlmService {
         meta: { label, provider: provider.name },
       });
       try {
-        const result = await provider.generate(messages, systemPrompt);
+        const result = await provider.generate(
+          messages,
+          systemPrompt,
+          tools, // Pass tools if present
+        );
         const latencyMs = Date.now() - start;
         this.logger.log(
           `[${label}] Using provider: ${provider.name} (${latencyMs}ms)`,
@@ -193,8 +203,10 @@ export class LlmService {
           message: `[${label}] Response from ${provider.name} in ${latencyMs}ms`,
           meta: { label, provider: provider.name, latencyMs },
         });
-        // Store per-request in CLS (concurrent-safe); also update the
-        // instance field as a fallback for test environments without CLS.
+
+        // If it's a tool call and the provider is Groq/OpenAI compatible,
+        // the result object will contain tool_calls.
+
         this.cls.set(CLS_PROVIDER_KEY, provider.name);
         this.lastUsedProvider = provider.name;
         return result;
@@ -248,21 +260,83 @@ export class LlmService {
     try {
       return JSON.parse(cleaned) as T;
     } catch {
-      throw new Error(`LLM returned invalid JSON for "${label}": ${cleaned.slice(0, 200)}`);
+      throw new Error(
+        `LLM returned invalid JSON for "${label}": ${cleaned.slice(0, 200)}`,
+      );
     }
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
 
-  /**
-   * Sends a multi-turn chat conversation to the active LLM provider.
-   *
-   * @param messages - Ordered conversation history.
-   * @param systemPrompt - System-level instruction for the model.
-   * @returns The model's text reply.
-   */
-  async chat(messages: ChatMessage[], systemPrompt: string): Promise<string> {
-    return this.withFallback('chat', messages, systemPrompt);
+  async chat(
+    messages: ChatMessage[],
+    systemPrompt: string,
+    useTools = false,
+    context?: any,
+  ): Promise<string> {
+    const tools = useTools ? this.careerToolsService.getTools() : undefined;
+    const conversation = [...messages];
+    const maxIterations = 5;
+
+    for (let i = 0; i < maxIterations; i++) {
+      const response = await this.withFallback(
+        'chat',
+        conversation,
+        systemPrompt,
+        tools,
+      );
+
+      // If there are no tool calls, return the content
+      if (!response.tool_calls || response.tool_calls.length === 0) {
+        return response.content || '';
+      }
+
+      // Handle tool calls
+      this.logger.log(
+        `[chat] Model requested ${response.tool_calls.length} tool calls`,
+      );
+      conversation.push(response);
+
+      for (const toolCall of response.tool_calls) {
+        const tool = tools?.find((t) => t.name === toolCall.function.name);
+        if (!tool) {
+          this.logger.warn(`[chat] Tool ${toolCall.function.name} not found`);
+          conversation.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: toolCall.function.name,
+            content: `Error: Tool ${toolCall.function.name} not available`,
+          });
+          continue;
+        }
+
+        try {
+          const args = JSON.parse(toolCall.function.arguments);
+          const result = await tool.execute(args, context);
+          conversation.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: toolCall.function.name,
+            content: result,
+          });
+        } catch (err) {
+          this.logger.error(
+            `[chat] Tool ${tool.name} failed`,
+            (err as Error).message,
+          );
+          conversation.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: tool.name,
+            content: `Error: Tool execution failed: ${(err as Error).message}`,
+          });
+        }
+      }
+      // Loop continues to feed tool results back to the LLM
+    }
+
+    this.logger.warn(`[chat] Max iterations reached (${maxIterations})`);
+    return 'I reached my turn limit while processing your request. Please try again or ask more specific questions.';
   }
 
   /**
@@ -291,12 +365,12 @@ export class LlmService {
       `{ "extracted_skills": ["skill1", "skill2", ...], "match_score": 0.0-1.0, "gaps": ["missing_skill1", ...] }\n` +
       `match_score is the fraction of extracted_skills present in candidate's skills.`;
 
-    const text = await this.withFallback(
+    const response = await this.withFallback(
       'analyzeJD',
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    return this.parseJson(text, 'analyzeJD');
+    return this.parseJson(response.content || '', 'analyzeJD');
   }
 
   /**
@@ -322,12 +396,12 @@ export class LlmService {
       `"skills": ["skill1", "skill2", ...], "experience_years": <number> }\n` +
       `If a field is not found, use empty string for strings, empty array for skills, and 0 for experience_years.`;
 
-    const raw = await this.withFallback(
+    const response = await this.withFallback(
       'parseResume',
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    return this.parseJson(raw, 'parseResume');
+    return this.parseJson(response.content || '', 'parseResume');
   }
 
   /**
@@ -362,12 +436,12 @@ export class LlmService {
       `Profile: ${profileSummary}\n\nRoles:\n${rolesBlock}\n\n` +
       `Respond as a JSON array of strings — one rationale per role in the same order. No markdown, only JSON.`;
 
-    const raw = await this.withFallback(
+    const response = await this.withFallback(
       'generateRationale',
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    return this.parseJson(raw, 'generateRationale');
+    return this.parseJson(response.content || '', 'generateRationale');
   }
 
   /**
@@ -393,12 +467,12 @@ export class LlmService {
       `Gaps: ${gapsList}\n\n` +
       `Respond as a JSON array of strings — one tip per gap in the same order. No markdown, only JSON.`;
 
-    const raw = await this.withFallback(
+    const response = await this.withFallback(
       'skillGapAdvice',
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    return this.parseJson(raw, 'skillGapAdvice');
+    return this.parseJson(response.content || '', 'skillGapAdvice');
   }
 
   /**
@@ -426,11 +500,13 @@ export class LlmService {
       `Recommended courses: ${courseTitles.join(', ')}\n\n` +
       `Be encouraging and mention SkillsFuture support where relevant. Output only the paragraph.`;
 
-    return this.withFallback(
+    const response = await this.withFallback(
       'roadmapNarrative',
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
+
+    return response.content || '';
   }
 
   // ─── Copilot Methods ──────────────────────────────────────────────────────
@@ -471,13 +547,16 @@ export class LlmService {
       `}\n` +
       `Be precise. Base career_paths on Singapore market demand.`;
 
-    const raw = await this.withFallback(
+    const response = await this.withFallback(
       'extractCareerIntelligence',
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
 
-    const parsed = this.parseJson<Record<string, unknown>>(raw, 'extractCareerIntelligence');
+    const parsed = this.parseJson<Record<string, unknown>>(
+      response.content || '',
+      'extractCareerIntelligence',
+    );
     return {
       ...(parsed as any),
       analyzed_at: new Date().toISOString(),
@@ -534,12 +613,12 @@ export class LlmService {
       `Group milestones into phases: Foundation (months 1-3), Development (4-8), Transition (9-12). ` +
       `Be specific and actionable.`;
 
-    const raw = await this.withFallback(
+    const response = await this.withFallback(
       'generateCareerPlan',
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    return this.parseJson(raw, 'generateCareerPlan');
+    return this.parseJson(response.content || '', 'generateCareerPlan');
   }
 
   /**
@@ -568,11 +647,11 @@ export class LlmService {
       `Respond ONLY with a JSON array of 6–8 specific, actionable tips. No markdown.\n` +
       `Example: ["Quantify impact in bullet points (e.g. reduced costs by 30%)", ...]`;
 
-    const raw = await this.withFallback(
+    const response = await this.withFallback(
       'generateResumeTips',
       [{ role: 'user', content: userPrompt }],
       systemPrompt,
     );
-    return this.parseJson(raw, 'generateResumeTips');
+    return this.parseJson(response.content || '', 'generateResumeTips');
   }
 }

@@ -65,12 +65,24 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       // Act
-      const actualResult = await authService.validateUser(inputEmail, inputPass);
+      const actualResult = await authService.validateUser(
+        inputEmail,
+        inputPass,
+      );
 
       // Assert
       expect(mockUsersService.findByEmail).toHaveBeenCalledWith(inputEmail);
-      expect(bcrypt.compare).toHaveBeenCalledWith(inputPass, mockUser.hashedPassword);
-      expect(actualResult).toEqual({ id: 1, email: inputEmail, isActive: true, lockedUntil: undefined, failedLoginAttempts: 0 });
+      expect(bcrypt.compare).toHaveBeenCalledWith(
+        inputPass,
+        mockUser.hashedPassword,
+      );
+      expect(actualResult).toEqual({
+        id: 1,
+        email: inputEmail,
+        isActive: true,
+        lockedUntil: undefined,
+        failedLoginAttempts: 0,
+      });
       expect(mockEntityManager.flush).toHaveBeenCalledTimes(1);
     });
 
@@ -129,7 +141,10 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       // Act
-      const result = await authService.validateUser('test@test.com', 'wrongpassword');
+      const result = await authService.validateUser(
+        'test@test.com',
+        'wrongpassword',
+      );
 
       // Assert
       expect(result).toBeNull();
@@ -189,7 +204,10 @@ describe('AuthService', () => {
       // Refresh token signed with REFRESH_TOKEN_SECRET and typ: 'refresh'
       expect(mockJwtService.sign).toHaveBeenCalledWith(
         expect.objectContaining({ typ: 'refresh' }),
-        expect.objectContaining({ secret: expect.any(String), expiresIn: '7d' }),
+        expect.objectContaining({
+          secret: expect.any(String),
+          expiresIn: '7d',
+        }),
       );
     });
   });

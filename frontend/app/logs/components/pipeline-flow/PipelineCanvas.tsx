@@ -54,7 +54,15 @@ export default function PipelineCanvas({ entries }: PipelineCanvasProps) {
         newActive.add("response");
     });
 
-    setActiveStages(newActive);
+    // Use functional update to avoid state update in render
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveStages((prev) => {
+      // Only update if there's a change to prevent unnecessary re-renders
+      if (prev.size !== newActive.size || ![...prev].every((s) => newActive.has(s))) {
+        return newActive;
+      }
+      return prev;
+    });
   }, [entries]);
 
   const nodes: Node[] = useMemo(

@@ -3,6 +3,7 @@ import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { TenantProvider } from "@/contexts/tenant-context";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { DemoModeProvider } from "@/contexts/demo-mode";
 import ErrorBoundary from "@/components/layout/error-boundary";
 import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
@@ -37,25 +38,27 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head></head>
       <body
-        className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background-dark text-slate-100 selection:bg-primary/30 min-h-dvh`}
+        className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background text-foreground min-h-dvh`}
       >
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
-          forcedTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange
         >
-          <QueryProvider>
-            <AuthProvider>
-              <TenantProvider>
-                <ErrorBoundary>
-                  <AppShell>{children}</AppShell>
-                  <ModalProvider />
-                  <Toaster />
-                </ErrorBoundary>
-              </TenantProvider>
-            </AuthProvider>
-          </QueryProvider>
+          <DemoModeProvider>
+            <QueryProvider>
+              <AuthProvider>
+                <TenantProvider>
+                  <ErrorBoundary>
+                    <AppShell>{children}</AppShell>
+                    <ModalProvider />
+                    <Toaster />
+                  </ErrorBoundary>
+                </TenantProvider>
+              </AuthProvider>
+            </QueryProvider>
+          </DemoModeProvider>
         </ThemeProvider>
       </body>
     </html>

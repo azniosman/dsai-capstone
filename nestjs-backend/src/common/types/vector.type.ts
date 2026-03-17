@@ -6,7 +6,7 @@
  * (`[0.1,0.2,...]`) transparently for all ORM read/write paths.
  */
 
-import type { EntityProperty, Platform } from '@mikro-orm/core';
+import type { EntityProperty } from '@mikro-orm/core';
 import { Type } from '@mikro-orm/core';
 
 export class VectorType extends Type<number[], string> {
@@ -36,7 +36,7 @@ export class VectorType extends Type<number[], string> {
   }
 
   /** The actual PostgreSQL column type. `prop.length` carries the dimension. */
-  getColumnType(prop: EntityProperty, _platform: Platform): string {
+  getColumnType(prop: EntityProperty): string {
     return `vector(${prop.length ?? 384})`;
   }
 

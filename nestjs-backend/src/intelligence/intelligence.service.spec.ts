@@ -10,6 +10,7 @@ import { getRepositoryToken } from '@mikro-orm/nestjs';
 import { IntelligenceService } from './intelligence.service';
 import { LlmService } from './llm.service';
 import { RagService } from '../rag/rag.service';
+import { RagPipelineService } from '../rag/rag-pipeline.service';
 import { DomainService } from '../domain/domain.service';
 import { UserProfile } from '@app/entities/user-profile.entity';
 import { JobRole } from '@app/entities/job-role.entity';
@@ -70,6 +71,19 @@ const mockRagService = {
   formatContext: jest.fn(),
 };
 
+const mockRagPipelineService = {
+  createContext: jest.fn().mockReturnValue({
+    traceId: 'test_trace_id',
+    hasCriticalFailure: false,
+  }),
+  query: jest.fn(),
+  formatContext: jest.fn(),
+  runStep: jest.fn(async (_ctx, _step, fn) => {
+    // Execute the function and return its result
+    return await fn();
+  }),
+};
+
 const mockDomainService = {};
 
 // ── Test suite ────────────────────────────────────────────────────────────────
@@ -85,6 +99,7 @@ describe('IntelligenceService', () => {
         { provide: getRepositoryToken(JobRole), useValue: mockRoleRepo },
         { provide: LlmService, useValue: mockLlmService },
         { provide: RagService, useValue: mockRagService },
+        { provide: RagPipelineService, useValue: mockRagPipelineService },
         { provide: DomainService, useValue: mockDomainService },
       ],
     }).compile();
@@ -182,7 +197,9 @@ describe('IntelligenceService', () => {
       mockRagService.query.mockResolvedValue(mockChunks);
       jest
         .spyOn(RagService, 'formatContext')
-        .mockReturnValue('\n\nContext: Data analysts earn SGD 5,000.');
+        .mockReturnValue(
+          '\n\nRelevant context from your documents:\n[1] (similarity: 0.70)\nData analysts earn SGD 5,000.',
+        );
       mockLlmService.chat.mockResolvedValue('Great question!');
 
       await service.chat(
@@ -195,7 +212,7 @@ describe('IntelligenceService', () => {
 
       expect(mockLlmService.chat).toHaveBeenCalledWith(
         expect.any(Array),
-        expect.stringContaining('Context:'),
+        expect.stringContaining('Relevant context'),
       );
     });
 

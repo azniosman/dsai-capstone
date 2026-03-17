@@ -5,9 +5,9 @@ import {
   ManyToOne,
   OneToMany,
   Collection,
-  Rel,
   OptionalProps,
 } from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import type { CareerIntelligence } from '../intelligence/dto/copilot.dto';
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';

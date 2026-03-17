@@ -1,0 +1,1043 @@
+{
+  "metadata": {
+    "project_name": "SkillBridge",
+    "description": "Job Recommendation & Skill Gap Analysis System for SCTP learners and career-switchers in Singapore",
+    "version": "1.0.0",
+    "generated_at": "2026-03-10",
+    "tech_stack": {
+      "frontend": ["Next.js 16", "React 19", "TypeScript", "Tailwind CSS 4", "shadcn/ui", "Recharts", "Framer Motion", "Three.js"],
+      "backend": ["NestJS 10", "TypeScript", "MikroORM", "Passport.js"],
+      "ai_ml": ["Sentence Transformers (bge-small-en-v1.5)", "FAISS", "Groq SDK", "Anthropic Claude API", "Google Gemini API"],
+      "database": ["PostgreSQL 16", "pgvector"],
+      "automation": ["n8n workflows", "AWS EventBridge Scheduler", "AWS Lambda"],
+      "deployment": ["Docker Compose (local)", "AWS Lambda + Aurora Serverless v2 + S3/CloudFront (production)"]
+    }
+  },
+
+  "services": [
+    {
+      "name": "AuthService",
+      "module": "auth",
+      "file": "/nestjs-backend/src/auth/auth.service.ts",
+      "responsibilities": [
+        "User authentication and validation",
+        "Password hashing with bcrypt",
+        "JWT token generation (access + refresh)",
+        "Account lockout after 5 failed attempts"
+      ],
+      "dependencies": ["UsersService", "JwtService", "ConfigService", "EntityManager"]
+    },
+    {
+      "name": "UsersService",
+      "module": "users",
+      "file": "/nestjs-backend/src/users/users.service.ts",
+      "responsibilities": [
+        "User CRUD operations",
+        "Password change validation",
+        "User account deactivation"
+      ],
+      "dependencies": ["EntityRepository (User)"]
+    },
+    {
+      "name": "ProfileService",
+      "module": "profile",
+      "file": "/nestjs-backend/src/profile/profile.service.ts",
+      "responsibilities": [
+        "User profile creation and management",
+        "Resume parsing integration",
+        "Profile snapshot tracking"
+      ],
+      "dependencies": ["IntelligenceService", "EntityRepository (UserProfile)"]
+    },
+    {
+      "name": "IntelligenceService",
+      "module": "intelligence",
+      "file": "/nestjs-backend/src/intelligence/intelligence.service.ts",
+      "responsibilities": [
+        "Job recommendations with hybrid scoring (0.55 content + 0.25 rule + 0.20 career-switcher)",
+        "Skill gap analysis",
+        "JD matching",
+        "Mock interviews",
+        "Resume rewriting"
+      ],
+      "dependencies": ["LlmService", "RolesService", "SkillsService", "CoursesService"]
+    },
+    {
+      "name": "CopilotService",
+      "module": "intelligence",
+      "file": "/nestjs-backend/src/intelligence/copilot.service.ts",
+      "responsibilities": [
+        "Phase 1: Career intelligence extraction from resume",
+        "Phase 2: Enriched chat with RAG context injection",
+        "Phase 3: Career analysis report generation",
+        "Phase 4: 12-month career plan generation",
+        "Phase 5: Resume improvement tips"
+      ],
+      "dependencies": ["LlmService", "RagService", "EntityRepository (UserProfile)"]
+    },
+    {
+      "name": "LlmService",
+      "module": "intelligence",
+      "file": "/nestjs-backend/src/intelligence/llm.service.ts",
+      "responsibilities": [
+        "Multi-provider LLM routing (Groq -> Claude -> Gemini)",
+        "Chat completions",
+        "Structured JSON parsing (resume, career intelligence, career plans)",
+        "Job description analysis",
+        "Skill gap advice generation"
+      ],
+      "dependencies": ["GroqProvider", "ClaudeProvider", "GeminiProvider", "ConfigService", "ClsService"]
+    },
+    {
+      "name": "RagService",
+      "module": "rag",
+      "file": "/nestjs-backend/src/rag/rag.service.ts",
+      "responsibilities": [
+        "Document chunk ingestion with SHA-256 idempotency",
+        "Hybrid search: pgvector HNSW + tsvector GIN with RRF (k=60)",
+        "Feedback-weighted re-ranking (alpha * tanh(net_votes))",
+        "Cross-encoder re-ranking (optional)",
+        "Embedding backfill"
+      ],
+      "dependencies": ["EmbeddingService", "CrossEncoderService", "EntityRepository (DocumentChunk)"]
+    },
+    {
+      "name": "EmbeddingService",
+      "module": "rag",
+      "file": "/nestjs-backend/src/rag/embedding.service.ts",
+      "responsibilities": [
+        "384-dim sentence embeddings via ONNX (@xenova/transformers)",
+        "Model: bge-small-en-v1.5 (baked into Docker image)",
+        "Lazy loading with caching"
+      ],
+      "dependencies": ["@xenova/transformers"]
+    },
+    {
+      "name": "CrossEncoderService",
+      "module": "rag",
+      "file": "/nestjs-backend/src/rag/cross-encoder.service.ts",
+      "responsibilities": [
+        "Cross-encoder re-ranking for RAG results",
+        "Model: ms-marco-MiniLM-L-6-v2",
+        "Optional (RERANKER_ENABLED=true)"
+      ],
+      "dependencies": ["@xenova/transformers"]
+    },
+    {
+      "name": "SkillsService",
+      "module": "skills",
+      "file": "/nestjs-backend/src/skills/skills.service.ts",
+      "responsibilities": [
+        "Skill progress tracking",
+        "Progress timeline retrieval",
+        "Peer comparison analysis"
+      ],
+      "dependencies": ["EntityRepository (SkillProgress, UserProfile)"]
+    },
+    {
+      "name": "UpskillingService",
+      "module": "upskilling",
+      "file": "/nestjs-backend/src/upskilling/upskilling.service.ts",
+      "responsibilities": [
+        "Personalised learning roadmap generation",
+        "Course sequencing with week-based scheduling",
+        "SkillsFuture subsidy calculation",
+        "Roadmap narrative generation via LLM"
+      ],
+      "dependencies": ["LlmService", "CoursesService", "SkillsService"]
+    },
+    {
+      "name": "RolesService",
+      "module": "roles",
+      "file": "/nestjs-backend/src/roles/roles.service.ts",
+      "responsibilities": [
+        "Job role listing",
+        "Multi-role comparison",
+        "Career-switcher friendly filtering"
+      ],
+      "dependencies": ["EntityRepository (JobRole)"]
+    },
+    {
+      "name": "CoursesService",
+      "module": "courses",
+      "file": "/nestjs-backend/src/courses/courses.service.ts",
+      "responsibilities": [
+        "SCTP course listing",
+        "SkillsFuture subsidy calculation",
+        "MCES eligibility checking"
+      ],
+      "dependencies": ["EntityRepository (SCTPCourse)"]
+    },
+    {
+      "name": "DomainService",
+      "module": "domain",
+      "file": "/nestjs-backend/src/domain/domain.service.ts",
+      "responsibilities": [
+        "Singapore labour market insights aggregation",
+        "Dashboard KPI summary for authenticated users",
+        "Trending skills identification"
+      ],
+      "dependencies": ["EntityRepository (MarketInsight, UserProfile, SkillProgress)"]
+    },
+    {
+      "name": "SsgService",
+      "module": "ssg",
+      "file": "/nestjs-backend/src/ssg/ssg.service.ts",
+      "responsibilities": [
+        "SkillsFuture/WSG API integration",
+        "Three-tier fallback: PostgreSQL cache -> live SSG API -> seeded SCTP data",
+        "Course search with pagination",
+        "Job role listing by sector",
+        "Skill-overlap based course recommendations"
+      ],
+      "dependencies": ["SsgCacheService", "SsgClientService", "EntityRepository (SCTPCourse)"]
+    },
+    {
+      "name": "SsgCacheService",
+      "module": "ssg",
+      "file": "/nestjs-backend/src/ssg/ssg-cache.service.ts",
+      "responsibilities": [
+        "SSG API response caching in PostgreSQL",
+        "TTL-based cache invalidation",
+        "Bulk expired row purging"
+      ],
+      "dependencies": ["EntityRepository (SsgCache)"]
+    },
+    {
+      "name": "DataIntelligenceService",
+      "module": "data-intelligence",
+      "file": "/nestjs-backend/src/data-intelligence/data-intelligence.service.ts",
+      "responsibilities": [
+        "Live skills matrix data ingestion",
+        "Dataset versioning and diff detection",
+        "Trend signal generation"
+      ],
+      "dependencies": ["EntityManager", "DataIngestionService", "TrendEngineService", "DatasetDiffService"]
+    },
+    {
+      "name": "SystemTerminalService",
+      "module": "intelligence",
+      "file": "/nestjs-backend/src/intelligence/system-terminal.service.ts",
+      "responsibilities": [
+        "RAG-powered Q&A over SkillBridge system documentation",
+        "System document ingestion",
+        "Scope-limited to architecture/deployment topics"
+      ],
+      "dependencies": ["LlmService", "RagService", "EntityRepository (SystemDocument)"]
+    },
+    {
+      "name": "LogBusService",
+      "module": "common",
+      "file": "/nestjs-backend/src/common/log-bus.service.ts",
+      "responsibilities": [
+        "In-memory RxJS Subject buffering last 500 log entries",
+        "Observable stream for live log viewing",
+        "Structured log emission across all services"
+      ],
+      "dependencies": ["RxJS Subject"]
+    }
+  ],
+
+  "apis": {
+    "auth": [
+      {"method": "POST", "path": "/api/auth/register", "description": "User registration", "guard": "None"},
+      {"method": "POST", "path": "/api/auth/login", "description": "User login (returns JWT)", "guard": "LocalAuthGuard"},
+      {"method": "GET", "path": "/api/auth/me", "description": "Current user info", "guard": "JwtAuthGuard"},
+      {"method": "PATCH", "path": "/api/auth/me", "description": "Update user name/email", "guard": "JwtAuthGuard"},
+      {"method": "POST", "path": "/api/auth/change-password", "description": "Change password", "guard": "JwtAuthGuard"},
+      {"method": "DELETE", "path": "/api/auth/me", "description": "Deactivate account", "guard": "JwtAuthGuard"},
+      {"method": "POST", "path": "/api/auth/logout", "description": "Logout (client-side)", "guard": "None"},
+      {"method": "POST", "path": "/api/auth/refresh", "description": "Refresh JWT token", "guard": "None"}
+    ],
+    "profile": [
+      {"method": "GET", "path": "/api/profile/me", "description": "Get my profile", "guard": "JwtAuthGuard"},
+      {"method": "POST", "path": "/api/profile", "description": "Create profile", "guard": "OptionalJwtAuthGuard"},
+      {"method": "GET", "path": "/api/profile/:id", "description": "Get profile by ID", "guard": "JwtAuthGuard"},
+      {"method": "PATCH", "path": "/api/profile/:id", "description": "Update profile", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/profile/parse-resume", "description": "Parse resume text", "guard": "None"}
+    ],
+    "resume": [
+      {"method": "POST", "path": "/api/upload-resume", "description": "Upload PDF/DOCX resume", "guard": "OptionalJwtAuthGuard"}
+    ],
+    "intelligence": [
+      {"method": "POST", "path": "/api/chat", "description": "Career coach chatbot", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/recommend", "description": "Get job recommendations", "guard": "OptionalJwtAuthGuard"},
+      {"method": "GET", "path": "/api/skill-gap/:profileId", "description": "Skill gap analysis", "guard": "OptionalJwtAuthGuard"},
+      {"method": "GET", "path": "/api/upskilling/:profileId", "description": "Upskilling roadmap", "guard": "JwtAuthGuard"},
+      {"method": "POST", "path": "/api/jd-match", "description": "Match profile vs JD", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/interview", "description": "AI mock interview", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/resume-rewriter", "description": "Rewrite resume bullet", "guard": "OptionalJwtAuthGuard"}
+    ],
+    "copilot": [
+      {"method": "POST", "path": "/api/copilot/extract", "description": "Extract career intelligence", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/copilot/chat", "description": "Enriched copilot chat", "guard": "OptionalJwtAuthGuard"},
+      {"method": "GET", "path": "/api/copilot/analyze/:profileId", "description": "Career analysis report", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/copilot/career-plan", "description": "Generate career plan", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/copilot/resume-tips", "description": "Resume improvement tips", "guard": "OptionalJwtAuthGuard"}
+    ],
+    "skills": [
+      {"method": "POST", "path": "/api/progress", "description": "Record skill progress", "guard": "JwtAuthGuard"},
+      {"method": "GET", "path": "/api/progress/:profileId", "description": "Get progress dashboard", "guard": "JwtAuthGuard"},
+      {"method": "GET", "path": "/api/progress/:profileId/timeline", "description": "Progress timeline", "guard": "JwtAuthGuard"},
+      {"method": "GET", "path": "/api/progress/peer-comparison/:profileId", "description": "Peer comparison", "guard": "JwtAuthGuard"},
+      {"method": "PATCH", "path": "/api/progress/:entryId", "description": "Update progress entry", "guard": "JwtAuthGuard"},
+      {"method": "DELETE", "path": "/api/progress/:entryId", "description": "Delete progress entry", "guard": "JwtAuthGuard"}
+    ],
+    "courses": [
+      {"method": "GET", "path": "/api/courses", "description": "List SCTP courses", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/calculate-subsidy", "description": "Calculate SkillsFuture subsidy", "guard": "OptionalJwtAuthGuard"}
+    ],
+    "roles": [
+      {"method": "GET", "path": "/api/roles", "description": "List all job roles", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/compare-roles", "description": "Multi-role comparison", "guard": "OptionalJwtAuthGuard"}
+    ],
+    "domain": [
+      {"method": "GET", "path": "/api/market-insights", "description": "Singapore labour market data", "guard": "OptionalJwtAuthGuard"},
+      {"method": "GET", "path": "/api/dashboard/summary", "description": "Authenticated user dashboard KPIs", "guard": "JwtAuthGuard"}
+    ],
+    "ssg": [
+      {"method": "GET", "path": "/api/ssg/courses/search", "description": "Search SkillsFuture courses (paginated)", "guard": "OptionalJwtAuthGuard"},
+      {"method": "GET", "path": "/api/ssg/courses/:ref", "description": "Get single SSG course", "guard": "OptionalJwtAuthGuard"},
+      {"method": "GET", "path": "/api/ssg/job-roles", "description": "List WSG job roles", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/ssg/recommendations", "description": "Personalised SSG courses by skill overlap", "guard": "OptionalJwtAuthGuard"}
+    ],
+    "rag": [
+      {"method": "POST", "path": "/api/rag/query", "description": "Hybrid RAG retrieval (pgvector + tsvector RRF)", "guard": "OptionalJwtAuthGuard"},
+      {"method": "POST", "path": "/api/rag/feedback", "description": "Thumbs-up/down for re-ranking", "guard": "OptionalJwtAuthGuard"}
+    ],
+    "data-intelligence": [
+      {"method": "GET", "path": "/api/live-matrix", "description": "Live skills matrix data (paginated)", "guard": "None"},
+      {"method": "GET", "path": "/api/datasets", "description": "List dataset versions", "guard": "None"},
+      {"method": "GET", "path": "/api/dataset-diff", "description": "Dataset diff analysis", "guard": "None"},
+      {"method": "GET", "path": "/api/trends", "description": "Trend signals", "guard": "None"}
+    ],
+    "system": [
+      {"method": "POST", "path": "/api/system-chat", "description": "RAG Q&A over system docs", "guard": "None"},
+      {"method": "GET", "path": "/api/logs/recent", "description": "Last N structured log entries (JSON)", "guard": "None"},
+      {"method": "GET", "path": "/api/logs/stream", "description": "Live log stream (SSE)", "guard": "None"}
+    ],
+    "internal": [
+      {"method": "GET", "path": "/internal/health", "description": "Warmup health check (no auth)", "guard": "None"},
+      {"method": "POST", "path": "/internal/sync/ssg/courses", "description": "SSG course cache population", "guard": "InternalTokenGuard"},
+      {"method": "POST", "path": "/internal/sync/ssg/jobroles", "description": "SSG job role cache population", "guard": "InternalTokenGuard"},
+      {"method": "POST", "path": "/internal/cache/cleanup", "description": "Bulk-delete expired ssg_cache rows", "guard": "InternalTokenGuard"},
+      {"method": "POST", "path": "/internal/embeddings/backfill", "description": "ONNX embedding backfill", "guard": "InternalTokenGuard"},
+      {"method": "POST", "path": "/internal/recommendations/precompute", "description": "Pre-compute recommendations (Phase 2)", "guard": "InternalTokenGuard"},
+      {"method": "POST", "path": "/internal/recommendations/rationale-pregen", "description": "Pre-gen LLM rationale (Phase 2)", "guard": "InternalTokenGuard"},
+      {"method": "POST", "path": "/internal/analytics/aggregate", "description": "Pre-compute market insights", "guard": "InternalTokenGuard"},
+      {"method": "POST", "path": "/internal/system/ingest", "description": "Ingest system doc chunks", "guard": "None"}
+    ]
+  },
+
+  "databases": {
+    "entities": [
+      {
+        "name": "User",
+        "table": "users",
+        "file": "/nestjs-backend/src/entities/user.entity.ts",
+        "fields": ["id", "email", "hashedPassword", "name", "createdAt", "isActive", "failedLoginAttempts", "lockedUntil", "tenant", "role"],
+        "relationships": [{"type": "ManyToOne", "target": "Tenant"}]
+      },
+      {
+        "name": "UserProfile",
+        "table": "user_profiles",
+        "file": "/nestjs-backend/src/entities/user-profile.entity.ts",
+        "fields": ["id", "user", "tenant", "name", "email", "phone", "location", "education", "yearsExperience", "age", "skills", "resumeText", "isCareerSwitcher", "careerIntelligence", "createdAt"],
+        "relationships": [{"type": "ManyToOne", "target": "User"}, {"type": "ManyToOne", "target": "Tenant"}, {"type": "OneToMany", "target": "ProfileSnapshot"}]
+      },
+      {
+        "name": "Tenant",
+        "table": "tenants",
+        "file": "/nestjs-backend/src/entities/tenant.entity.ts",
+        "fields": ["id", "name"],
+        "relationships": [{"type": "OneToMany", "target": "User"}]
+      },
+      {
+        "name": "Skill",
+        "table": "skills",
+        "file": "/nestjs-backend/src/entities/skill.entity.ts",
+        "fields": ["id", "name", "category", "tenant"],
+        "relationships": [{"type": "ManyToOne", "target": "Tenant"}]
+      },
+      {
+        "name": "JobRole",
+        "table": "job_roles",
+        "file": "/nestjs-backend/src/entities/job-role.entity.ts",
+        "fields": ["id", "title", "category", "description", "requiredSkills", "preferredSkills", "minExperienceYears", "educationLevel", "careerSwitcherFriendly", "salaryRange", "tenant"],
+        "relationships": [{"type": "ManyToOne", "target": "Tenant"}]
+      },
+      {
+        "name": "SCTPCourse",
+        "table": "sctp_courses",
+        "file": "/nestjs-backend/src/entities/sctp-course.entity.ts",
+        "fields": ["id", "title", "provider", "skillsTaught", "durationWeeks", "level", "url", "certification", "skillsfutureEligible", "skillsfutureCreditAmount", "courseFee", "nettFeeAfterSubsidy", "subsidyPercent", "mcesEligible", "tenant"],
+        "relationships": [{"type": "ManyToOne", "target": "Tenant"}]
+      },
+      {
+        "name": "SkillProgress",
+        "table": "skill_progress",
+        "file": "/nestjs-backend/src/entities/skill-progress.entity.ts",
+        "fields": ["id", "profile", "skill", "level", "recordedAt", "tenant"],
+        "relationships": [{"type": "ManyToOne", "target": "UserProfile"}, {"type": "ManyToOne", "target": "Tenant"}]
+      },
+      {
+        "name": "MarketInsight",
+        "table": "market_insights",
+        "file": "/nestjs-backend/src/entities/market-insight.entity.ts",
+        "fields": ["id", "roleCategory", "trendingSkills", "avgSalarySgd", "demandLevel", "hiringVolume", "yoyGrowthPct", "forecast2026", "outlook", "updatedAt", "tenant"],
+        "relationships": [{"type": "ManyToOne", "target": "Tenant"}]
+      },
+      {
+        "name": "ProfileSnapshot",
+        "table": "profile_snapshots",
+        "file": "/nestjs-backend/src/entities/profile-snapshot.entity.ts",
+        "fields": ["id", "profile", "snapshotDate", "skillsCount", "recommendationsCount", "gapsCount", "careerReadiness"],
+        "relationships": [{"type": "ManyToOne", "target": "UserProfile"}]
+      },
+      {
+        "name": "DocumentChunk",
+        "table": "document_chunk",
+        "file": "/nestjs-backend/src/entities/document-chunk.entity.ts",
+        "fields": ["id", "content", "contentHash", "sourceType", "chunkIndex", "embedding (vector[384])", "profile", "tenant", "createdAt", "search_vector (tsvector, generated)"],
+        "relationships": [{"type": "ManyToOne", "target": "UserProfile"}, {"type": "ManyToOne", "target": "Tenant"}],
+        "indexes": ["UNIQUE(contentHash, profile)", "HNW(embedding)", "GIN(search_vector)"]
+      },
+      {
+        "name": "RagFeedback",
+        "table": "rag_feedback",
+        "file": "/nestjs-backend/src/entities/rag-feedback.entity.ts",
+        "fields": ["id", "chunk", "profile", "queryText", "isPositive", "createdAt"],
+        "relationships": [{"type": "ManyToOne", "target": "DocumentChunk"}, {"type": "ManyToOne", "target": "UserProfile"}]
+      },
+      {
+        "name": "SsgCache",
+        "table": "ssg_cache",
+        "file": "/nestjs-backend/src/entities/ssg-cache.entity.ts",
+        "fields": ["id", "cacheKey", "value (json)", "createdAt", "expiresAt"],
+        "relationships": []
+      },
+      {
+        "name": "SystemDocument",
+        "table": "system_documents",
+        "file": "/nestjs-backend/src/entities/system-document.entity.ts",
+        "fields": ["id (uuid)", "filePath", "content", "chunkHash", "embedding (vector[384])", "createdAt", "updatedAt"],
+        "relationships": []
+      },
+      {
+        "name": "Dataset",
+        "table": "datasets",
+        "file": "/nestjs-backend/src/entities/dataset.entity.ts",
+        "fields": ["id", "datasetName", "datasetVersion", "sourceUrl", "checksum", "recordCount", "downloadedAt", "processedAt", "status (enum)"],
+        "relationships": []
+      },
+      {
+        "name": "LiveMatrixData",
+        "table": "live_matrix_data",
+        "file": "/nestjs-backend/src/entities/live-matrix-data.entity.ts",
+        "fields": ["id", "dataset", "year", "sector", "jobRole", "skillCategory", "demandIndex", "supplyIndex", "growthRate", "createdAt"],
+        "relationships": [{"type": "ManyToOne", "target": "Dataset"}]
+      },
+      {
+        "name": "TrendSignal",
+        "table": "trend_signals",
+        "file": "/nestjs-backend/src/entities/trend-signal.entity.ts",
+        "fields": ["id", "sector", "jobRole", "trendType", "trendScore", "confidence", "dataset", "createdAt"],
+        "relationships": [{"type": "ManyToOne", "target": "Dataset"}]
+      },
+      {
+        "name": "DatasetDiff",
+        "table": "dataset_diffs",
+        "file": "/nestjs-backend/src/entities/dataset-diff.entity.ts",
+        "fields": ["id", "datasetNew", "datasetPrevious", "fieldName", "oldValue", "newValue", "changeType (enum)", "detectedAt"],
+        "relationships": [{"type": "ManyToOne", "target": "Dataset"}, {"type": "ManyToOne", "target": "Dataset"}]
+      }
+    ],
+    "schema_notes": [
+      "All entities have tenant isolation via Tenant relation (nullable for global data)",
+      "DocumentChunk uses pgvector for 384-dim embeddings with HNSW index",
+      "DocumentChunk has generated tsvector column for full-text search with GIN index",
+      "Hybrid search uses Reciprocal Rank Fusion (RRF k=60) to merge semantic + keyword results",
+      "RagFeedback stores thumbs-up/down signals for re-ranking",
+      "SsgCache implements TTL-based caching for SSG API responses",
+      "UserProfile.careerIntelligence stores AI-extracted career profile as JSONB"
+    ]
+  },
+
+  "ai_integrations": {
+    "llm_providers": [
+      {
+        "name": "Groq",
+        "file": "/nestjs-backend/src/intelligence/providers/groq.provider.ts",
+        "model": "llama-3.3-70b-versatile (configurable)",
+        "sdk": "groq-sdk",
+        "priority": "Primary (configurable via PRIMARY_LLM)",
+        "env_vars": ["GROQ_API_KEY", "GROQ_MODEL", "AI_TEMPERATURE", "AI_MAX_TOKENS"]
+      },
+      {
+        "name": "Anthropic Claude",
+        "file": "/nestjs-backend/src/intelligence/providers/claude.provider.ts",
+        "model": "claude-3-5-sonnet-20241022 (configurable)",
+        "sdk": "@anthropic-ai/sdk",
+        "priority": "Secondary (configurable via SECONDARY_LLM)",
+        "env_vars": ["ANTHROPIC_API_KEY", "CLAUDE_MODEL"]
+      },
+      {
+        "name": "Google Gemini",
+        "file": "/nestjs-backend/src/intelligence/providers/gemini.provider.ts",
+        "model": "gemini-2.0-flash (configurable)",
+        "sdk": "@google/generative-ai",
+        "priority": "Tertiary (configurable via TERTIARY_LLM)",
+        "env_vars": ["GEMINI_API_KEY", "GEMINI_MODEL"]
+      }
+    ],
+    "embedding_models": [
+      {
+        "name": "BGE Small EN v1.5",
+        "model_id": "Xenova/bge-small-en-v1.5",
+        "dimensions": 384,
+        "size": "~22 MB quantized",
+        "default": true,
+        "notes": "Better retrieval quality"
+      },
+      {
+        "name": "MiniLM L6 v2",
+        "model_id": "Xenova/all-MiniLM-L6-v2",
+        "dimensions": 384,
+        "size": "~23 MB quantized",
+        "default": false,
+        "notes": "Legacy option, fast"
+      },
+      {
+        "name": "MiniLM L12 v2",
+        "model_id": "Xenova/all-MiniLM-L12-v2",
+        "dimensions": 384,
+        "size": "~33 MB quantized",
+        "default": false,
+        "notes": "Higher MiniLM quality"
+      }
+    ],
+    "reranker_models": [
+      {
+        "name": "MS MARCO MiniLM L6 v2",
+        "model_id": "Xenova/ms-marco-MiniLM-L-6-v2",
+        "enabled_by_default": false,
+        "env_var": "RERANKER_ENABLED=true"
+      }
+    ],
+    "rag_pipeline": {
+      "file": "/nestjs-backend/src/rag/rag.service.ts",
+      "stages": [
+        "1. Embed query using ONNX sentence transformer",
+        "2. Single SQL CTE: pgvector HNSW (semantic) + tsvector GIN (keyword) via FULL OUTER JOIN",
+        "3. Reciprocal Rank Fusion (k=60) to merge branches",
+        "4. Feedback boost: rrfScore += 0.01 * tanh(net_votes) for authenticated users",
+        "5. Optional cross-encoder re-ranking (RERANKER_ENABLED=true)",
+        "6. Slice to topK and return"
+      ],
+      "fallback": "CTE failure degrades to semantic-only automatically"
+    },
+    "ai_features": [
+      {
+        "feature": "Career Coach Chat",
+        "endpoint": "POST /api/chat",
+        "service": "IntelligenceService.chat()",
+        "description": "Multi-turn chat with LLM provider chain"
+      },
+      {
+        "feature": "Job Recommendations",
+        "endpoint": "POST /api/recommend",
+        "service": "IntelligenceService.getRecommendations()",
+        "scoring": "0.55 content_similarity + 0.25 rule_match + 0.20 career_switcher_bonus"
+      },
+      {
+        "feature": "Skill Gap Analysis",
+        "endpoint": "GET /api/skill-gap/:profileId",
+        "service": "IntelligenceService.getSkillGap()",
+        "description": "Compare profile skills vs job role requirements"
+      },
+      {
+        "feature": "Resume Parsing",
+        "endpoint": "POST /api/upload-resume",
+        "service": "IntelligenceService.parseResume()",
+        "output": "name, email, phone, skills, experience_years"
+      },
+      {
+        "feature": "Career Intelligence Extraction",
+        "endpoint": "POST /api/copilot/extract",
+        "service": "CopilotService.extractCareerProfile()",
+        "output": "experience_level, top_skills, industries, strengths, improvement_areas, career_paths, professional_summary"
+      },
+      {
+        "feature": "Career Analysis Report",
+        "endpoint": "GET /api/copilot/analyze/:profileId",
+        "service": "CopilotService.analyzeCareer()",
+        "output": "Structured markdown report with 7 sections"
+      },
+      {
+        "feature": "Career Plan Generation",
+        "endpoint": "POST /api/copilot/career-plan",
+        "service": "CopilotService.generateCareerPlan()",
+        "output": "12-month plan with milestones, actions, Singapore programmes"
+      },
+      {
+        "feature": "Resume Tips",
+        "endpoint": "POST /api/copilot/resume-tips",
+        "service": "CopilotService.getResumeTips()",
+        "output": "6-8 actionable improvement tips"
+      },
+      {
+        "feature": "Mock Interview",
+        "endpoint": "POST /api/interview",
+        "service": "IntelligenceService.interview()",
+        "description": "AI interviewer for job title"
+      },
+      {
+        "feature": "Resume Rewriter",
+        "endpoint": "POST /api/resume-rewriter",
+        "service": "IntelligenceService.rewriteResume()",
+        "description": "Rewrite bullet point for target role"
+      },
+      {
+        "feature": "JD Match",
+        "endpoint": "POST /api/jd-match",
+        "service": "IntelligenceService.analyzeJdMatch()",
+        "description": "Score profile vs job description"
+      },
+      {
+        "feature": "System Terminal Q&A",
+        "endpoint": "POST /api/system-chat",
+        "service": "SystemTerminalService.systemChat()",
+        "description": "RAG Q&A over SkillBridge documentation"
+      }
+    ]
+  },
+
+  "background_jobs": {
+    "automation_lambdas": [
+      {
+        "name": "ssg-sync",
+        "file": "/lambdas/automation/ssg_sync.py",
+        "handler": "lambdas.automation.ssg_sync.handler",
+        "schedule": "Daily 01:00 UTC (courses), 01:30 UTC (job roles)",
+        "memory": 256,
+        "timeout": 300,
+        "description": "Sync SSG course and job role cache",
+        "endpoints_called": ["/internal/sync/ssg/courses", "/internal/sync/ssg/jobroles"]
+      },
+      {
+        "name": "cache-cleanup",
+        "file": "/lambdas/automation/cache_cleanup.py",
+        "handler": "lambdas.automation.cache_cleanup.handler",
+        "schedule": "Daily 03:00 UTC",
+        "memory": 128,
+        "timeout": 60,
+        "description": "Bulk-delete expired ssg_cache rows",
+        "endpoints_called": ["/internal/cache/cleanup"]
+      },
+      {
+        "name": "recommendation-refresh",
+        "file": "/lambdas/automation/recommendation_refresh.py",
+        "handler": "lambdas.automation.recommendation_refresh.handler",
+        "schedule": "Daily 02:00 UTC",
+        "memory": 512,
+        "timeout": 600,
+        "description": "Pre-compute recommendation scores (Phase 2 stub)",
+        "endpoints_called": ["/internal/recommendations/precompute"]
+      },
+      {
+        "name": "embedding-backfill",
+        "file": "/lambdas/automation/embedding_backfill.py",
+        "handler": "lambdas.automation.embedding_backfill.handler",
+        "schedule": "Every 6 hours",
+        "memory": 512,
+        "timeout": 600,
+        "description": "Re-embed document_chunk rows with NULL embedding",
+        "endpoints_called": ["/internal/embeddings/backfill"]
+      },
+      {
+        "name": "market-insights",
+        "file": "/lambdas/automation/market_insights.py",
+        "handler": "lambdas.automation.market_insights.handler",
+        "schedule": "Daily 04:00 UTC",
+        "memory": 256,
+        "timeout": 120,
+        "description": "Aggregate market insight metrics",
+        "endpoints_called": ["/internal/analytics/aggregate"]
+      },
+      {
+        "name": "lambda-warmup",
+        "file": "/lambdas/automation/lambda_warmup.py",
+        "handler": "lambdas.automation.lambda_warmup.handler",
+        "schedule": "Every 5 minutes (optional)",
+        "memory": 128,
+        "timeout": 30,
+        "description": "Warm-up ping to keep Lambda containers warm",
+        "endpoints_called": ["/internal/health"]
+      }
+    ],
+    "eventbridge_rules": [
+      {"name": "ssg-courses-sync", "schedule": "cron(0 1 * * ? *)", "target": "ssg-sync", "task": "sync_courses"},
+      {"name": "ssg-jobroles-sync", "schedule": "cron(30 1 * * ? *)", "target": "ssg-sync", "task": "sync_jobroles"},
+      {"name": "recommendation-refresh", "schedule": "cron(0 2 * * ? *)", "target": "recommendation-refresh"},
+      {"name": "cache-cleanup", "schedule": "cron(0 3 * * ? *)", "target": "cache-cleanup"},
+      {"name": "embedding-backfill", "schedule": "rate(6 hours)", "target": "embedding-backfill"},
+      {"name": "market-insights", "schedule": "cron(0 4 * * ? *)", "target": "market-insights"},
+      {"name": "lambda-warmup", "schedule": "rate(5 minutes)", "target": "lambda-warmup"}
+    ],
+    "n8n_workflows": [
+      {
+        "name": "resume_ingestion",
+        "file": "/n8n/workflows/resume_ingestion.json",
+        "port": 5678,
+        "description": "Automated resume processing workflow"
+      },
+      {
+        "name": "market_simulation",
+        "file": "/n8n/workflows/market_simulation.json",
+        "port": 5678,
+        "description": "Market data simulation workflow"
+      },
+      {
+        "name": "analysis_notification",
+        "file": "/n8n/workflows/analysis_notification.json",
+        "port": 5678,
+        "description": "Analysis notification workflow"
+      }
+    ],
+    "monitoring": {
+      "dlq": "aws_sqs_queue.automation_dlq (14-day retention)",
+      "alerts": "aws_sns_topic.alerts (email subscription)",
+      "metrics_namespace": "SkillBridgeAutomation",
+      "cloudwatch_alarms": 6
+    }
+  },
+
+  "security_modules": {
+    "guards": [
+      {
+        "name": "JwtAuthGuard",
+        "file": "/nestjs-backend/src/auth/guards/jwt-auth.guard.ts",
+        "strategy": "jwt",
+        "description": "Requires valid JWT; throws 401 on failure"
+      },
+      {
+        "name": "OptionalJwtAuthGuard",
+        "file": "/nestjs-backend/src/auth/guards/optional-jwt-auth.guard.ts",
+        "strategy": "jwt",
+        "description": "Silently returns null user if JWT absent/invalid; used on public endpoints"
+      },
+      {
+        "name": "LocalAuthGuard",
+        "file": "/nestjs-backend/src/auth/guards/local-auth.guard.ts",
+        "strategy": "local",
+        "description": "Validates username/password for login"
+      },
+      {
+        "name": "InternalTokenGuard",
+        "file": "/nestjs-backend/src/common/guards/internal-token.guard.ts",
+        "header": "X-Internal-Token",
+        "description": "Validates shared secret for automation Lambda-to-Lambda calls; rejects without correct token"
+      }
+    ],
+    "strategies": [
+      {
+        "name": "JwtStrategy",
+        "file": "/nestjs-backend/src/auth/strategies/jwt.strategy.ts",
+        "description": "Extracts user from JWT token"
+      },
+      {
+        "name": "LocalStrategy",
+        "file": "/nestjs-backend/src/auth/strategies/local.strategy.ts",
+        "description": "Passport local strategy for username/password"
+      }
+    ],
+    "middleware": [
+      {
+        "name": "Helmet",
+        "file": "/nestjs-backend/src/main.ts",
+        "description": "Security headers middleware"
+      },
+      {
+        "name": "ThrottlerGuard",
+        "file": "/nestjs-backend/src/main.ts",
+        "config": "60 requests per 60 seconds (global)",
+        "description": "Rate limiting"
+      },
+      {
+        "name": "ValidationPipe",
+        "file": "/nestjs-backend/src/main.ts",
+        "options": "whitelist, transform, forbidNonWhitelisted",
+        "description": "DTO validation and transformation"
+      },
+      {
+        "name": "AllExceptionsFilter",
+        "file": "/nestjs-backend/src/common/filters/all-exceptions.filter.ts",
+        "description": "Global exception handling"
+      },
+      {
+        "name": "TransformInterceptor",
+        "file": "/nestjs-backend/src/common/interceptors/transform.interceptor.ts",
+        "description": "Response transformation"
+      },
+      {
+        "name": "CORS",
+        "file": "/nestjs-backend/src/main.ts",
+        "config": "Configurable via CORS_ALLOWED_ORIGINS env var",
+        "description": "Cross-origin resource sharing"
+      }
+    ],
+    "auth_flow": {
+      "login": "POST /api/auth/login -> LocalAuthGuard -> AuthService.validateUser() -> JWT generation",
+      "token_refresh": "POST /api/auth/refresh -> Verify refresh_token -> Generate new access_token",
+      "logout": "Client-side token clearing (stateless JWT; no server-side invalidation)",
+      "password_hashing": "bcrypt with saltRounds=10",
+      "account_lockout": "5 failed attempts -> 15-minute lockout"
+    }
+  },
+
+  "external_dependencies": {
+    "aws_services": [
+      {"service": "Lambda", "usage": "Backend API (single Lambda function)", "module": "terraform/modules/lambda_backend"},
+      {"service": "API Gateway", "usage": "HTTP API for Lambda", "module": "terraform/modules/api_gateway"},
+      {"service": "Aurora Serverless v2", "usage": "PostgreSQL with pgvector", "module": "terraform/modules/database"},
+      {"service": "S3", "usage": "Frontend static hosting", "module": "terraform/modules/s3_frontend"},
+      {"service": "CloudFront", "usage": "CDN for S3 (optional HTTPS)", "module": "terraform/modules/cloudfront"},
+      {"service": "ECR", "usage": "Docker image registry", "module": "terraform/modules/ecr"},
+      {"service": "EventBridge Scheduler", "usage": "Cron triggers for automation Lambdas", "module": "terraform/modules/eventbridge"},
+      {"service": "Secrets Manager", "usage": "Store INTERNAL_AUTOMATION_TOKEN", "module": "terraform/modules/eventbridge"},
+      {"service": "SQS", "usage": "Dead Letter Queue for failed automation", "module": "terraform/modules/eventbridge"},
+      {"service": "SNS", "usage": "Alert notifications", "module": "terraform/modules/eventbridge"},
+      {"service": "CloudWatch", "usage": "Metrics and alarms", "module": "terraform/modules/eventbridge"},
+      {"service": "VPC", "usage": "Network isolation", "module": "terraform/modules/vpc"},
+      {"service": "NAT Gateway", "usage": "Outbound internet access (optional)", "module": "terraform/modules/vpc"}
+    ],
+    "third_party_apis": [
+      {
+        "name": "Groq API",
+        "purpose": "Primary LLM provider",
+        "website": "console.groq.com",
+        "env_vars": ["GROQ_API_KEY", "GROQ_MODEL"]
+      },
+      {
+        "name": "Anthropic Claude API",
+        "purpose": "Secondary LLM provider",
+        "website": "anthropic.com",
+        "env_vars": ["ANTHROPIC_API_KEY", "CLAUDE_MODEL"]
+      },
+      {
+        "name": "Google Gemini API",
+        "purpose": "Tertiary LLM provider",
+        "website": "ai.google.dev",
+        "env_vars": ["GEMINI_API_KEY", "GEMINI_MODEL"]
+      },
+      {
+        "name": "SkillsFuture/WSG API",
+        "purpose": "Singapore course and job role data",
+        "optional": true,
+        "fallback": "Seeded SCTP data",
+        "env_vars": ["SSG_CLIENT_ID", "SSG_CLIENT_SECRET", "SSG_API_BASE_URL", "SSG_TOKEN_URL"]
+      }
+    ],
+    "npm_packages": {
+      "backend": [
+        "@nestjs/common", "@nestjs/core", "@nestjs/config", "@nestjs/jwt", "@nestjs/passport", "@nestjs/throttler",
+        "@mikro-orm/core", "@mikro-orm/nestjs", "@mikro-orm/postgresql", "@mikro-orm/seeder",
+        "@xenova/transformers", "groq-sdk", "@anthropic-ai/sdk", "@google/generative-ai",
+        "passport", "passport-jwt", "passport-local", "bcrypt",
+        "class-validator", "class-transformer", "helmet", "nestjs-cls",
+        "pg", "pgvector", "rxjs",
+        "mammoth", "pdf-parse", "xlsx", "csv-parse"
+      ],
+      "frontend": [
+        "next", "react", "react-dom",
+        "@tanstack/react-query", "axios", "zustand",
+        "tailwindcss", "shadcn/ui", "radix-ui",
+        "recharts", "framer-motion", "postprocessing", "@xyflow/react",
+        "react-hook-form", "@hookform/resolvers", "zod",
+        "lucide-react", "clsx", "tailwind-merge",
+        "react-markdown", "remark-gfm", "isomorphic-dompurify",
+        "sonner", "next-themes", "geist"
+      ]
+    },
+    "data_seeds": [
+      {"file": "/data/seed/skills_taxonomy.json", "description": "~150+ skills across 9 categories"},
+      {"file": "/data/seed/job_roles.json", "description": "SGD salary benchmarks"},
+      {"file": "/data/seed/sctp_courses.json", "description": "SkillsFuture SCTP courses with subsidy fields"}
+    ]
+  },
+
+  "configuration": {
+    "env_files": [
+      "/.env.example",
+      "/nestjs-backend/.env",
+      "/frontend/.env.local"
+    ],
+    "backend_env_vars": {
+      "required": [
+        {"name": "JWT_SECRET", "description": "JWT signing key (min 32 chars)", "generate": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""},
+        {"name": "REFRESH_TOKEN_SECRET", "description": "Refresh token signing key (min 32 chars)"},
+        {"name": "INTERNAL_AUTOMATION_TOKEN", "description": "Shared secret for automation Lambdas", "generate": "python3 -c \"import secrets; print(secrets.token_hex(32))\""}
+      ],
+      "database": [
+        {"name": "DATABASE_URL", "description": "Full Postgres connection string (overrides individual vars)"},
+        {"name": "DATABASE_USER", "default": "capstone"},
+        {"name": "DATABASE_PASSWORD", "default": "changeme"},
+        {"name": "DATABASE_HOST", "default": "localhost"},
+        {"name": "DATABASE_PORT", "default": "5432"},
+        {"name": "DATABASE_NAME", "default": "capstone"}
+      ],
+      "llm_router": [
+        {"name": "PRIMARY_LLM", "default": "groq", "values": ["groq", "claude", "gemini"]},
+        {"name": "SECONDARY_LLM", "default": "claude", "values": ["groq", "claude", "gemini"]},
+        {"name": "TERTIARY_LLM", "default": "gemini", "values": ["groq", "claude", "gemini"]}
+      ],
+      "groq": [
+        {"name": "GROQ_API_KEY", "description": "Get from console.groq.com"},
+        {"name": "GROQ_MODEL", "default": "llama-3.3-70b-versatile"},
+        {"name": "AI_TEMPERATURE", "default": "0.3"},
+        {"name": "AI_MAX_TOKENS", "default": "2048"}
+      ],
+      "anthropic": [
+        {"name": "ANTHROPIC_API_KEY"},
+        {"name": "CLAUDE_MODEL", "default": "claude-3-5-sonnet-20241022"}
+      ],
+      "gemini": [
+        {"name": "GEMINI_API_KEY"},
+        {"name": "GEMINI_MODEL", "default": "gemini-2.0-flash"}
+      ],
+      "embedding": [
+        {"name": "EMBEDDING_MODEL", "default": "Xenova/bge-small-en-v1.5", "notes": "Baked into Docker image"},
+        {"name": "RERANKER_ENABLED", "default": "false (unset)", "notes": "Set true to activate cross-encoder"},
+        {"name": "RERANKER_MODEL", "default": "Xenova/ms-marco-MiniLM-L-6-v2"},
+        {"name": "RERANKER_TOP_N", "default": "20"}
+      ],
+      "ssg": [
+        {"name": "SSG_CLIENT_ID", "optional": true},
+        {"name": "SSG_CLIENT_SECRET", "optional": true},
+        {"name": "SSG_API_BASE_URL", "default": "https://uat-api.ssg-wsg.gov.sg"},
+        {"name": "SSG_TOKEN_URL", "optional": true},
+        {"name": "SSG_CACHE_TTL_SECONDS", "default": "3600"}
+      ],
+      "cors": [
+        {"name": "CORS_ALLOWED_ORIGINS", "default": "[\"http://localhost:3000\",\"http://localhost:5173\"]", "format": "JSON array or comma-separated"}
+      ],
+      "frontend": [
+        {"name": "NEXT_PUBLIC_API_URL", "default": "http://localhost:8000"}
+      ]
+    },
+    "terraform_variables": {
+      "project_name": "skillbridge",
+      "environment": "dev | prod",
+      "region": "ap-southeast-1",
+      "vpc_cidr": "10.0.0.0/16",
+      "enable_cloudfront": "boolean",
+      "enable_custom_domain": "boolean",
+      "custom_domain": "string (e.g., sklbr.co)"
+    },
+    "docker_compose": {
+      "services": ["db", "backend", "frontend", "n8n"],
+      "ports": {
+        "db": "5432",
+        "backend": "8000",
+        "frontend": "3000",
+        "n8n": "5678"
+      }
+    }
+  },
+
+  "deployment": {
+    "local": {
+      "command": "docker compose up",
+      "script": "/scripts/deploy.sh",
+      "services": ["db (:5432)", "backend (:8000)", "frontend (:3000)", "n8n (:5678)"]
+    },
+    "aws_serverless": {
+      "workflow": "/.github/workflows/deploy-serverless.yml",
+      "script": "/scripts/deploy-serverless.sh",
+      "command": "gh workflow run deploy-serverless.yml -f environment=dev -f skip_terraform=true",
+      "components": [
+        "Lambda (backend API)",
+        "API Gateway (HTTP)",
+        "Aurora Serverless v2 (PostgreSQL + pgvector)",
+        "S3 (frontend static)",
+        "CloudFront (optional CDN)",
+        "ECR (Docker images)",
+        "EventBridge Scheduler (automation)",
+        "SQS DLQ",
+        "SNS alerts",
+        "CloudWatch alarms"
+      ],
+      "notes": [
+        "Full deploy (~35 min): deletes all non-ECR resources before terraform apply",
+        "Quick deploy (~5 min): skip_terraform=true for code-only changes",
+        "API Gateway URL and S3 bucket name change on every full deploy"
+      ]
+    },
+    "lambda_considerations": [
+      "update-function-code is not instant: warm containers may serve old code for 1-2 minutes",
+      "Docker buildx must pass --provenance=false to avoid OCI manifest issues",
+      "Embedding model is baked into Docker image at build time (no internet needed at runtime)",
+      "OMP_NUM_THREADS=1 required to prevent FAISS/model loading memory issues",
+      "Internal /internal/* endpoints invoked via Lambda Invoke API only (not API Gateway)"
+    ]
+  },
+
+  "key_design_decisions": [
+    {
+      "decision": "Hybrid scoring formula",
+      "formula": "0.55 * content_similarity + 0.25 * rule_match + 0.20 * career_switcher_bonus",
+      "rationale": "Balances semantic matching with hard skill requirements and career-switcher inclusivity"
+    },
+    {
+      "decision": "Skill levels",
+      "values": "0 (missing), 0.5 (partial), 1.0 (strong)",
+      "rationale": "Simple three-tier scale for gap severity calculation"
+    },
+    {
+      "decision": "FAISS in-memory",
+      "rationale": "Rebuilt on startup; no external vector store needed for capstone scale"
+    },
+    {
+      "decision": "LLM provider chain",
+      "order": "Groq -> Claude -> Gemini -> HTTP 503",
+      "rationale": "Configurable fallback for reliability; all three providers optional"
+    },
+    {
+      "decision": "Auth is optional",
+      "rationale": "Core features work without login via OptionalJwtAuthGuard; unauthenticated requests default to Global tenant (ID 1)"
+    },
+    {
+      "decision": "Multi-tenancy",
+      "rationale": "All entities have tenant relation; Global tenant auto-created on startup"
+    },
+    {
+      "decision": "Recommendation cache",
+      "ttl": "300 seconds in-memory",
+      "rationale": "Reduce LLM calls for repeated queries"
+    },
+    {
+      "decision": "RAG retrieval pipeline",
+      "stages": "embed(query) -> single SQL CTE (HNSW + GIN via FULL OUTER JOIN -> RRF k=60) -> feedback boost -> cross-encoder (opt-in) -> slice(0, topK)",
+      "rationale": "Single DB round trip; CTE failure degrades to semantic-only automatically"
+    },
+    {
+      "decision": "RAG feedback re-ranking",
+      "formula": "rrfScore += 0.01 * tanh(net_feedback)",
+      "rationale": "tanh normalises vote counts so even 10 votes saturates at +/-0.01, proportional to RRF score range (~0.016-0.033)"
+    },
+    {
+      "decision": "Schema migrations",
+      "approach": "updateSchema() runs on every cold start (additive-only - never drops)",
+      "rationale": "Safe for Lambda cold starts; write migrations to src/migrations/ for destructive changes"
+    },
+    {
+      "decision": "Internal automation endpoints",
+      "security": "Lambda Invoke API only (no API Gateway route) + InternalTokenGuard",
+      "rationale": "Defense in depth: primary guard is no public route; token validation is secondary"
+    },
+    {
+      "decision": "Embedding model baked into Docker",
+      "rationale": "No internet access needed at Lambda runtime; works without NAT Gateway (~$32/month savings)"
+    }
+  ]
+}

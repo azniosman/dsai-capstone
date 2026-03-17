@@ -49,7 +49,9 @@ export class UploadController {
 
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   async uploadResume(
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: UploadResumeDto,
@@ -60,7 +62,9 @@ export class UploadController {
     }
 
     if (!UploadController.ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      throw new BadRequestException('Only PDF, DOCX, and TXT files are allowed');
+      throw new BadRequestException(
+        'Only PDF, DOCX, and TXT files are allowed',
+      );
     }
 
     let text: string;

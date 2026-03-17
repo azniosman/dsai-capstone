@@ -9,7 +9,10 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ChatMessage } from './intelligence.dto';
 
 // ─── Core Intelligence Types ──────────────────────────────────────────────────
 
@@ -80,7 +83,9 @@ export class CopilotChatDto {
   profile_id?: number;
 
   @IsArray()
-  messages!: Array<{ role: string; content: string }>;
+  @ValidateNested({ each: true })
+  @Type(() => ChatMessage)
+  messages!: ChatMessage[];
 
   /**
    * Optional copilot command to trigger a structured analysis instead of free chat.

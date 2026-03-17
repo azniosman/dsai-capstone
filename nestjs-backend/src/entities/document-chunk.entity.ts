@@ -17,9 +17,9 @@ import {
   OptionalProps,
   PrimaryKey,
   Property,
-  Rel,
   Unique,
 } from '@mikro-orm/core';
+import type { Rel } from '@mikro-orm/core';
 import { UserProfile } from './user-profile.entity';
 import { Tenant } from './tenant.entity';
 import { VectorType } from '@app/common/types/vector.type';

@@ -2,7 +2,7 @@ import { Controller, Get, Param, UseGuards, Request } from '@nestjs/common';
 import { UpskillingService } from './upskilling.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RoadmapDataDto } from './dto/upskilling.dto';
-import { AuthenticatedRequest } from '../types/auth-request.interface';
+import type { AuthenticatedRequest } from '../types/auth-request.interface';
 
 @UseGuards(JwtAuthGuard)
 @Controller('upskilling')

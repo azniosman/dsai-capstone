@@ -55,7 +55,9 @@ export class AuthService {
       sub: user.id.toString(),
       typ: 'access',
     };
-    const refreshSecret = this.configService.get<string>('REFRESH_TOKEN_SECRET');
+    const refreshSecret = this.configService.get<string>(
+      'REFRESH_TOKEN_SECRET',
+    );
     return {
       access_token: this.jwtService.sign(payload),
       refresh_token: this.jwtService.sign(

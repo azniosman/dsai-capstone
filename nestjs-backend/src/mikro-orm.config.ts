@@ -19,6 +19,7 @@ const config: Options = {
   entitiesTs: ['./src/**/*.entity.ts'],
   debug: process.env.NODE_ENV !== 'production',
   logger: logger.log.bind(logger),
+  allowGlobalContext: true, // Required for production assurance background monitoring
   migrations: {
     path: './dist/migrations',
     pathTs: './src/migrations',

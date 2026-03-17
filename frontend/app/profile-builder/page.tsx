@@ -2,9 +2,7 @@
 
 import { useProfileBuilderStore } from "@/store/profileBuilderStore";
 import StepUploadResume from "@/components/profile-builder/StepUploadResume";
-import StepPersonalInfo from "@/components/profile-builder/StepPersonalInfo";
-import StepSkills from "@/components/profile-builder/StepSkills";
-import StepReview from "@/components/profile-builder/StepReview";
+import StepFinalizeProfile from "@/components/profile-builder/StepFinalizeProfile";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -21,15 +19,13 @@ import {
 /* ─── Step metadata ─── */
 const STEPS = [
   { id: 1, label: "Step 1", title: "Upload Resume", icon: FileText },
-  { id: 2, label: "Step 2", title: "Personal Details", icon: User },
-  { id: 3, label: "Step 3", title: "Skills & Expertise", icon: Brain },
-  { id: 4, label: "Step 4", title: "Review & Finish", icon: Target },
+  { id: 2, label: "Step 2", title: "Verify & Finalize", icon: Target },
 ] as const;
 
 /* ─── Progress Ring ─── */
 function ProgressRing({ score }: { score: number }) {
   return (
-    <div className="absolute top-4 right-4 flex flex-col items-center z-10 hidden sm:flex">
+    <div className="absolute top-4 right-4 hidden sm:flex flex-col items-center z-10">
       <div
         className="relative w-12 h-12 rounded-full p-1 border border-border/50 bg-card/30 backdrop-blur-sm"
         style={{
@@ -63,10 +59,9 @@ export default function ProfileBuilderPage() {
   const hasIdentity = !!(store.personalInfo.name && store.personalInfo.email);
   const hasSkills = store.skills.length > 0;
   const integrityScore =
-    (hasResume ? 25 : 0) +
-    (hasIdentity ? 25 : 0) +
-    (hasSkills ? Math.min(store.skills.length * 2.5, 25) : 0) +
-    (store.step === 4 ? 25 : 0);
+    (hasResume ? 40 : 0) +
+    (hasIdentity ? 30 : 0) +
+    (hasSkills ? Math.min(store.skills.length * 5, 30) : 0);
 
   return (
     <div className="bg-background text-foreground h-full flex flex-col overflow-hidden selection:bg-primary/30">
@@ -180,22 +175,18 @@ export default function ProfileBuilderPage() {
           </div>
 
           {/* Dynamic Step Content Area */}
-          <div className="flex-1 min-h-0 flex flex-col relative">
+          <div className="h-full bg-card/10 backdrop-blur-sm p-4 relative overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.div
                 key={store.step}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="w-full h-full flex flex-col"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="h-full"
               >
-                <div className="flex-1 overflow-y-auto pr-2 pb-4">
-                  {store.step === 1 && <StepUploadResume />}
-                  {store.step === 2 && <StepPersonalInfo />}
-                  {store.step === 3 && <StepSkills />}
-                  {store.step === 4 && <StepReview />}
-                </div>
+                {store.step === 1 && <StepUploadResume />}
+                {store.step === 2 && <StepFinalizeProfile />}
               </motion.div>
             </AnimatePresence>
           </div>
