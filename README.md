@@ -106,7 +106,8 @@ graph TD
 | Data fetching | TanStack Query v5 (React Query)                |
 | Charts        | Recharts 3                                     |
 | Animation     | Framer Motion 12                               |
-| 3D            | Three.js (landing page, architecture diagram)  |
+| 3D            | Three.js (landing page)                        |
+| Diagramming   | React Flow (architecture diagram)              |
 | HTTP client   | Axios (auto JWT attach + 401 refresh)          |
 
 ### Infrastructure
@@ -259,7 +260,8 @@ All automation functions share `base_automation.py` for token retrieval (from Se
 - **Skill Gap Analysis** — Identifies missing and partial skills for a target role with severity classification (critical / high / medium)
 - **Upskilling Roadmap** — Personalised learning path with SCTP course recommendations and AI-generated motivational narrative
 - **JD Match** — Paste any job description to get skill extraction, match score, and gap analysis in seconds
-- **AI Career Coach** — Multi-turn chat with context-aware career guidance (Groq → Claude → Gemini fallback)
+- **AI Career Copilot (Dossier)** — Centralized career intelligence profile with multi-turn chat, data extraction, and quick actions (Groq → Claude → Gemini fallback)
+- **Trace Activity Timeline (Logs)** — Real-time observability dashboard for tracking RAG pipeline execution steps and system-wide telemetry
 - **Interview Preparation** — AI-generated role-specific practice questions
 - **Resume Upload & Parsing** — PDF and DOCX parsing with LLM-assisted structured extraction (name, email, skills, experience years)
 - **Resume Rewriter** — AI rewrites individual resume bullet points optimised for a target role
@@ -538,6 +540,7 @@ Create a `.env` file at the project root. See `.env.example` for a complete temp
 | `GET`  | `/api/datasets`               | List ingested datasets + versions                         |
 | `GET`  | `/api/dataset-diff`           | Diff between two dataset versions                         |
 | `GET`  | `/api/trends`                 | Aggregated trend signals                                  |
+| `POST` | `/api/system-chat`            | System-level chat for copilot and internal extraction     |
 
 ### Internal Automation Endpoints
 
@@ -621,7 +624,8 @@ dsai-capstone/
 │       ├── layout/              # AppShell, SidebarNav, PageHeader
 │       ├── modals/              # Feature modals (AppModal wrapper)
 │       ├── dashboard/           # KpiCard, chart components
-│       └── landing/             # Three.js canvases (SSR-disabled)
+│       ├── landing/             # Three.js canvases (SSR-disabled)
+│       └── operations/          # React Flow architecture diagram
 │
 ├── lambdas/automation/          # Python EventBridge automation functions
 │   ├── base_automation.py       # Shared: token fetch, Lambda Invoke, EMF metrics
