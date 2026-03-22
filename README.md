@@ -4,8 +4,8 @@
 
 SkillBridge is a serverless, full-stack AI platform that helps SCTP learners and mid-career professionals navigate Singapore's evolving tech job market. It combines a six-phase hybrid Retrieval-Augmented Generation (RAG) pipeline, multi-provider LLM orchestration, and an interactive AI career coach — all grounded in real SkillsFuture course data, SSG/WSG salary benchmarks, and live market intelligence.
 
-![Orchestrating](misc/images/SkillBridge_Orchestration.png)
-![Overview](misc/images/aioverview_new.png)
+![Orchestrating](misc/images/orchestrating.png)
+![Overview](misc/images/aioverview.png)
 
 **Enterprise Roadmap:** See [Enterprise-Technical_Roadmap.md](Enterprise-Technical_Roadmap.md)
 
@@ -82,33 +82,33 @@ graph TD
 
 ### Backend
 
-| Layer            | Technology                                                                                                            |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Runtime          | NestJS 11 + TypeScript 5.7                                                                                            |
-| ORM              | MikroORM 6 (PostgreSQL driver)                                                                                        |
-| Database         | PostgreSQL 16 + pgvector extension                                                                                    |
-| Vector index     | HNSW (`vector_cosine_ops`) + tsvector GIN                                                                             |
-| Auth             | Passport.js — JWT + Local + LinkedIn OAuth strategies                                                                 |
-| Embedding model  | `Xenova/bge-small-en-v1.5` (ONNX, 384-dim, runs in-process)                                                        |
-| Re-ranking model | `Xenova/ms-marco-MiniLM-L-6-v2` (cross-encoder, optional)                                                          |
-| LLM providers    | Groq (`llama-3.3-70b-versatile`), Anthropic Claude (`claude-sonnet-4-6`), Google Gemini (`gemini-2.0-flash`)        |
-| File parsing     | `pdf-parse` (PDF), `mammoth` (DOCX)                                                                                   |
-| Validation       | `class-validator` + `class-transformer`                                                                               |
+| Layer            | Technology                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| Runtime          | NestJS 11 + TypeScript 5.7                                                                                   |
+| ORM              | MikroORM 6 (PostgreSQL driver)                                                                               |
+| Database         | PostgreSQL 16 + pgvector extension                                                                           |
+| Vector index     | HNSW (`vector_cosine_ops`) + tsvector GIN                                                                    |
+| Auth             | Passport.js — JWT + Local + LinkedIn OAuth strategies                                                        |
+| Embedding model  | `Xenova/bge-small-en-v1.5` (ONNX, 384-dim, runs in-process)                                                  |
+| Re-ranking model | `Xenova/ms-marco-MiniLM-L-6-v2` (cross-encoder, optional)                                                    |
+| LLM providers    | Groq (`llama-3.3-70b-versatile`), Anthropic Claude (`claude-sonnet-4-6`), Google Gemini (`gemini-2.0-flash`) |
+| File parsing     | `pdf-parse` (PDF), `mammoth` (DOCX)                                                                          |
+| Validation       | `class-validator` + `class-transformer`                                                                      |
 
 ### Frontend
 
-| Layer         | Technology                                     |
-| ------------- | ---------------------------------------------- |
-| Framework     | Next.js 16 (App Router) + React 19 (PWA-enabled) |
-| Language      | TypeScript 5                                     |
+| Layer         | Technology                                              |
+| ------------- | ------------------------------------------------------- |
+| Framework     | Next.js 16 (App Router) + React 19 (PWA-enabled)        |
+| Language      | TypeScript 5                                            |
 | Styling       | Tailwind CSS 4 + shadcn/ui (New York style) + dark mode |
-| State         | Zustand 5 (modal store, profile builder store) |
-| Data fetching | TanStack Query v5 (React Query)                |
-| Charts        | Recharts 3                                     |
-| Animation     | Framer Motion 12                               |
-| 3D            | Three.js (landing page)                        |
-| Diagramming   | React Flow (architecture diagram)              |
-| HTTP client   | Axios (auto JWT attach + 401 refresh)          |
+| State         | Zustand 5 (modal store, profile builder store)          |
+| Data fetching | TanStack Query v5 (React Query)                         |
+| Charts        | Recharts 3                                              |
+| Animation     | Framer Motion 12                                        |
+| 3D            | Three.js (landing page)                                 |
+| Diagramming   | React Flow (architecture diagram)                       |
+| HTTP client   | Axios (auto JWT attach + 401 refresh)                   |
 
 ### Infrastructure
 
@@ -182,6 +182,7 @@ Overlapping chunks (1,500 chars, 200-char overlap, sentence-boundary aware)
 **Embedding model note**: `Xenova/bge-small-en-v1.5` is baked into the Docker image at build time via `scripts/download-model.cjs`. `EmbeddingService` sets `allowRemoteModels=false` in production — the model must be present in `/app/.cache/huggingface` or the service will log an error at startup.
 
 ```
+
 ```
 
 ### Hybrid Scoring (Job Recommendations)
@@ -480,67 +481,67 @@ Create a `.env` file at the project root. See `.env.example` for a complete temp
 
 ### Public Endpoints
 
-| Method | Path                          | Description                                               |
-| ------ | ----------------------------- | --------------------------------------------------------- |
-| `POST`   | `/api/auth/register`          | User registration                                         |
-| `POST`   | `/api/auth/login`             | Login → returns JWT                                       |
-| `GET`    | `/api/auth/me`                | Current user info                                         |
-| `PATCH`  | `/api/auth/me`                | Update account (email, display name)                      |
-| `DELETE` | `/api/auth/me`                | Delete account (GDPR/PDPA right to erasure)               |
-| `POST`   | `/api/auth/change-password`   | Change password                                           |
-| `POST`   | `/api/auth/logout`            | Invalidate refresh token                                  |
-| `POST`   | `/api/auth/refresh`           | Refresh JWT access token                                  |
-| `GET`    | `/api/auth/linkedin`          | Initiate LinkedIn OAuth flow                              |
-| `GET`    | `/api/auth/linkedin/callback` | LinkedIn OAuth callback                                   |
-| `GET`    | `/api/auth/linkedin/preview`  | Preview LinkedIn profile before import                    |
-| `POST`   | `/api/consent`                | Record GDPR/PDPA consent                                  |
-| `GET`    | `/api/consent`                | Get current consent status                                |
-| `GET`    | `/api/consent/history`        | Full consent audit trail                                  |
-| `GET`    | `/api/consent/export`         | Export personal data (PDPA data portability)              |
-| `DELETE` | `/api/consent/erase`          | Erase personal data (PDPA right to erasure)               |
-| `POST`   | `/api/profile`                | Create user profile                                       |
-| `POST` | `/api/upload-resume`          | Upload PDF/DOCX resume for parsing                        |
-| `POST`   | `/api/recommend`              | Get job recommendations (auth optional)                   |
-| `GET`    | `/api/skill-gap/{id}`         | Skill gap analysis for a role                             |
-| `GET`    | `/api/upskilling/{id}`        | Upskilling roadmap for a role                             |
-| `POST`   | `/api/jd-match`               | Match profile against job description (auth optional)     |
-| `POST`   | `/api/chat`                   | Career coach chat — returns `{ reply, engine }` JSON      |
-| `GET`    | `/api/market-insights`        | Singapore labor market data                               |
-| `POST`   | `/api/compare-roles`          | Multi-role comparison                                     |
-| `GET`    | `/api/roles`                  | List all job roles                                        |
-| `POST`   | `/api/progress`                              | Record skill progress                   |
-| `GET`    | `/api/progress/{id}`                         | Progress dashboard                      |
-| `GET`    | `/api/progress/{id}/timeline`                | Progress timeline                       |
-| `POST`   | `/api/progress/enroll`                       | Enroll in a course                      |
-| `PATCH`  | `/api/progress/enrollment/{id}/progress`     | Update course progress                  |
-| `PATCH`  | `/api/progress/enrollment/{id}/complete`     | Mark course complete                    |
-| `GET`    | `/api/progress/enrollments`                  | List all enrollments                    |
-| `GET`    | `/api/progress/summary`                      | Gamified progress summary               |
-| `GET`    | `/api/progress/achievements`                 | List earned achievements                |
-| `GET`    | `/api/progress/achievement-summary`          | Achievement statistics                  |
-| `GET`    | `/api/courses`                | List SCTP courses                                         |
-| `POST`   | `/api/calculate-subsidy`      | Calculate SkillsFuture subsidy                            |
-| `POST`   | `/api/rag/query`              | Hybrid RAG retrieval (pgvector HNSW + tsvector GIN + RRF) |
-| `POST`   | `/api/rag/feedback`           | Submit thumbs-up/down for a retrieved chunk               |
-| `GET`    | `/api/dashboard/summary`      | Authenticated user's dashboard KPIs                       |
-| `POST`   | `/api/resume-rewriter`        | AI-rewrite a resume bullet for a target role              |
-| `GET`    | `/api/ssg/courses/search`     | Search SkillsFuture courses (paginated)                   |
-| `GET`    | `/api/ssg/courses/:ref`       | Get a single SSG course by reference number               |
-| `GET`    | `/api/ssg/job-roles`          | List WSG SkillsFramework job roles                        |
-| `POST`   | `/api/ssg/recommendations`    | Personalised SSG courses by skill overlap                 |
-| `POST`   | `/api/interview`              | AI mock interview session                                 |
-| `POST`   | `/api/copilot/extract`        | Extract career profile from free text                     |
-| `POST`   | `/api/copilot/chat`           | Multi-turn AI career copilot chat                         |
-| `GET`    | `/api/copilot/analyze/:id`    | Full career analysis for a profile                        |
-| `POST`   | `/api/copilot/career-plan`    | Generate personalised career plan                         |
-| `POST`   | `/api/copilot/resume-tips`    | Get resume improvement tips                               |
-| `GET`  | `/api/logs/recent`            | Last N structured log entries — JSON polling              |
-| `GET`  | `/api/logs/stream`            | Live log stream (SSE)                                     |
-| `GET`  | `/api/live-matrix`            | Infocomm job matrix (live dataset)                        |
-| `GET`  | `/api/datasets`               | List ingested datasets + versions                         |
-| `GET`  | `/api/dataset-diff`           | Diff between two dataset versions                         |
-| `GET`  | `/api/trends`                 | Aggregated trend signals                                  |
-| `POST` | `/api/system-chat`            | System-level chat for copilot and internal extraction     |
+| Method   | Path                                     | Description                                               |
+| -------- | ---------------------------------------- | --------------------------------------------------------- |
+| `POST`   | `/api/auth/register`                     | User registration                                         |
+| `POST`   | `/api/auth/login`                        | Login → returns JWT                                       |
+| `GET`    | `/api/auth/me`                           | Current user info                                         |
+| `PATCH`  | `/api/auth/me`                           | Update account (email, display name)                      |
+| `DELETE` | `/api/auth/me`                           | Delete account (GDPR/PDPA right to erasure)               |
+| `POST`   | `/api/auth/change-password`              | Change password                                           |
+| `POST`   | `/api/auth/logout`                       | Invalidate refresh token                                  |
+| `POST`   | `/api/auth/refresh`                      | Refresh JWT access token                                  |
+| `GET`    | `/api/auth/linkedin`                     | Initiate LinkedIn OAuth flow                              |
+| `GET`    | `/api/auth/linkedin/callback`            | LinkedIn OAuth callback                                   |
+| `GET`    | `/api/auth/linkedin/preview`             | Preview LinkedIn profile before import                    |
+| `POST`   | `/api/consent`                           | Record GDPR/PDPA consent                                  |
+| `GET`    | `/api/consent`                           | Get current consent status                                |
+| `GET`    | `/api/consent/history`                   | Full consent audit trail                                  |
+| `GET`    | `/api/consent/export`                    | Export personal data (PDPA data portability)              |
+| `DELETE` | `/api/consent/erase`                     | Erase personal data (PDPA right to erasure)               |
+| `POST`   | `/api/profile`                           | Create user profile                                       |
+| `POST`   | `/api/upload-resume`                     | Upload PDF/DOCX resume for parsing                        |
+| `POST`   | `/api/recommend`                         | Get job recommendations (auth optional)                   |
+| `GET`    | `/api/skill-gap/{id}`                    | Skill gap analysis for a role                             |
+| `GET`    | `/api/upskilling/{id}`                   | Upskilling roadmap for a role                             |
+| `POST`   | `/api/jd-match`                          | Match profile against job description (auth optional)     |
+| `POST`   | `/api/chat`                              | Career coach chat — returns `{ reply, engine }` JSON      |
+| `GET`    | `/api/market-insights`                   | Singapore labor market data                               |
+| `POST`   | `/api/compare-roles`                     | Multi-role comparison                                     |
+| `GET`    | `/api/roles`                             | List all job roles                                        |
+| `POST`   | `/api/progress`                          | Record skill progress                                     |
+| `GET`    | `/api/progress/{id}`                     | Progress dashboard                                        |
+| `GET`    | `/api/progress/{id}/timeline`            | Progress timeline                                         |
+| `POST`   | `/api/progress/enroll`                   | Enroll in a course                                        |
+| `PATCH`  | `/api/progress/enrollment/{id}/progress` | Update course progress                                    |
+| `PATCH`  | `/api/progress/enrollment/{id}/complete` | Mark course complete                                      |
+| `GET`    | `/api/progress/enrollments`              | List all enrollments                                      |
+| `GET`    | `/api/progress/summary`                  | Gamified progress summary                                 |
+| `GET`    | `/api/progress/achievements`             | List earned achievements                                  |
+| `GET`    | `/api/progress/achievement-summary`      | Achievement statistics                                    |
+| `GET`    | `/api/courses`                           | List SCTP courses                                         |
+| `POST`   | `/api/calculate-subsidy`                 | Calculate SkillsFuture subsidy                            |
+| `POST`   | `/api/rag/query`                         | Hybrid RAG retrieval (pgvector HNSW + tsvector GIN + RRF) |
+| `POST`   | `/api/rag/feedback`                      | Submit thumbs-up/down for a retrieved chunk               |
+| `GET`    | `/api/dashboard/summary`                 | Authenticated user's dashboard KPIs                       |
+| `POST`   | `/api/resume-rewriter`                   | AI-rewrite a resume bullet for a target role              |
+| `GET`    | `/api/ssg/courses/search`                | Search SkillsFuture courses (paginated)                   |
+| `GET`    | `/api/ssg/courses/:ref`                  | Get a single SSG course by reference number               |
+| `GET`    | `/api/ssg/job-roles`                     | List WSG SkillsFramework job roles                        |
+| `POST`   | `/api/ssg/recommendations`               | Personalised SSG courses by skill overlap                 |
+| `POST`   | `/api/interview`                         | AI mock interview session                                 |
+| `POST`   | `/api/copilot/extract`                   | Extract career profile from free text                     |
+| `POST`   | `/api/copilot/chat`                      | Multi-turn AI career copilot chat                         |
+| `GET`    | `/api/copilot/analyze/:id`               | Full career analysis for a profile                        |
+| `POST`   | `/api/copilot/career-plan`               | Generate personalised career plan                         |
+| `POST`   | `/api/copilot/resume-tips`               | Get resume improvement tips                               |
+| `GET`    | `/api/logs/recent`                       | Last N structured log entries — JSON polling              |
+| `GET`    | `/api/logs/stream`                       | Live log stream (SSE)                                     |
+| `GET`    | `/api/live-matrix`                       | Infocomm job matrix (live dataset)                        |
+| `GET`    | `/api/datasets`                          | List ingested datasets + versions                         |
+| `GET`    | `/api/dataset-diff`                      | Diff between two dataset versions                         |
+| `GET`    | `/api/trends`                            | Aggregated trend signals                                  |
+| `POST`   | `/api/system-chat`                       | System-level chat for copilot and internal extraction     |
 
 ### Internal Automation Endpoints
 
